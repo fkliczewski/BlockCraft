@@ -1,0 +1,13 @@
+{
+  "name": "blockcraft-readme-media",
+  "private": true,
+  "type": "module",
+  "description": "Składa nagrania z BlockCraft.exe --showcase w GIF-y i zrzuty do README",
+  "scripts": {
+    "media": "node gifs.mjs ../../src/BlockCraft/bin/Release/net8.0/showcase ../../docs/media/gif 640 flyover && node gifs.mjs ../../src/BlockCraft/bin/Release/net8.0/showcase ../../docs/media/gif 400 title,daycycle,steve,mining,tnt,water,redstone,animals,monsters && node screens.mjs ../../src/BlockCraft/bin/Release/net8.0/showcase ../../docs/media/screens 960"
+  },
+  "dependencies": {
+    "gifenc": "1.0.3",
+    "pngjs": "7.0.0"
+  }
+}

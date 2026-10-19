@@ -5,3 +5,8 @@ obj/
 BlockCraft_Gra/
 .claude/
 *.log
+
+# mTiles workspace state
+.claude/skills/mtiles-database/
+
+node_modules/

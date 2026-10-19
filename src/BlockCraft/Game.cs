@@ -56,6 +56,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     {
         _args = args;
         _autotest = args.Contains("--autotest");
+        _showcase = args.Contains("--showcase");
         Settings = Settings.Load();
         VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
     }
@@ -77,6 +78,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         SetScreen(new TitleScreen());
         _lastTime = _clock.Elapsed.TotalSeconds;
         if (_autotest) SetupAutotest();
+        else if (_showcase) SetupShowcase();
     }
 
     // ================= ustawienia / GUI =================
@@ -320,7 +322,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnFocusedChanged(FocusedChangedEventArgs e)
     {
         base.OnFocusedChanged(e);
-        if (!e.IsFocused && World != null && _screen == null && !_autotest) SetScreen(new PauseScreen());
+        if (!e.IsFocused && World != null && _screen == null && !Scripted) SetScreen(new PauseScreen());
         UpdateCursor();
     }
 
@@ -433,6 +435,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         try { RenderFrame(pt); } catch (Exception ex) { Log.Error("Render: " + ex); }
         _frames++;
         if (_autotest) AutotestStep();
+        else if (_showcase) ShowcaseFrame();
         if (_screenshotRequested) { _screenshotRequested = false; TakeScreenshot(null); }
         SwapBuffers();
         if (!Settings.VSync && Settings.MaxFps < 1000)
@@ -522,7 +525,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private void ControlTick()
     {
         var p = Player; var kb = KeyboardState;
-        bool inGame = _screen == null && IsFocused || _autotest && _screen == null;
+        bool inGame = _screen == null && IsFocused || Scripted && _screen == null;
         if (p.Dead) { p.MoveForward = p.MoveStrafe = 0; p.IsJumping = false; return; }
         bool fwd = inGame && kb.IsKeyDown(Keys.W), back = inGame && kb.IsKeyDown(Keys.S);
         bool left = inGame && kb.IsKeyDown(Keys.A), right = inGame && kb.IsKeyDown(Keys.D);
