@@ -18,6 +18,16 @@ namespace BlockCraft.Render
             Add("door_iron_upper", IronDoor(true));
             Add("trip_wire_source", HookTex());
             Add("trip_wire", WireTex());
+            Add("hopper_outside", HopperTex(false));
+            Add("hopper_inside", HopperTex(true));
+            Add("dispenser_front_horizontal", DispenserFront(false, false));
+            Add("dispenser_front_vertical", DispenserFront(false, true));
+            Add("dropper_front_horizontal", DispenserFront(true, false));
+            Add("dropper_front_vertical", DispenserFront(true, true));
+            Add("noteblock", NoteBlockTex());
+            var tc = (uint[])Get16("chest_front").Clone();
+            for (int y = 2; y < 9; y++) for (int x = 6; x < 10; x++) if (x == 6 || x == 9 || y == 2 || y == 8) tc[y * 16 + x] = Hex(0xA01818);
+            Add("trapped_chest_front", tc);
 
             var p = New();
             var up = Get16("door_iron_upper"); var lo = Get16("door_iron_lower");
@@ -111,6 +121,44 @@ namespace BlockCraft.Render
         {
             var p = Planks(Palette(0xB08F5A, 0x9C7F4E, 0x86683E, 0xBC9862), Hex(0x6B5331), 268);
             for (int y = 4; y < 12; y++) for (int x = 4; x < 12; x++) if (x == 4 || x == 11 || y == 4 || y == 11) p[y * 16 + x] = Hex(0xBFBFBF);
+            return p;
+        }
+        private static uint[] HopperTex(bool inside)
+        {
+            var p = Noisy(inside ? 270 : 269, Palette(0x3C3C3C, 0x444444, 0x4C4C4C, 0x363636), 0.5f, 1.0f);
+            for (int i = 0; i < 16; i++)
+            {
+                uint e = inside ? Hex(0x2A2A2A) : Hex(0x5C5C5C);
+                p[i] = e; p[15 * 16 + i] = e; p[i * 16] = e; p[i * 16 + 15] = e;
+            }
+            return p;
+        }
+        private static uint[] DispenserFront(bool dropper, bool vertical)
+        {
+            var p = (uint[])Get16(vertical ? "furnace_top" : "furnace_side").Clone();
+            uint dark = Hex(0x1E1E1E), rim = Hex(0x5A5A5A);
+            if (dropper)
+            {
+                for (int y = 5; y < 11; y++) for (int x = 5; x < 11; x++) p[y * 16 + x] = (x == 5 || x == 10 || y == 5 || y == 10) ? rim : dark;
+            }
+            else
+            {
+                for (int y = 4; y < 12; y++)
+                    for (int x = 4; x < 12; x++)
+                    {
+                        double d = Math.Sqrt((x - 7.5) * (x - 7.5) + (y - 7.5) * (y - 7.5));
+                        if (d < 3.6) p[y * 16 + x] = d > 2.6 ? rim : dark;
+                    }
+                for (int x = 3; x < 13; x++) p[12 * 16 + x] = rim;
+            }
+            return p;
+        }
+        private static uint[] NoteBlockTex()
+        {
+            var p = Planks(Palette(0x6E4A2E, 0x7A5434, 0x5E3F27, 0x845C39), Hex(0x3E2716), 271);
+            for (int y = 3; y < 13; y++) for (int x = 3; x < 13; x++) if (x == 3 || x == 12 || y == 3 || y == 12) p[y * 16 + x] = Hex(0x2A1A10);
+            for (int y = 5; y < 10; y++) p[y * 16 + 9] = Hex(0x111111);
+            p[10 * 16 + 7] = p[10 * 16 + 8] = p[9 * 16 + 7] = p[9 * 16 + 8] = Hex(0x111111);
             return p;
         }
         private static uint[] WireTex()

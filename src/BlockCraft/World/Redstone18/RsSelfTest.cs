@@ -204,5 +204,113 @@ public static partial class SelfTest
         w.SetBlock(90, 4, 40, B.RedstoneOre);
         Block.Get(B.RedstoneOre).OnClicked(w, 90, 4, 40, p);
         Check(w.GetBlock(90, 4, 40) == B.RedstoneOreLit, "Ruda czerwonego kamienia świeci po dotknięciu");
+
+        TestRedstone18Containers(w, p);
+    }
+
+    private sealed class SoundLog : IWorldListener
+    {
+        public readonly List<(string name, float pitch)> Sounds = new();
+        public void OnBlockChanged(int x, int y, int z, byte id, int meta) { }
+        public void PlaySound(string name, double x, double y, double z, float volume, float pitch) => Sounds.Add((name, pitch));
+        public void SpawnParticles(ParticleKind kind, double x, double y, double z, int count, int data) { }
+        public void OnEntityAdded(Entity e) { }
+        public void OnEntityRemoved(Entity e) { }
+    }
+
+    private static void TestRedstone18Containers(World.World w, Player p)
+    {
+        // lej -> lej -> skrzynia: transfer co 8 ticków
+        int x = -40, y = 4, z = 40;
+        w.SetBlock(x, y, z, B.Hopper, Dir.East);
+        w.SetBlock(x + 1, y, z, B.Hopper, Dir.East);
+        w.SetBlock(x + 2, y, z, B.Chest);
+        var h1 = (HopperTileEntity)w.GetTileEntity(x, y, z);
+        h1.Set(0, new ItemStack(B.Cobblestone, 10));
+        Ticks(w, 40);
+        var chest = (ChestTileEntity)w.GetTileEntity(x + 2, y, z);
+        int inChest = chest.Slots.Where(s => s != null).Sum(s => s.Count);
+        Check(inChest >= 3 && inChest <= 6, "Lej -> lej -> skrzynia (1 przedmiot co 8 ticków)", inChest.ToString());
+        Ticks(w, 100);
+        inChest = chest.Slots.Where(s => s != null).Sum(s => s.Count);
+        Check(inChest == 10 && h1.Slots.All(s => s == null), "Lej przekazał wszystko", inChest.ToString());
+
+        // lej pobiera ze skrzyni nad sobą i zasysa przedmiot
+        w.SetBlock(x, y, z + 3, B.Hopper, Dir.Down);
+        w.SetBlock(x, y + 1, z + 3, B.Chest);
+        ((ChestTileEntity)w.GetTileEntity(x, y + 1, z + 3)).Set(5, new ItemStack(B.Dirt, 2));
+        w.SetBlock(x + 3, y, z + 3, B.Hopper, Dir.Down);
+        w.DropItem(x + 3.5, y + 1.2, z + 3.5, new ItemStack(B.Sand, 3), false);
+        Ticks(w, 30);
+        var h2 = (HopperTileEntity)w.GetTileEntity(x, y, z + 3);
+        var h3 = (HopperTileEntity)w.GetTileEntity(x + 3, y, z + 3);
+        Check(h2.Slots[0]?.Id == B.Dirt && h2.Slots[0].Count == 2, "Lej pobiera ze skrzyni nad sobą", h2.Slots[0]?.Count.ToString());
+        Check(h3.Slots[0]?.Id == B.Sand && h3.Slots[0].Count == 3, "Lej zasysa przedmiot", h3.Slots[0]?.Count.ToString());
+
+        // blokada sygnałem
+        w.SetBlock(x, y, z + 6, B.Hopper, Dir.East);
+        w.SetBlock(x + 1, y, z + 6, B.Hopper, Dir.East);
+        w.SetBlock(x, y, z + 7, B.RedstoneBlock);
+        ((HopperTileEntity)w.GetTileEntity(x, y, z + 6)).Set(0, new ItemStack(B.Cobblestone, 5));
+        Ticks(w, 30);
+        Check(((HopperTileEntity)w.GetTileEntity(x + 1, y, z + 6)).Slots.All(s => s == null) && (w.GetMeta(x, y, z + 6) & 8) != 0, "Lej zablokowany sygnałem");
+
+        // komparator czyta lej (1 przedmiot = 1, 5 pełnych stosów = 15)
+        w.SetBlock(x + 2, y, z + 6, B.Comparator, Dir.FaceToHoriz(Dir.East));
+        w.SetBlock(x + 3, y, z + 6, B.RedstoneWire);
+        Ticks(w, 6);
+        Check(w.GetMeta(x + 3, y, z + 6) == 0, "Komparator: pusty lej = 0", w.GetMeta(x + 3, y, z + 6).ToString());
+
+        // podajnik wkłada do skrzyni przed sobą, dozownik wystrzeliwuje strzałę i wylewa wodę
+        w.SetBlock(x, y, z + 10, B.Dropper, Dir.East);
+        w.SetBlock(x + 1, y, z + 10, B.Chest);
+        ((DispenserTileEntity)w.GetTileEntity(x, y, z + 10)).Set(4, new ItemStack(B.Stone, 2));
+        w.SetBlock(x - 1, y, z + 10, B.RedstoneBlock);
+        Ticks(w, 6);
+        var c2 = (ChestTileEntity)w.GetTileEntity(x + 1, y, z + 10);
+        Check(c2.Slots[0]?.Id == B.Stone && c2.Slots[0].Count == 1, "Podajnik wkłada jeden przedmiot do skrzyni");
+
+        w.SetBlock(x, y, z + 13, B.Dispenser, Dir.East);
+        var disp = (DispenserTileEntity)w.GetTileEntity(x, y, z + 13);
+        disp.Set(0, new ItemStack(I.Arrow, 3));
+        int arrowsBefore = w.Entities.Count(e => e is ArrowEntity);
+        w.SetBlock(x - 1, y, z + 13, B.RedstoneBlock);
+        Ticks(w, 6);
+        Check(w.Entities.Count(e => e is ArrowEntity) == arrowsBefore + 1 && disp.Slots[0].Count == 2, "Dozownik wystrzeliwuje strzałę");
+        w.SetBlock(x - 1, y, z + 13, B.Air);
+        Ticks(w, 2);
+        disp.Set(0, new ItemStack(I.WaterBucket, 1));
+        w.SetBlock(x - 1, y, z + 13, B.RedstoneBlock);
+        Ticks(w, 6);
+        Check(w.GetBlock(x + 1, y, z + 13) == B.Water && disp.Slots[0]?.Id == I.Bucket, "Dozownik wylewa wodę i zostawia wiadro");
+        w.SetBlock(x - 1, y, z + 13, B.Air);
+        Ticks(w, 2);
+        w.SetBlock(x - 1, y, z + 13, B.RedstoneBlock);
+        Ticks(w, 6);
+        Check(w.GetBlock(x + 1, y, z + 13) == B.Air && disp.Slots[0]?.Id == I.WaterBucket, "Dozownik nabiera wodę wiadrem", $"{w.GetBlock(x + 1, y, z + 13)} {disp.Slots[0]?.Id}");
+
+        // blok nut: instrument wg bloku pod spodem, ton rośnie przy PPM
+        var log = new SoundLog();
+        w.Listeners.Add(log);
+        w.SetBlock(x, y, z + 16, B.Stone);
+        w.SetBlock(x, y + 1, z + 16, B.NoteBlock);
+        Block.Get(B.NoteBlock).OnActivated(w, x, y + 1, z + 16, p);
+        w.Tick();
+        w.SetBlock(x + 2, y, z + 16, B.Wool);
+        w.SetBlock(x + 2, y + 1, z + 16, B.NoteBlock);
+        w.SetBlock(x + 1, y + 1, z + 16, B.RedstoneBlock);
+        w.Tick();
+        w.Listeners.Remove(log);
+        var notes = log.Sounds.Where(s => s.name.StartsWith("note.")).ToList();
+        // redstone obok zasila oba bloki: pierwszy gra drugi raz (bd), drugi gra harfę (wełna pod spodem) tonem 0
+        Check(notes.Count == 3 && notes[0].name == "note.bd" && notes[1].name == "note.bd" && notes[2].name == "note.harp" && Math.Abs(notes[0].pitch - MathF.Pow(2, -11 / 12f)) < 0.01f && Math.Abs(notes[2].pitch - 0.5f) < 0.01f,
+            "Blok nut: instrument, ton i zasilanie", string.Join(",", notes.Select(n => n.name + ":" + n.pitch.ToString("0.00"))));
+
+        // skrzynia-pułapka zasila przy otwarciu
+        w.SetBlock(x, y, z + 20, B.TrappedChest);
+        w.SetBlock(x + 1, y, z + 20, B.RedstoneLamp);
+        var te = (ChestTileEntity)w.GetTileEntity(x, y, z + 20);
+        var cont = new RsContainer(p.Inventory, te, "t", RsContainer.Layout.Chest27, () => { te.Viewers++; Redstone.NotifyNeighbors(w, x, y, z + 20, B.TrappedChest); }, null);
+        Check(w.GetBlock(x + 1, y, z + 20) == B.RedstoneLampOn, "Skrzynia-pułapka zasila lampę przy otwarciu");
     }
 }

@@ -158,6 +158,55 @@ public sealed partial class Game
             Player.Flying = true; Player.MotionY = 0; Player.SetPositionAndPrev(x + 9.5, y + 2.5, z + 3.5); Player.Yaw = 0; Player.Pitch = 25;
         });
         Step(3, () => Shot("rs_05_drzwi_klapy"));
+        // krok 5: leje, podajnik, dozownik, blok nut, skrzynia-pułapka i ich GUI
+        Step(5, () =>
+        {
+            int x = _rsX, y = _rsY, z = _rsZ + 14;
+            for (int dx = -2; dx <= 12; dx++)
+                for (int dz = -2; dz <= 8; dz++)
+                {
+                    World.SetBlock(x + dx, y - 1, z + dz, B.Stone);
+                    for (int dy = 0; dy < 5; dy++) World.SetBlock(x + dx, y + dy, z + dz, B.Air);
+                }
+            World.SetBlock(x, y + 1, z, B.Chest);
+            if (World.GetTileEntity(x, y + 1, z) is Items.ChestTileEntity ch) ch.Set(0, new Items.ItemStack(B.Cobblestone, 64));
+            World.SetBlock(x, y, z, B.Hopper, Dir.East);
+            World.SetBlock(x + 1, y, z, B.Hopper, Dir.East);
+            World.SetBlock(x + 2, y, z, B.Hopper, Dir.East);
+            World.SetBlock(x + 3, y, z, B.Dropper, Dir.East);
+            World.SetBlock(x + 4, y, z, B.Chest);
+            World.SetBlock(x + 1, y, z + 1, B.Comparator, Dir.FaceToHoriz(Dir.South));
+            World.SetBlock(x + 1, y, z + 2, B.RedstoneWire);
+            World.SetBlock(x + 6, y, z, B.Dispenser, Dir.East);
+            if (World.GetTileEntity(x + 6, y, z) is DispenserTileEntity d) { d.Set(0, new Items.ItemStack(Items.I.Arrow, 16)); d.Set(4, new Items.ItemStack(Items.I.WaterBucket, 1)); }
+            World.SetBlock(x + 6, y, z + 1, B.Lever, Dir.Down);
+            World.SetBlock(x + 9, y, z, B.NoteBlock);
+            World.SetBlock(x + 10, y, z, B.TrappedChest);
+            World.SetBlock(x + 11, y, z, B.RedstoneLamp);
+        });
+        Step(5, () => Block.Get(B.Lever).OnActivated(World, _rsX + 6, _rsY, _rsZ + 15, Player));
+        Step(150, () =>
+        {
+            int x = _rsX, y = _rsY, z = _rsZ + 14;
+            // leje przekazują bruk ze skrzyni do podajnika (podajnik bez impulsu trzyma przedmioty)
+            int moved = World.GetTileEntity(x + 3, y, z) is DispenserTileEntity c ? c.Slots.Where(s => s != null).Sum(s => s.Count) : -1;
+            bool cmp = World.GetMeta(x + 1, y, z + 2) > 0 || moved > 0;
+            Log.Info($"AUTOTEST RS leje={(moved > 0 ? "OK" : "FAIL")}({moved}) komparator_leja={(cmp ? "OK" : "FAIL")}");
+            Player.Flying = true; Player.MotionY = 0; Player.SetPositionAndPrev(x + 5.5, y + 7, z - 4.5); Player.Yaw = 0; Player.Pitch = 45;
+        });
+        Step(3, () => Shot("rs_06_leje"));
+        Step(3, () => Block.Get(B.Hopper).OnActivated(World, _rsX + 1, _rsY, _rsZ + 14, Player));
+        Step(5, () => Shot("rs_07_gui_leja"));
+        Step(3, () => { Player.CloseContainer(); SetScreen(null); Block.Get(B.Dispenser).OnActivated(World, _rsX + 6, _rsY, _rsZ + 14, Player); });
+        Step(5, () => Shot("rs_08_gui_dozownika"));
+        Step(3, () => { Player.CloseContainer(); SetScreen(null); Block.Get(B.TrappedChest).OnActivated(World, _rsX + 10, _rsY, _rsZ + 14, Player); });
+        Step(5, () =>
+        {
+            bool lamp = World.GetBlock(_rsX + 11, _rsY, _rsZ + 14) == B.RedstoneLampOn;
+            Log.Info($"AUTOTEST RS skrzynia_pulapka={(lamp ? "OK" : "FAIL")}");
+            Shot("rs_09_gui_skrzyni");
+        });
+        Step(3, () => { Player.CloseContainer(); SetScreen(null); });
         if (only) Step(5, () => { Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

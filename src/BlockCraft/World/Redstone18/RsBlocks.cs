@@ -32,6 +32,11 @@ namespace BlockCraft.World
             new ComparatorBlock(B.ComparatorOn, "powered_comparator", "Komparator", true).NotCreative();
             new RedstoneOreBlock(B.RedstoneOre, "redstone_ore", "Ruda czerwonego kamienia", false);
             new RedstoneOreBlock(B.RedstoneOreLit, "lit_redstone_ore", "Ruda czerwonego kamienia", true);
+            new HopperBlock(B.Hopper, "hopper", "Lej").Tab(TabRedstone);
+            new DispenserBlock(B.Dropper, "dropper", "Podajnik", true).Tab(TabRedstone);
+            new DispenserBlock(B.Dispenser, "dispenser", "Dozownik", false).Tab(TabRedstone);
+            new NoteBlockBlock(B.NoteBlock, "noteblock", "Blok nut").Tab(TabRedstone);
+            new TrappedChestBlock(B.TrappedChest, "trapped_chest", "Skrzynia-pułapka").H(2.5f).Tool_(ToolType.Axe).Snd(SoundType.Wood).Tab(TabRedstone);
         }
     }
 }
@@ -60,6 +65,10 @@ namespace BlockCraft.Entities
             Tile(10, () => new ComparatorTileEntity());
             Tile(11, () => new PistonTileEntity());
             Tile(12, () => new DaylightSensorTileEntity());
+            Tile(13, () => new HopperTileEntity());
+            Tile(14, () => new DispenserTileEntity(false));
+            Tile(15, () => new DispenserTileEntity(true));
+            Tile(16, () => new NoteTileEntity());
             Render.EntityRenderer.Custom[typeof(PistonMovingVisual)] = Render.EntityRenderer.RenderMovingBlock;
         }
     }
