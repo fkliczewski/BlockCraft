@@ -126,6 +126,8 @@ public sealed partial class PlayerController
         var held = p.Inventory.Selected;
         if (HitEntity != null)
         {
+            if (HitEntity is Mob named && held?.Id == I.NameTag && !string.IsNullOrEmpty(held.CustomName))
+            { named.CustomName = held.CustomName; named.PersistenceRequired = true; Mob.ConsumeHeld(p); p.SwingArm(); return; }
             if (HitEntity.Interact(p)) { p.SwingArm(); return; }
         }
         if (Hit.Hit)
@@ -212,6 +214,16 @@ public sealed partial class PlayerController
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
         if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
+        if (held.Id == I.SpawnEgg)
+        {
+            var egg = SpawnEggs.Find(held.Damage);
+            if (egg == null) return false;
+            if (W.GetTileEntity(x, y, z) is MobSpawnerTile spawner)
+            { spawner.SetData("EntityId", egg.Key); Consume(held); return true; }
+            double sx = x + Dir.X[face] + .5, sy = y + Dir.Y[face], sz = z + Dir.Z[face] + .5;
+            if (SpawnEggs.Spawn(W, held, sx, sy, sz) == null) return false;
+            Consume(held); return true;
+        }
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {

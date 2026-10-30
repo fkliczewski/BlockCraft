@@ -16,7 +16,7 @@ public abstract partial class Mob : LivingEntity
 
     protected Mob(World.World w) : base(w) { Nav = new Navigator(this); Health = MaxHealth; }
 
-    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = s; }
+    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = 1; }
 
     public virtual string LivingSound => null;
     public virtual int LivingSoundInterval => 80;
@@ -27,7 +27,7 @@ public abstract partial class Mob : LivingEntity
         MoveForward = 0; MoveStrafe = 0; IsJumping = false;
         if (InWater && World.Rand.NextFloat() < 0.8f) IsJumping = true;
         if (LivingSound != null && World.Rand.Next(1000) < LivingSoundTimer++) { LivingSoundTimer = -LivingSoundInterval; World.PlaySound(LivingSound, X, Y + EyeHeight, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
-        Think();
+        if (!TickMobControl()) Think();
         Nav.Tick();
         if (InWater && !Nav.HasPath) IsJumping = true;
         UpdateLook();
@@ -88,8 +88,8 @@ public abstract partial class Mob : LivingEntity
         return best;
     }
 
-    public override void Save(BinaryWriter bw) { base.Save(bw); }
-    public override void Load(BinaryReader br) { base.Load(br); }
+    public override void Save(BinaryWriter bw) { base.Save(bw); SaveMobData(bw); }
+    public override void Load(BinaryReader br) { base.Load(br); LoadMobData(br); }
 }
 
 // ===================== ZWIERZĘTA =====================
@@ -200,6 +200,7 @@ public abstract class Animal : Mob
 
     public override bool Interact(Player p)
     {
+        if (InteractLead(p)) return true;
         var held = p.Inventory.Selected;
         if (IsBreedingItem(held))
         {
@@ -219,7 +220,7 @@ public abstract class Animal : Mob
     public override void SetNetData(int d) { GrowingAge = (d & 1) != 0 ? -1 : 0; }
 }
 
-public sealed class Cow : Animal
+public class Cow : Animal
 {
     public Cow(World.World w) : base(w) { Width = 0.9f; Height = 1.4f; MaxHealth = 10; Health = 10; MoveSpeed = 0.2; }
     public override string TypeKey => "cow";
@@ -251,7 +252,7 @@ public sealed class Cow : Animal
     }
 }
 
-public sealed class Pig : Animal
+public sealed partial class Pig : Animal
 {
     public Pig(World.World w) : base(w) { Width = 0.9f; Height = 0.9f; MaxHealth = 10; Health = 10; MoveSpeed = 0.25; }
     public override string TypeKey => "pig";
@@ -260,7 +261,8 @@ public sealed class Pig : Animal
     public override string StepSoundName => "mob.pig.step";
     public override string HurtSound => "mob.pig.say";
     public override string DeathSound => "mob.pig.death";
-    public override bool IsBreedingItem(ItemStack s) => s?.Id == I.Wheat || s?.Id == I.Apple;
+    public override bool IsBreedingItem(ItemStack s) => s?.Id == I.Carrot;
+
     public override Animal CreateChild() => new Pig(World);
     protected override void DropLoot(bool byPlayer, bool burning)
     {
@@ -412,6 +414,7 @@ public abstract class Monster : Mob
         base.Tick();
         if (IsRemoteControlled || World.IsRemote) return;
         if (World.Difficulty == Difficulty.Peaceful) { Removed = true; return; }
+        if (Persistent) return;
         // despawn
         Player near = null; double nd = double.MaxValue;
         foreach (var p in World.Players) { double d = p.DistanceSq(this); if (d < nd) { nd = d; near = p; } }
@@ -457,15 +460,17 @@ public abstract class Monster : Mob
             SwingArm();
             if (Target.Attack(DamageSource.Mob(this), ScaledDamage))
             {
+                OnMeleeHit(Target);
                 if (FireTicks > 0 && World.Rand.NextFloat() < 0.3f * (int)World.Difficulty) Target.FireTicks = 60;
             }
         }
     }
+    protected virtual void OnMeleeHit(LivingEntity target) { }
 }
 
-public sealed class Zombie : Monster
+public partial class Zombie : Monster
 {
-    public Zombie(World.World w) : base(w) { MaxHealth = 20; Health = 20; MoveSpeed = 0.23; AttackDamage = 3; FollowRange = 40; }
+    public Zombie(World.World w) : base(w) { MaxHealth = 20; Health = 20; MoveSpeed = 0.23; AttackDamage = 3; FollowRange = 40; Height = 1.95f; }
     public override string TypeKey => "zombie";
     public override string DisplayName => "Zombie";
     public override string LivingSound => "mob.zombie.say";
@@ -475,7 +480,8 @@ public sealed class Zombie : Monster
     public override int ArmorValue => 2;
     protected override void Think()
     {
-        BurnsInDaylight();
+        if (TickZombie()) return;
+        if (!Baby) BurnsInDaylight();
         AcquireTarget();
         if (Target != null) MeleeChase(MoveSpeed * 1.0);
         else { LookAtPlayersRandomly(); Wander(MoveSpeed); }
@@ -489,7 +495,7 @@ public sealed class Zombie : Monster
 
 public sealed class Skeleton : Monster
 {
-    private int _shootTimer = 40; private int _strafeTime; private bool _strafeLeft;
+    private int _shootTimer = 40; private int _seenTicks;
     public Skeleton(World.World w) : base(w) { MaxHealth = 20; Health = 20; MoveSpeed = 0.25; AttackDamage = 2; HeldItem = new ItemStack(I.Bow); }
     public override string TypeKey => "skeleton";
     public override string DisplayName => "Szkielet";
@@ -507,7 +513,8 @@ public sealed class Skeleton : Monster
         LookTarget = Target; LookTime = 10;
         double d2 = DistanceSq(Target);
         bool see = CanSee(Target);
-        if (d2 > 15 * 15 || !see)
+        _seenTicks = see ? _seenTicks + 1 : 0;
+        if (d2 > 15 * 15 || _seenTicks < 20)
         {
             if (!Nav.HasPath || World.Rand.Next(20) == 0) Nav.MoveTo(Target.X, Target.Y, Target.Z, MoveSpeed);
         }
@@ -515,9 +522,6 @@ public sealed class Skeleton : Monster
         {
             Nav.Stop();
             FaceTowards(Target.X, Target.Z, 30);
-            if (++_strafeTime > 20 + World.Rand.Next(20)) { _strafeTime = 0; _strafeLeft = !_strafeLeft; }
-            MoveStrafe = _strafeLeft ? 0.5f : -0.5f; AiMoveSpeed = (float)MoveSpeed * 0.5f;
-            if (d2 < 25) { MoveForward = -0.5f; }
         }
         if (see && d2 < 15 * 15)
         {
@@ -525,7 +529,7 @@ public sealed class Skeleton : Monster
             if (--_shootTimer <= 0)
             {
                 double dist = Math.Sqrt(d2);
-                _shootTimer = (int)(20 + dist / 15 * 40);
+                _shootTimer = World.Difficulty == Difficulty.Hard ? 20 : 40;
                 var a = new ArrowEntity(World) { Shooter = this, PickupAllowed = false };
                 a.SetPositionAndPrev(X, Y + EyeHeight - 0.1, Z);
                 double dx = Target.X - X, dz = Target.Z - Z, dy = Target.Y + Target.Height / 3 - a.Y;
@@ -547,7 +551,7 @@ public sealed class Skeleton : Monster
     public override void SetNetData(int d) => Aiming = d != 0;
 }
 
-public sealed class Creeper : Monster
+public sealed partial class Creeper : Monster
 {
     public int Fuse, PrevFuse; public const int MaxFuse = 30;
     private bool _ignited;
@@ -559,6 +563,7 @@ public sealed class Creeper : Monster
     public override void PrevTick() { base.PrevTick(); PrevFuse = Fuse; }
     protected override void Think()
     {
+        if (AvoidCats()) { Fuse = Math.Max(0, Fuse - 1); return; }
         AcquireTarget();
         if (Target == null) { if (Fuse > 0) Fuse--; LookAtPlayersRandomly(); Wander(MoveSpeed); return; }
         double d2 = DistanceSq(Target);
@@ -573,7 +578,7 @@ public sealed class Creeper : Monster
             if (Fuse >= MaxFuse)
             {
                 Removed = true; Dead = true;
-                Explosion.Explode(World, this, X, Y + 0.5, Z, 3f, true);
+                Explosion.Explode(World, this, X, Y + 0.5, Z, Charged ? 6f : 3f, true);
             }
         }
         else
@@ -593,7 +598,7 @@ public sealed class Creeper : Monster
     public override void SetNetData(int d) { Fuse = d; }
 }
 
-public sealed class Spider : Monster
+public class Spider : Monster
 {
     private int _leapCooldown;
     public Spider(World.World w) : base(w) { Width = 1.4f; Height = 0.9f; MaxHealth = 16; Health = 16; MoveSpeed = 0.3; AttackDamage = 2; }
