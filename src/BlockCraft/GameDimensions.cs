@@ -15,6 +15,8 @@ public partial class Game
             Player.OpenContainer = null;
             next.ChunkManager ??= new ChunkManager(next) { Radius = Settings.RenderDistance };
             World = next; Ctrl = new PlayerController(this); Cmds = new Commands(next);
+            // renderer odrzuca stare siatki, więc chunki świata, do którego wracamy, trzeba przebudować
+            foreach (var c in next.Chunks.Values) c.MarkAllDirty();
             Renderer.SetWorld(next);
             SetScreen(null);
             next.PlaySound("portal.travel",Player.X,Player.Y,Player.Z,.8f);

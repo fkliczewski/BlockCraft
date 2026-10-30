@@ -57,10 +57,12 @@ public static class DimensionPortals
     {
         if(entity.World.IsRemote||entity.World.Dimensions==null||entity.Dead)return;
         var c=Contacts.GetOrCreateValue(entity);c.Touched=true;
-        if(c.Cooldown>0){c.Cooldown=300;return;}
+        // MC 1.8: getPortalCooldown() = 10 dla gracza, 300 dla innych encji; stanie w portalu odnawia odliczanie
+        int cooldown=entity is Player?10:300;
+        if(c.Cooldown>0){c.Cooldown=cooldown;return;}
         if(block==B.Portal && ++c.Time < (entity is Player p&&!p.Creative?80:1))
         { if(c.Time==1)entity.World.PlaySound("portal.trigger",entity.X,entity.Y,entity.Z);return; }
-        c.Time=0;c.Cooldown=300;
+        c.Time=0;c.Cooldown=cooldown;
         var set=entity.World.Dimensions;
         if(block==B.EndPortal)
         {

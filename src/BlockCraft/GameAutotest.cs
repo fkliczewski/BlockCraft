@@ -23,6 +23,7 @@ public sealed partial class Game
         _shotDir = Path.Combine(AppContext.BaseDirectory, "autotest");
         Directory.CreateDirectory(_shotDir);
         foreach (var f in Directory.GetFiles(_shotDir, "*.png")) File.Delete(f);
+        if (_args.Contains("--ne")) { SetupAutotestNetherEnd(); return; }
         int t0 = 0;
         WaitUntil(() => HasMenuWorld && Renderer.PendingMeshes < 20 || ++t0 > 600);
         Step(30, () => Shot("01_title"));
