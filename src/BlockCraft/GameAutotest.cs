@@ -23,6 +23,7 @@ public sealed partial class Game
         _shotDir = Path.Combine(AppContext.BaseDirectory, "autotest");
         Directory.CreateDirectory(_shotDir);
         foreach (var f in Directory.GetFiles(_shotDir, "*.png")) File.Delete(f);
+        if (Environment.GetEnvironmentVariable("BC_AUTOTEST") == "rs") { AutotestRedstone(true); return; }
         int t0 = 0;
         WaitUntil(() => HasMenuWorld && Renderer.PendingMeshes < 20 || ++t0 > 600);
         Step(30, () => Shot("01_title"));
@@ -176,6 +177,7 @@ public sealed partial class Game
         Step(30, () => Shot("22_cave_torch"));
         Step(5, () => { World.DayTime = 6000; Player.SetPositionAndPrev(Player.X, World.GetHeight(MathUtil.FloorToInt(Player.X), MathUtil.FloorToInt(Player.Z)) + 1, Player.Z); _autoInput = (true, false, false, false); });
         Step(60, () => { _autoInput = null; Shot("23_after_walk"); Log.Info($"AUTOTEST walk: pos {Player.X:F1} {Player.Y:F1} {Player.Z:F1} hp {Player.Health} food {Player.FoodLevel}"); });
+        AutotestRedstone(false);
         Step(5, () => QuitToTitle());
         Step(30, () => Shot("24_title_again"));
         Step(5, () => { Log.Info("AUTOTEST DONE"); Close(); });

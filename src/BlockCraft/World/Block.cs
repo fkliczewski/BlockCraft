@@ -136,6 +136,10 @@ public class Block
     public virtual void OnRandomTick(World w, int x, int y, int z, Rng r) { }
     public virtual void OnEntityCollide(World w, int x, int y, int z, Entity e) { }
     public virtual void OnEntityWalk(World w, int x, int y, int z, Entity e) { }
+    /// <summary>MC onLanded: encja wylądowała na bloku z prędkością motionY (MotionY jest już wyzerowane; szlam odbija).</summary>
+    public virtual void OnEntityLanded(World w, Entity e, double motionY) { }
+    /// <summary>MC onFallenUpon: mnożnik obrażeń od upadku na ten blok (szlam: 0, gdy encja nie skrada się).</summary>
+    public virtual float FallDamageMultiplier(World w, Entity e) => 1f;
     public virtual void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p) { }
 
     public virtual void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)

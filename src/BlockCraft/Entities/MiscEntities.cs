@@ -248,6 +248,7 @@ public sealed class ArrowEntity : Entity
             InGround = true; Shake = 7; Critical = false;
             World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
             if (_gid == B.Tnt && FireTicks > 0) TntBlock.Ignite(World, _gx, _gy, _gz, 80);
+            if (!World.IsRemote) Block.ById[_gid].OnEntityCollide(World, _gx, _gy, _gz, this); // MC 1.8: strzała trafia blok (drewniany przycisk, płyta)
             return;
         }
         X = ex; Y = ey; Z = ez;

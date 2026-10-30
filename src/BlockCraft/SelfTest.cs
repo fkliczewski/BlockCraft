@@ -7,7 +7,7 @@ using BlockCraft.World;
 namespace BlockCraft;
 
 /// <summary>Testy logiki gry uruchamiane bez okna: BlockCraft.exe --selftest</summary>
-public static class SelfTest
+public static partial class SelfTest
 {
     private static int _pass, _fail;
     private static readonly List<string> Failures = new();
@@ -50,6 +50,7 @@ public static class SelfTest
         try { TestPhysics(); } catch (Exception e) { Check(false, "Physics", e.ToString()); }
         try { TestFluids(); } catch (Exception e) { Check(false, "Fluids", e.ToString()); }
         try { TestRedstone(); } catch (Exception e) { Check(false, "Redstone", e.ToString()); }
+        try { TestRedstone18(); } catch (Exception e) { Check(false, "Redstone 1.8", e.ToString()); }
         try { TestMobs(); } catch (Exception e) { Check(false, "Mobs", e.ToString()); }
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
@@ -365,13 +366,18 @@ public static class SelfTest
         w.SetBlock(0, 4, 20, B.Piston, Dir.East);
         w.SetBlock(1, 4, 20, B.Cobblestone);
         w.SetBlock(-1, 4, 20, B.RedstoneBlock);
+        Ticks(w, 4); // MC 1.8: zdarzenie bloku + 2 ticki ruchu
         Check(w.GetBlock(2, 4, 20) == B.Cobblestone && w.GetBlock(1, 4, 20) == B.PistonHead, "Tłok pcha blok", $"{w.GetBlock(1, 4, 20)} {w.GetBlock(2, 4, 20)}");
         w.SetBlock(-1, 4, 20, B.Air);
+        Ticks(w, 4);
         Check(w.GetBlock(1, 4, 20) == B.Air && w.GetBlock(0, 4, 20) == B.Piston, "Tłok się chowa", $"{w.GetBlock(0, 4, 20)} {w.GetBlock(1, 4, 20)}");
         w.SetBlock(0, 4, 24, B.StickyPiston, Dir.East);
         w.SetBlock(1, 4, 24, B.Sand);
         w.SetBlock(-1, 4, 24, B.RedstoneBlock);
+        Ticks(w, 4);
+        Check(w.GetBlock(2, 4, 24) == B.Sand, "Lepki tłok pcha blok", w.GetBlock(2, 4, 24).ToString());
         w.SetBlock(-1, 4, 24, B.Air);
+        Ticks(w, 4);
         Check(w.GetBlock(1, 4, 24) == B.Sand, "Lepki tłok ciągnie blok", w.GetBlock(1, 4, 24).ToString());
         // repeater
         w.SetBlock(0, 4, 30, B.Lever, Dir.Down);

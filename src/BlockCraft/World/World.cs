@@ -205,7 +205,7 @@ public sealed partial class World : IBlockAccess
         if (IsRemote || (uint)y >= Chunk.Height) return;
         int id = GetBlock(x, y, z);
         if (id == 0) return;
-        if (_notifyDepth > 64) { ScheduleTick(x, y, z, (byte)id, 1, true); return; }
+        if (_notifyDepth > 256) { ScheduleTick(x, y, z, (byte)id, 1, true); return; }
         _notifyDepth++;
         try { Block.ById[id].OnNeighborChanged(this, x, y, z, sourceId); }
         finally { _notifyDepth--; }
@@ -279,35 +279,57 @@ public sealed partial class World : IBlockAccess
     }
 
     // ---------- zaplanowane ticki ----------
-    private readonly PriorityQueue<(int x, int y, int z, byte id), long> _ticks = new();
+    // Kolejność jak NextTickListEntry w MC 1.8: czas, priorytet, kolejność dodania. Bloki "powiązane" (np. przekaźnik
+    // wł./wył., pochodnia wł./wył.) dzielą wpis (TickGroup), a tick trafia do bloku, który jest tam w chwili wykonania.
+    private readonly PriorityQueue<(int x, int y, int z, byte id), (long due, int prio, long seq)> _ticks = new();
     private readonly HashSet<(int, int, int, byte)> _tickSet = new();
+    private readonly List<(int x, int y, int z, byte id)> _ticksNow = new();
+    private readonly HashSet<(int, int, int, byte)> _ticksNowSet = new();
+    private long _tickSeq;
+    /// <summary>Grupa bloku dla ticków (0 = sam blok). RS ustawia np. TickGroup[RepeaterOn] = Repeater.</summary>
+    public static readonly byte[] TickGroup = new byte[256];
+    public static byte TickKey(byte id) => TickGroup[id] != 0 ? TickGroup[id] : id;
 
-    public void ScheduleTick(int x, int y, int z, byte id, int delay, bool force = false)
+    public void ScheduleTick(int x, int y, int z, byte id, int delay, bool force = false) => ScheduleTickPriority(x, y, z, id, delay, 0, force);
+
+    public void ScheduleTickPriority(int x, int y, int z, byte id, int delay, int priority, bool force = false)
     {
         if (IsRemote) return;
-        var key = (x, y, z, id);
+        var key = (x, y, z, TickKey(id));
         if (!force && _tickSet.Contains(key)) return;
         _tickSet.Add(key);
-        _ticks.Enqueue((x, y, z, id), TotalTime + Math.Max(1, delay));
+        _ticks.Enqueue((x, y, z, id), (TotalTime + Math.Max(1, delay), priority, _tickSeq++));
     }
+
+    /// <summary>MC 1.8 isBlockTickPending: czy ten blok ma jeszcze tick do wykonania w bieżącej paczce.</summary>
+    public bool IsBlockTickPending(int x, int y, int z, byte id) => _ticksNowSet.Contains((x, y, z, TickKey(id)));
 
     private void ProcessScheduledTicks()
     {
-        int n = 0;
-        while (n < 2000 && _ticks.TryPeek(out var t, out long due) && due <= TotalTime)
+        _ticksNow.Clear(); _ticksNowSet.Clear();
+        while (_ticksNow.Count < 2000 && _ticks.TryPeek(out var t, out var due) && due.due <= TotalTime)
         {
-            _ticks.Dequeue(); n++;
-            _tickSet.Remove(t);
-            if (!IsLoadedAt(t.x, t.z)) continue;
-            if (GetBlock(t.x, t.y, t.z) != t.id) continue;
-            Block.ById[t.id].OnScheduledTick(this, t.x, t.y, t.z, Rand);
+            _ticks.Dequeue();
+            var key = (t.x, t.y, t.z, TickKey(t.id));
+            _tickSet.Remove(key);
+            _ticksNow.Add(t); _ticksNowSet.Add(key);
         }
+        for (int i = 0; i < _ticksNow.Count; i++)
+        {
+            var t = _ticksNow[i];
+            _ticksNowSet.Remove((t.x, t.y, t.z, TickKey(t.id)));
+            if (!IsLoadedAt(t.x, t.z)) continue;
+            byte cur = GetBlock(t.x, t.y, t.z);
+            if (cur == 0 || TickKey(cur) != TickKey(t.id)) continue;
+            Block.ById[cur].OnScheduledTick(this, t.x, t.y, t.z, Rand);
+        }
+        _ticksNow.Clear(); _ticksNowSet.Clear();
     }
 
     public List<(int x, int y, int z, byte id, long due)> PendingTicksSnapshot()
     {
         var l = new List<(int, int, int, byte, long)>();
-        foreach (var (e, p) in _ticks.UnorderedItems) l.Add((e.x, e.y, e.z, e.id, p - TotalTime));
+        foreach (var (e, p) in _ticks.UnorderedItems) l.Add((e.x, e.y, e.z, e.id, p.due - TotalTime));
         return l;
     }
 
@@ -439,6 +461,7 @@ public sealed partial class World : IBlockAccess
         {
             ProcessScheduledTicks();
             RandomTicks();
+            ProcessBlockEvents();
             TickTileEntities();
             if (Rules.DoMobSpawning) Spawner.Tick();
             CheckSleeping();
@@ -508,7 +531,7 @@ public sealed partial class World : IBlockAccess
     private void TickTileEntities()
     {
         _teTmp.Clear();
-        foreach (var c in Chunks.Values) foreach (var te in c.TileEntities.Values) if (te is FurnaceTileEntity) _teTmp.Add(te);
+        foreach (var c in Chunks.Values) foreach (var te in c.TileEntities.Values) _teTmp.Add(te);
         foreach (var te in _teTmp) te.Tick(this);
     }
 
