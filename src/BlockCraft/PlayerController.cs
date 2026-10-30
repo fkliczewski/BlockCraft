@@ -227,7 +227,10 @@ public sealed partial class PlayerController
         if (it.Id == I.FlintAndSteel)
         {
             if (id == B.Tnt) { TntBlock.Ignite(W, x, y, z, 80); p.DamageHeld(1); return true; }
-            return false;
+            int fx = x + Dir.X[face], fy = y + Dir.Y[face], fz = z + Dir.Z[face];
+            if (W.GetBlock(fx, fy, fz) != B.Air) return false;
+            W.PlaySound("fire.ignite", fx + 0.5, fy + 0.5, fz + 0.5, 1f, W.Rand.NextFloat() * 0.4f + 0.8f);
+            W.SetBlock(fx, fy, fz, B.Fire, 0); p.DamageHeld(1); return true;
         }
         if (it.IsFood || it.Id == I.MilkBucket || it.Id == I.Bow || it.Id == I.EnderPearl || it.Id == I.Egg || it.ArmorSlot >= 0) return UseInAir(held);
         if (!it.IsBlock) return false;

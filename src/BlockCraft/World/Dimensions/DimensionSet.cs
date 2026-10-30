@@ -105,7 +105,7 @@ public sealed class DimensionSet : IDisposable
     }
     public void Tick()
     {
-        foreach (var w in _worlds.Values.ToArray()) { CopyRules(w); w.Tick(); }
+        foreach (var w in _worlds.Values.ToArray()) { CopyRules(w); w.Tick(); if (!w.IsRemote) DimensionPortals.TickContacts(w); }
         FlushTransfers();
     }
     public void SaveAll() { foreach (var w in _worlds.Values) w.ChunkManager?.SaveAll(); }
