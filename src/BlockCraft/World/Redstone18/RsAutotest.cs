@@ -207,6 +207,7 @@ public sealed partial class Game
             Shot("rs_09_gui_skrzyni");
         });
         Step(3, () => { Player.CloseContainer(); SetScreen(null); });
+        RsTransportAutotest();
         if (only) Step(5, () => { Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

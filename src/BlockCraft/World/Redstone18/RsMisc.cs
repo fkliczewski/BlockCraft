@@ -48,6 +48,7 @@ namespace BlockCraft.Render
                 }
             Add("slime", s);
             TexRedstoneComponents();
+            TexRedstoneTransport();
         }
     }
 }

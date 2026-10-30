@@ -37,6 +37,10 @@ namespace BlockCraft.World
             new DispenserBlock(B.Dispenser, "dispenser", "Dozownik", false).Tab(TabRedstone);
             new NoteBlockBlock(B.NoteBlock, "noteblock", "Blok nut").Tab(TabRedstone);
             new TrappedChestBlock(B.TrappedChest, "trapped_chest", "Skrzynia-pułapka").H(2.5f).Tool_(ToolType.Axe).Snd(SoundType.Wood).Tab(TabRedstone);
+            new RailBlock(B.Rail, "rail", "Tory", "rail_normal");
+            new RailBlock(B.PoweredRail, "golden_rail", "Zasilane tory", "rail_golden");
+            new RailBlock(B.DetectorRail, "detector_rail", "Tory detektorowe", "rail_detector");
+            new RailBlock(B.ActivatorRail, "activator_rail", "Tory aktywacyjne", "rail_activator");
         }
     }
 }

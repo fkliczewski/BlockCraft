@@ -579,7 +579,7 @@ public sealed partial class ChunkMesher
                 int kk = (k + rot) & 3;
                 float u = uvs[kk * 2], v = uvs[kk * 2 + 1];
                 if (f == 0) { u = uvs[kk * 2]; v = uvs[kk * 2 + 1]; }
-                buf.V(x + px, y + py, z + pz, u, v, tex, 0, shade, sky, blk, tint);
+                buf.V(x + px, y + py + px * mb.SlopeX + pz * mb.SlopeZ, z + pz, u, v, tex, 0, shade, sky, blk, tint);
             }
             // płaskie: dodaj stronę odwrotną
             if (mb.NoCull && (x0 == x1 || z0 == z1 || y0 == y1))
@@ -588,7 +588,7 @@ public sealed partial class ChunkMesher
                 {
                     float px = fv[k * 3] == 0 ? x0 : x1, py = fv[k * 3 + 1] == 0 ? y0 : y1, pz = fv[k * 3 + 2] == 0 ? z0 : z1;
                     int kk = (k + rot) & 3;
-                    buf.V(x + px, y + py, z + pz, uvs[kk * 2], uvs[kk * 2 + 1], tex, 0, shade, sky, blk, tint);
+                    buf.V(x + px, y + py + px * mb.SlopeX + pz * mb.SlopeZ, z + pz, uvs[kk * 2], uvs[kk * 2 + 1], tex, 0, shade, sky, blk, tint);
                 }
             }
         }

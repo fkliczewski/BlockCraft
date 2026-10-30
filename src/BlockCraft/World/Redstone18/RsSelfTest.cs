@@ -92,6 +92,7 @@ public static partial class SelfTest
         Check(w.GetBlock(2, 4, 100) == B.RedstoneLamp, "Zablokowany przekaźnik nie przekazuje", w.GetBlock(2, 4, 100).ToString());
 
         TestRedstone18Components(w, p);
+        TestRedstone18Rails(w);
     }
 
     private static void TestRedstone18Components(World.World w, Player p)
