@@ -7,7 +7,7 @@ using BlockCraft.World;
 namespace BlockCraft;
 
 /// <summary>Testy logiki gry uruchamiane bez okna: BlockCraft.exe --selftest</summary>
-public static class SelfTest
+public static partial class SelfTest
 {
     private static int _pass, _fail;
     private static readonly List<string> Failures = new();
@@ -51,6 +51,7 @@ public static class SelfTest
         try { TestFluids(); } catch (Exception e) { Check(false, "Fluids", e.ToString()); }
         try { TestRedstone(); } catch (Exception e) { Check(false, "Redstone", e.ToString()); }
         try { TestMobs(); } catch (Exception e) { Check(false, "Mobs", e.ToString()); }
+        try { TestMobs18(); } catch (Exception e) { Check(false, "Mobs18", e.ToString()); }
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }

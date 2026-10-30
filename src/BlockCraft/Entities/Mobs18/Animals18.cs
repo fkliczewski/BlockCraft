@@ -108,7 +108,7 @@ public sealed class Wolf : Tameable
         var s=p.Inventory.Selected;
         if(Tamed) {
             if(s!=null&&IsWolfMeat(s.Id)&&Health<20) { Heal(s.Item?.Hunger??2); ConsumeHeld(p); return true; }
-            if(s?.Id==I.Dye) { int c=Dyes.ColorOf(s); if(c>=0&&c!=Collar) { Collar=c; ConsumeHeld(p); return true; } }
+            if(Dyes.ColorOf(s) is int c&&c>=0&&c!=Collar) { Collar=c; ConsumeHeld(p); return true; }
             if(InteractLead(p)) return true;
             if(p.Name==Owner&&!IsBreedingItem(s)) { if(!World.IsRemote) { Sitting=!Sitting; IsJumping=false; Nav.Stop(); Target=null; } return true; }
         }
@@ -567,10 +567,14 @@ public sealed class LeashKnot : Entity
     }
     public override bool Interact(Player p)
     {
+        // EntityLeashKnot.interactFirst: ze smyczą w ręce przypina moby gracza, bez niej zrywa węzeł
         if(World.IsRemote) return true;
-        var tied=World.Entities.OfType<Mob>().Where(m=>m.LeashHolder==this).ToList();
-        if(tied.Count>0&&!World.GetEntitiesInBox(BoundingBox.Grow(7),this).OfType<Mob>().Any(m=>m.LeashHolder==p)) foreach(var m in tied) m.LeashHolder=p;
-        else Break(p.Creative);
+        if(p.Inventory.Selected?.Id==I.Lead) {
+            var mine=World.GetEntitiesInBox(BoundingBox.Grow(7),this).OfType<Mob>().Where(m=>m.LeashHolder==p).ToList();
+            foreach(var m in mine) m.LeashHolder=this;
+            if(mine.Count>0) return true;
+        }
+        Break(p.Creative);
         return true;
     }
     public void Break(bool creative)
