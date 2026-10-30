@@ -164,7 +164,7 @@ public sealed partial class Game
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
     {
         if (s == null || s.Item == null) return;
-        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16);
+        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
         else
         {
             var it = s.Item;

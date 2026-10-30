@@ -33,7 +33,7 @@ public sealed class TitleScreen : Screen
         float scale = Math.Min(1f, W * 0.72f / lw);
         float lx = W / 2f - lw * scale / 2, ly = 30;
         sb.Draw(G.Gui.Logo, lx, ly, lw * scale, lh * scale);
-        sb.TextCentered("JAVA EDITION", W / 2f, ly + lh * scale + 2, 0xFFE0E0E0);
+        sb.TextCentered(".NET/C# EDITION", W / 2f, ly + lh * scale + 2, 0xFFE0E0E0);
         float t = (float)(Environment.TickCount64 % 1000) / 1000f * MathF.PI * 2;
         float s = 1.8f - MathF.Abs(MathF.Sin(t)) * 0.1f;
         s = s * 100f / (sb.Measure(_splash) + 32);
