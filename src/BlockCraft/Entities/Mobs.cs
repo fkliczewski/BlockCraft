@@ -103,6 +103,7 @@ public abstract class Animal : Mob
     public bool IsBaby => GrowingAge < 0;
     public abstract bool IsBreedingItem(ItemStack s);
     public abstract Animal CreateChild();
+    public virtual bool CanMateWith(Animal a) => a != this && a.GetType() == GetType();
     public override int XpValue => 1 + World.Rand.Next(3);
 
     protected Animal(World.World w) : base(w) { }
@@ -150,7 +151,7 @@ public abstract class Animal : Mob
             {
                 Mate = null;
                 foreach (var e in World.GetEntitiesInBox(BoundingBox.Grow(8, 4, 8), this))
-                    if (e.GetType() == GetType() && e is Animal a && a.InLove > 0 && !a.IsBaby && a != this) { Mate = a; break; }
+                    if (e is Animal a && CanMateWith(a) && a.InLove > 0 && !a.IsBaby) { Mate = a; break; }
             }
             if (Mate != null)
             {

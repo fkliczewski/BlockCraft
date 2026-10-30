@@ -124,7 +124,8 @@ public sealed partial class PlayerController
         if (p.ItemInUse != null) return;
         RightClickDelay = 4;
         var held = p.Inventory.Selected;
-        if (HitEntity != null)
+        if (p.RidingMob is Pig ridden && held?.Id == I.CarrotOnAStick) { if (ridden.Boost(p)) p.SwingArm(); return; }
+        if (HitEntity != null && HitEntity != p.RidingMob)
         {
             if (HitEntity is Mob named && held?.Id == I.NameTag && !string.IsNullOrEmpty(held.CustomName))
             { named.CustomName = held.CustomName; named.PersistenceRequired = true; Mob.ConsumeHeld(p); p.SwingArm(); return; }
@@ -134,9 +135,10 @@ public sealed partial class PlayerController
         {
             int x = Hit.X, y = Hit.Y, z = Hit.Z;
             var b = Block.Get(W.GetBlock(x, y, z));
+            if (LeashKnot.TryTie(W, p, x, y, z)) { p.SwingArm(); return; }
             if (!p.Sneaking || held == null)
                 if (b.OnActivated(W, x, y, z, p)) { p.SwingArm(); return; }
-            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; return; }
+            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
         }
         if (held != null) UseInAir(held);
     }

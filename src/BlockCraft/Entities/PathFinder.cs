@@ -13,12 +13,13 @@ public static class PathFinder
 
     private static readonly List<AABB> Tmp = new();
 
+    public static bool IsWoodDoor(int id) => id == B.OakDoor || id >= B.SpruceDoor && id <= B.DarkOakDoor;
     public static bool IsPassable(World.World w, int x, int y, int z)
     {
         int id = w.GetBlock(x, y, z);
         if (id == 0) return true;
         var b = Block.ById[id];
-        if (id == B.OakDoor) return (w.GetMeta(x, y, z) & 4) != 0 || (w.GetMeta(x, y - 1, z) & 4) != 0;
+        if (IsWoodDoor(id)) return (w.GetMeta(x, y, z) & 4) != 0 || (w.GetMeta(x, y - 1, z) & 4) != 0;
         if (b.IsLiquid) return id == B.Water;
         if (id == B.Cactus || id == B.Fence || id == B.FenceGate) return false;
         return !b.Solid;
@@ -33,7 +34,7 @@ public static class PathFinder
     /// <summary>Czy mob może stać w (x,y,z): miejsce wolne na height bloków i grunt pod spodem.</summary>
     private static bool CanStand(World.World w, int x, int y, int z, int h, bool allowWater, bool doors = false)
     {
-        for (int i = 0; i < h; i++) if (!(IsPassable(w, x, y + i, z) || doors && w.GetBlock(x, y + i, z) == B.OakDoor) || IsDanger(w, x, y + i, z)) return false;
+        for (int i = 0; i < h; i++) if (!(IsPassable(w, x, y + i, z) || doors && IsWoodDoor(w.GetBlock(x, y + i, z))) || IsDanger(w, x, y + i, z)) return false;
         int below = w.GetBlock(x, y - 1, z);
         if (below == B.Water) return allowWater;
         var bb = Block.Get(below);
@@ -131,7 +132,7 @@ public sealed class Navigator
     {
         if (!HasPath) return;
         var (x, y, z) = _path[_idx];
-        if (_m.CanOpenDoors && _m.World.GetBlock(x,y,z)==B.OakDoor) { int meta=_m.World.GetMeta(x,y,z); if ((meta&8)==0 && (meta&4)==0) { _m.World.SetMeta(x,y,z,meta|4); _m.World.PlaySound("random.door_open",x,y,z); } }
+        if (_m.CanOpenDoors && PathFinder.IsWoodDoor(_m.World.GetBlock(x,y,z))) _m.OpenDoorAt(x,y,z);
         double tx = x + 0.5, tz = z + 0.5;
         double dx = tx - _m.X, dz = tz - _m.Z;
         double dist = Math.Sqrt(dx * dx + dz * dz);
