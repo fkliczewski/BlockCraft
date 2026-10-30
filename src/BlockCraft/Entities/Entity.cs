@@ -240,6 +240,7 @@ public abstract class Entity
         CollidedH = odx != dx || odz != dz;
         CollidedV = ody != dy;
         OnGround = CollidedV && ody < 0;
+        UpdateStepSound(dx, dz);
         if (odx != dx) MotionX = 0;
         if (odz != dz) MotionZ = 0;
         if (ody != dy) MotionY = 0;
@@ -267,6 +268,36 @@ public abstract class Entity
                             if (cb.Intersects(bb)) Block.ById[id].OnEntityCollide(World, x, y, z, this);
                         }
                     }
+    }
+
+    // ---- dźwięk kroków (MC 1.8: distanceWalkedModified / nextStepDistance) ----
+    private float _distWalked, _nextStep = 1f;
+    /// <summary>Zdarzenie kroku moba (np. mob.cow.step); null = dźwięk bloku pod nogami.</summary>
+    public virtual string StepSoundName => null;
+    protected virtual bool SilentSteps => this is LivingEntity le && le.Sneaking;
+
+    private void UpdateStepSound(double dx, double dz)
+    {
+        if (!(this is LivingEntity) || NoClip) return;
+        if (SilentSteps) return;
+        _distWalked += (float)Math.Sqrt(dx * dx + dz * dz) * 0.6f;
+        if (_distWalked <= _nextStep) return;
+        _nextStep = (int)_distWalked + 1;
+        int bx = MathUtil.FloorToInt(X), by = MathUtil.FloorToInt(Y - 0.2), bz = MathUtil.FloorToInt(Z);
+        if (InWater)
+        {
+            float f = (float)Math.Sqrt(MotionX * MotionX * 0.2 + MotionY * MotionY + MotionZ * MotionZ * 0.2) * 0.35f;
+            if (f > 1f) f = 1f;
+            World.PlaySound(this is Player ? "game.player.swim" : "game.neutral.swim", X, Y, Z, f, 1f + (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.4f);
+            return;
+        }
+        if (!OnGround) return;
+        int id = World.GetBlock(bx, by, bz);
+        if (id == 0) return;
+        var b = Block.Get(id);
+        if (b.IsLiquid) return;
+        string name = StepSoundName ?? BlockCraft.Audio.SoundEvents.Step(b.Sound);
+        World.PlaySound(name, X, Y, Z, 0.15f, 1f);
     }
 
     protected virtual void OnFall(float distance) { }

@@ -452,7 +452,7 @@ public class ChestBlock : Block
     }
     public override int GetPlacementMeta(World w, int x, int y, int z, int face, double hx, double hy, double hz, Player p, int itemMeta)
         => (Dir.HorizFromYaw(p.Yaw) + 2) & 3;
-    public override bool OnActivated(World w, int x, int y, int z, Player p) { p.OpenBlockGui(GuiKind.Chest, x, y, z); return true; }
+    public override bool OnActivated(World w, int x, int y, int z, Player p) { w.PlaySound("random.chestopen", x + 0.5, y + 0.5, z + 0.5, 0.5f, w.Rand.NextFloat() * 0.1f + 0.9f); p.OpenBlockGui(GuiKind.Chest, x, y, z); return true; }
     public override void OnAdded(World w, int x, int y, int z)
     {
         if (w.GetTileEntity(x, y, z) is not ChestTileEntity) w.SetTileEntity(x, y, z, new ChestTileEntity());

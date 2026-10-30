@@ -52,7 +52,8 @@ public partial class Player : LivingEntity
     public bool Spectator => GameMode == 3;
     public override int ArmorValue => Inventory.ArmorValue;
     protected override bool IsFlyingNow => Flying;
-    public override string HurtSound => "player_hurt";
+    public override string HurtSound => "game.player.hurt";
+    public override string DeathSound => "game.player.die";
 
     public void SetGameMode(int gm)
     {
@@ -338,6 +339,7 @@ public partial class Player : LivingEntity
 
     public void CloseContainer()
     {
+        if (OpenContainer is ChestContainer) World.PlaySound("random.chestclosed", X, Y, Z, 0.5f, World.Rand.NextFloat() * 0.1f + 0.9f);
         if (OpenContainer != null) { OpenContainer.OnClose(this); OpenContainer = null; }
         else InventoryContainer.OnClose(this);
     }

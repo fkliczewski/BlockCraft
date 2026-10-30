@@ -10,11 +10,6 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace BlockCraft;
 
-public static class Sound
-{
-    public static void Play(string name, double x, double y, double z, float vol, float pitch, Player listener) { }
-}
-
 public sealed partial class Game
 {
     private Matrix4 _proj;

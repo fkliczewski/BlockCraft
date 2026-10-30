@@ -41,6 +41,8 @@ public sealed class TitleScreen : Screen
         sb.TextCentered(_splash, 0, -8, 0xFF00FFFF);
         sb.PopTransform();
         sb.Text("BlockCraft 1.0 (.NET)", 2, H - 10, 0xFFFFFFFF);
+        var ast = BlockCraft.Audio.AssetStore.Status;
+        if (!string.IsNullOrEmpty(ast)) sb.Text(ast + (BlockCraft.Audio.AssetStore.Done ? "" : " (" + (int)(BlockCraft.Audio.AssetStore.Progress * 100) + "%)"), 2, H - 20, 0xFFA0A0A0);
         string c = "Nie jest powiązane z Mojang AB.";
         sb.Text(c, W - sb.Measure(c) - 2, H - 10, 0xFFFFFFFF);
         base.Render(mx, my, pt);
@@ -197,6 +199,7 @@ public sealed class OptionsScreen : Screen
         Add(new Button(W / 2 + 5, y + 48, 150, 20, "Sterowanie...", () => G.SetScreen(new ControlsScreen(this))));
         Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));
         Add(new Button(W / 2 + 5, y + 72, 150, 20, () => "Licznik FPS: " + (s.ShowFps ? "TAK" : "NIE"), () => s.ShowFps = !s.ShowFps));
+        Add(new Button(W / 2 - 155, y + 24, 150, 20, "Muzyka i dźwięki...", () => G.SetScreen(new BlockCraft.Audio.SoundOptionsScreen(this))));
         Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
     }
     public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };
