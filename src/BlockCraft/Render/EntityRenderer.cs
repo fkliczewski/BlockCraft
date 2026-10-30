@@ -55,13 +55,14 @@ public sealed partial class EntityRenderer : IDisposable
     public TextureArray TerrainTex;
 
     public const string LightmapGlsl = @"
-uniform float uSun; uniform float uGamma;
-float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; return (1.0 - f1)/(f1*3.0 + 1.0); }
+uniform float uSun; uniform float uGamma; uniform int uDimension;
+float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; float a = uDimension == -1 ? 0.1 : 0.0; return (1.0 - f1)/(f1*3.0 + 1.0)*(1.0-a)+a; }
 vec3 lightmap(float sky, float blk){
   float f = uSun; float f1 = f*0.95+0.05;
   float f2 = tbl(sky)*f1; float f3 = tbl(blk)*1.5;
   vec3 c = vec3(f2*(f*0.65+0.35), f2*(f*0.65+0.35), f2) + vec3(f3, f3*((f3*0.6+0.4)*0.6+0.4), f3*(f3*f3*0.6+0.4));
   c = clamp(c*0.96+0.03, 0.0, 1.0);
+  if (uDimension == 1) c = vec3(0.22,0.28,0.25) + vec3(f3*0.75);
   vec3 g = 1.0 - pow(1.0 - c, vec3(4.0)); c = mix(c, g, uGamma);
   return clamp(c*0.96+0.03, 0.0, 1.0);
 }";

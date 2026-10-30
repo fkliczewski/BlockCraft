@@ -463,6 +463,7 @@ public partial class Player : LivingEntity
     {
         var d = new PlayerData
         {
+            Dimension = (int)World.Dimension,
             Name = Name, X = X, Y = Y, Z = Z, Yaw = Yaw, Pitch = Pitch, Health = Health, Food = FoodLevel, Saturation = Saturation, Exhaustion = Exhaustion,
             GameMode = GameMode, Flying = Flying, XpLevel = XpLevel, XpProgress = XpProgress, XpTotal = XpTotal, Selected = Inventory.SelectedSlot, Air = Air,
             HasSpawn = HasSpawn, SpawnX = SpawnX, SpawnY = SpawnY, SpawnZ = SpawnZ, Dead = Dead
