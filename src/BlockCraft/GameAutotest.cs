@@ -28,6 +28,10 @@ public sealed partial class Game
         Step(30, () => Shot("01_title"));
         Step(5, () => SetScreen(new OptionsScreen(new TitleScreen())));
         Step(5, () => Shot("02_options"));
+        Step(5, () => SetScreen(new BlockCraft.Audio.SoundOptionsScreen(new TitleScreen())));
+        Step(5, () => { Shot("02a_dzwieki"); BlockCraft.Core.Log.Info("AUDIO: enabled=" + Sound.Enabled + " voices=" + Sound.ActiveVoices); });
+        Step(2, () => { Sound.PlayUi("random.click"); Sound.Play("dig.stone", 0, 0, 0); });
+        Step(10, () => BlockCraft.Core.Log.Info("AUDIO: po odtworzeniu voices=" + Sound.ActiveVoices));
         Step(5, () => SetScreen(new VideoScreen(new TitleScreen())));
         Step(5, () => Shot("02b_video"));
         Step(5, () => SetScreen(new CreateWorldScreen(new TitleScreen())));

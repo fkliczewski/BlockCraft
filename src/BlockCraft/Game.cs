@@ -71,7 +71,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Gui = new GuiTextures();
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
-        Renderer.SoundHook = (n, x, y, z, v, p) => Sound.Play(n, x, y, z, v, p, Player);
+        Sound.Init(Settings);
+        Renderer.SoundHook = (n, x, y, z, v, p) => Sound.Play(n, x, y, z, v, p);
         UpdateGuiScale();
         ApplySettings();
         StartMenuWorld();
@@ -144,7 +145,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         CursorState = grab ? CursorState.Grabbed : CursorState.Normal;
     }
 
-    public void PlayUiClick() => Sound.Play("click", 0, 0, 0, 0.25f, 1f, null);
+    public void PlayUiClick() => Sound.PlayUi("random.click", 1f, 1f);
     public string GetClipboard() { try { return ClipboardString; } catch { return null; } }
     public void Quit() => Close();
 
@@ -415,7 +416,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        try { SaveWorld(); Dimensions?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        try { Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
         base.OnClosing(e);
     }
 
@@ -467,6 +468,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private void Tick()
     {
         _tickCount++;
+        try { AudioTick(); } catch (Exception ex) { Log.Error("Audio: " + ex.Message); }
         _screen?.Tick();
         if (_menuWorld != null)
         {

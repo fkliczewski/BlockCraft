@@ -331,8 +331,8 @@ public abstract class LivingEntity : Entity
         World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f);
     }
 
-    public virtual string HurtSound => "hurt";
-    public virtual string DeathSound => HurtSound;
+    public virtual string HurtSound => "game.neutral.hurt";
+    public virtual string DeathSound => "game.neutral.die";
 
     protected virtual void DamageEntity(DamageSource src, float amount)
     {
