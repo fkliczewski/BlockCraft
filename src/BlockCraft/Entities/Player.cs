@@ -441,6 +441,7 @@ public partial class Player : LivingEntity
     /// <summary>Atak wręcz na encję.</summary>
     public void AttackEntity(Entity target)
     {
+        if (target is not LivingEntity && target.AttackedByPlayer(this)) return;
         if (target is not LivingEntity le || le.Dead) return;
         var held = Inventory.Selected;
         float dmg = held?.Item?.AttackDamage ?? 1f;

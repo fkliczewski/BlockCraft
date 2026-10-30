@@ -71,6 +71,67 @@ public sealed partial class Game
         Step(20, () => Shot("ne_03_nether_view"));
         Step(5, () => { Player.Yaw = 90; Player.Pitch = -20; });
         Step(20, () => Shot("ne_04_nether_view2"));
+        // moby Netheru: galeria i testy zachowań
+        int mx0 = 0, my0 = 0, mz0 = 0;
+        Step(5, () =>
+        {
+            Cmds.Execute(Player, "/gamemode creative");
+            mx0 = MathUtil.FloorToInt(Player.X); my0 = MathUtil.FloorToInt(Player.Y) + 30; mz0 = MathUtil.FloorToInt(Player.Z) + 40;
+            World.EnsureDimensionArea(mx0, mz0 + 8, 32);
+            for (int dx = -12; dx <= 12; dx++) for (int dz = -4; dz <= 20; dz++) for (int dy = -1; dy < 12; dy++)
+                World.SetBlock(mx0 + dx, my0 + dy, mz0 + dz, dy < 0 ? ((dx + dz) % 4 == 0 ? B.Glowstone : B.Netherrack) : B.Air, 0);
+            string[] mobs = { "zombie_pigman", "blaze", "magma_cube", "wither_skeleton", "endermite" };
+            for (int i = 0; i < mobs.Length; i++) Cmds.Execute(Player, $"/summon {mobs[i]} {mx0 - 6 + i * 3} {my0} {mz0 + 6}");
+            Cmds.Execute(Player, $"/summon ghast {mx0} {my0 + 3} {mz0 + 15}");
+            foreach (var e in World.Entities.OfType<Mob>()) { e.Yaw = e.BodyYaw = e.HeadYaw = 180; }
+            Player.SetPositionAndPrev(mx0 + .5, my0 + 1, mz0 - 2); Player.Yaw = 0; Player.Pitch = 12; Player.Flying = true;
+        });
+        Step(40, () => Shot("ne_09_nether_mobs"));
+        Step(5, () =>
+        {
+            foreach (var e in World.Entities.OfType<Mob>().ToList()) e.Removed = true;
+            Cmds.Execute(Player, "/gamemode survival"); Player.Flying = false;
+            Player.SetPositionAndPrev(mx0 + .5, my0, mz0 + .5);
+            // gniew grupowy pigmanów
+            var pigs = new List<ZombiePigman>();
+            for (int i = 0; i < 3; i++) { var z = new ZombiePigman(World); z.SetPositionAndPrev(mx0 + i * 2 - 2 + .5, my0, mz0 + 6.5); World.SpawnEntity(z); pigs.Add(z); }
+            for (int i = 0; i < 3; i++) World.Tick();
+            Player.AttackEntity(pigs[0]);
+            NeCheck("gniew grupowy pigmanów", pigs.All(z => z.Angry), $"wściekłe {pigs.Count(z => z.Angry)}/3");
+            foreach (var z in pigs) z.Removed = true;
+            // odbicie kuli ognia ghasta w niego samego
+            var g = new Ghast(World); g.SetPositionAndPrev(mx0 + .5, my0 + 3, mz0 + 16.5); World.SpawnEntity(g);
+            var fb = new LargeFireballEntity(World); fb.Launch(g, mx0 + .5, my0 + 3, mz0 + 13, 0, -.1, -1, 0); World.SpawnEntity(fb);
+            Player.Yaw = 0; Player.Pitch = -8; Player.Health = 20;
+            fb.AttackedByPlayer(Player);
+            for (int i = 0; i < 60 && !fb.Removed; i++) World.Tick();
+            NeCheck("odbita kula zabija ghasta", fb.Removed && (g.Dead || g.Removed), $"kula {(fb.Removed ? "wybuchła" : "leci")}, ghast hp {g.Health}");
+            g.Removed = true;
+            // płomyk strzela salwą
+            var bl = new Blaze(World); bl.SetPositionAndPrev(mx0 + .5, my0, mz0 + 10.5); World.SpawnEntity(bl);
+            int shots = 0;
+            for (int i = 0; i < 160; i++) { World.Tick(); shots = Math.Max(shots, World.Entities.OfType<SmallFireballEntity>().Count()); Player.Health = 20; }
+            NeCheck("płomyk strzela kulami", shots >= 1, $"kul naraz {shots}, cel {(bl.Target == Player ? "gracz" : "brak")}");
+            bl.Removed = true;
+            foreach (var e in World.Entities.OfType<FireballEntity>().ToList()) e.Removed = true;
+            // kostka magmy dzieli się
+            var mc = new MagmaCube(World); mc.SetSize(4); mc.SetPositionAndPrev(mx0 + 4.5, my0, mz0 + 4.5); World.SpawnEntity(mc);
+            World.Tick();
+            mc.Attack(DamageSource.Generic, 100);
+            for (int i = 0; i < 3; i++) World.Tick();
+            int small = World.Entities.OfType<MagmaCube>().Count(m => m.Size == 2 && !m.Dead);
+            NeCheck("kostka magmy dzieli się", small >= 2, $"mniejszych {small}");
+            foreach (var e in World.Entities.OfType<Mob>().ToList()) e.Removed = true;
+            Player.Health = 20;
+            // spawner Netheru
+            Dimensions.Get(DimensionId.Overworld).Rules.DoMobSpawning = true;
+            for (int i = 0; i < 400; i++) { Dimensions.Tick(); Player.Health = 20; Player.FireTicks = 0; }
+            var kinds = World.Entities.OfType<Monster>().GroupBy(m => m.TypeKey).Select(k => k.Key + "=" + k.Count());
+            NeCheck("spawn mobów w Netherze", World.Entities.OfType<Monster>().Any(), string.Join(", ", kinds));
+            Dimensions.Get(DimensionId.Overworld).Rules.DoMobSpawning = false;
+            foreach (var e in World.Entities.OfType<Mob>().ToList()) e.Removed = true;
+            Player.SetPositionAndPrev(npx + 0.5, npy, npz - 0.7);
+        });
         // powrót: gracz był poza portalem (cooldown minął), wchodzi z powrotem
         int t4 = 0;
         Step(5, () => { Player.SetPositionAndPrev(npx + 0.5, npy, npz + 0.5); Log.Info($"NE-TEST Nether portal {npx} {npy} {npz}"); });
