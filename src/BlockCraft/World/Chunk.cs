@@ -84,6 +84,9 @@ public abstract class TileEntity
 {
     public int X, Y, Z;
     public virtual void Tick(World w) { }
+    /// <summary>Ogólne ustawienie danych bez zależności kompilacyjnej między modułami, np. spawner: SetData("EntityId", "zombie"),
+    /// skrzynia ze skarbem: SetData("LootTable", "dungeon"). Typ ignoruje nieznane klucze.</summary>
+    public virtual void SetData(string key, string value) { }
     public abstract void Save(BinaryWriter bw);
     public abstract void Load(BinaryReader br);
     public abstract int TypeId { get; }

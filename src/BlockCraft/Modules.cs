@@ -83,3 +83,22 @@ namespace BlockCraft.Entities
         public static void Tile(int typeId, Func<TileEntity> factory) => TileEntity.Types[typeId] = factory;
     }
 }
+
+namespace BlockCraft.World
+{
+    /// <summary>
+    /// Haki między modułami bez zależności kompilacyjnej: właściciel ustawia delegat w swojej inicjalizacji,
+    /// pozostali wołają go, jeśli nie jest null.
+    /// </summary>
+    public static class WorldHooks
+    {
+        /// <summary>OW: najbliższa twierdza (dla oka Endu i /locate Stronghold). Zwraca środek albo null.</summary>
+        public static Func<World, int, int, (int x, int y, int z)?> FindStronghold;
+        /// <summary>OW: najbliższa struktura po nazwie MC (/locate Village, Temple, Mineshaft, Monument; NE: Fortress).</summary>
+        public static readonly Dictionary<string, Func<World, int, int, (int x, int y, int z)?>> Locators = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>OW: czy w danym miejscu pada deszcz (pogoda + biom + niebo). Używają: ogień, moby, wędka, cauldron.</summary>
+        public static Func<World, int, int, int, bool> IsRainingAt;
+        /// <summary>NE: wołane, gdy encja stoi w bloku portalu (Nether lub End). Argumenty: encja, id bloku portalu.</summary>
+        public static Action<Entities.Entity, int> OnEntityInPortal;
+    }
+}
