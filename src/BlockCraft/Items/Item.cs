@@ -1,4 +1,5 @@
 using BlockCraft.Core;
+using BlockCraft.Entities;
 using BlockCraft.Render;
 using BlockCraft.World;
 
@@ -89,6 +90,10 @@ public class Item
     public Func<ItemStack, (int layer, uint color)> OverlayFn;
     /// <summary>Własna nazwa zależna od stacka (np. mikstury, zaklęta książka).</summary>
     public Func<ItemStack, string> NameFn;
+    /// <summary>Własne użycie PPM na bloku: (gracz, stack, x, y, z, ściana, hx, hy, hz). True = obsłużone, domyślna logika się nie wykona.</summary>
+    public Func<Player, ItemStack, int, int, int, int, double, double, double, bool> UseOnBlock;
+    /// <summary>Własne użycie PPM w powietrze (też gdy UseOnBlock nie obsłużył). True = obsłużone.</summary>
+    public Func<Player, ItemStack, bool> UseInAir;
 
     public Item(int id, string key, string name)
     {

@@ -109,7 +109,7 @@ public sealed partial class DimensionPortalBlock : Block
 public sealed partial class NetherFireBlock : Block
 {
     public NetherFireBlock() : base(B.Fire,"fire","Ogień")
-    { Plant(); T("fire"); Light(15); InCreative = false; NeedsSupport = false; DropOverride = 0; }
+    { Plant(); T("fire"); Light(15); InCreative = false; NeedsSupport = false; DropOverride = 0; RandomTicks = true; }
     public override void OnEntityCollide(World w, int x, int y, int z, Entity e) { if (e is LivingEntity le) le.Attack(DamageSource.Fire,1); e.FireTicks = Math.Max(e.FireTicks,160); }
 }
 

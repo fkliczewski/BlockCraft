@@ -17,6 +17,7 @@ public static partial class ItemRegistry
         Simple(I.EyeOfEnder, "ender_eye", "Oko Endu", Blocks.TabMisc);
         Simple(I.FireCharge, "fire_charge", "Ładunek ognisty", Blocks.TabMisc);
         Simple(I.NetherStar, "nether_star", "Gwiazda Netheru", Blocks.TabMaterials).Glint = true;
+        NetherEndItemUse();
     }
 }
 

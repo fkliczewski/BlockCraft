@@ -1,3 +1,4 @@
+using BlockCraft.Audio;
 using BlockCraft.Entities;
 using BlockCraft.World;
 
@@ -21,5 +22,19 @@ public partial class Game
             SetScreen(null);
             next.PlaySound("portal.travel",Player.X,Player.Y,Player.Z,.8f);
         };
+    }
+
+    /// <summary>MC 1.8 Minecraft.getAmbientMusicType: muzyka Netheru, Endu (z bossem: EndBoss), w Overworldzie gra albo kreatywny.</summary>
+    private void DimensionMusicTick()
+    {
+        BossStatus.Tick();
+        if (Player == null || World == null || Music.Context == MusicType.Credits) return;
+        var t = World.Dimension switch
+        {
+            DimensionId.Nether => MusicType.Nether,
+            DimensionId.End => BossStatus.Visible ? MusicType.EndBoss : MusicType.End,
+            _ => Player.Creative ? MusicType.Creative : MusicType.Game
+        };
+        if (t != Music.Context) Music.SetContext(t);
     }
 }

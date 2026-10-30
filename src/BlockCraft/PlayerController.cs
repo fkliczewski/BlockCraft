@@ -142,6 +142,7 @@ public sealed partial class PlayerController
     private bool UseInAir(ItemStack held)
     {
         var p = P; var it = held.Item;
+        if (it.UseInAir != null && it.UseInAir(p, held)) return true;
         if (it.IsFood) { if (p.CanEat(it.Id == I.GoldenApple)) p.StartUsing(held); return true; }
         if (it.Id == I.MilkBucket) { p.StartUsing(held); return true; }
         if (it.Id == I.Bow) { if (p.Creative || p.Inventory.CountOf(I.Arrow) > 0) p.StartUsing(held); return true; }
@@ -209,6 +210,7 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {

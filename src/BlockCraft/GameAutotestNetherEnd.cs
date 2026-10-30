@@ -79,6 +79,69 @@ public sealed partial class Game
         int t5 = 0;
         WaitUntil(() => NeReady(40, ref t5));
         Step(10, () => { Player.Pitch = 10; Shot("ne_05_back_overworld"); });
+        // ogień 1.8: ładunek ognisty na drewnianej chatce, rozprzestrzenianie, gaszenie deszczem, wieczny ogień
+        int fx = 0, fy = 0, fz = 0;
+        Step(5, () =>
+        {
+            fx = MathUtil.FloorToInt(Player.X) - 14; fz = MathUtil.FloorToInt(Player.Z); fy = MathUtil.FloorToInt(Player.Y);
+            for (int dx = -5; dx <= 5; dx++) for (int dz = -10; dz <= 6; dz++) for (int dy = -1; dy < 8; dy++)
+                World.SetBlock(fx + dx, fy + dy, fz + dz, dy < 0 ? B.Stone : B.Air, 0);
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) for (int dy = 0; dy < 4; dy++)
+                if (Math.Abs(dx) == 2 || Math.Abs(dz) == 2 || dy == 3) World.SetBlock(fx + dx, fy + dy, fz + dz, dy == 3 ? B.OakPlanks : Math.Abs(dx) == 2 && Math.Abs(dz) == 2 ? B.OakLog : B.OakPlanks, 0);
+            World.SetBlock(fx, fy + 1, fz + 4, B.Netherrack, 0);
+            Player.SetPositionAndPrev(fx + 0.5, fy, fz - 5.5); Player.Yaw = 0; Player.Pitch = 15;
+            Player.Inventory.Main[2] = new ItemStack(I.FireCharge, 3); Player.Inventory.SelectedSlot = 2;
+        });
+        Step(5, () => { Ctrl.UpdateTarget(1f); Log.Info($"NE-TEST cel ładunku {Ctrl.Hit.X} {Ctrl.Hit.Y} {Ctrl.Hit.Z} face {Ctrl.Hit.Face}"); _rightPressed = true; });
+        Step(5, () =>
+        {
+            NeCheck("ładunek ognisty stawia ogień", World.GetBlock(fx, fy, fz - 3) == B.Fire, $"blok {Block.Get(World.GetBlock(fx, fy, fz - 3)).Key}, ładunków {Player.Inventory.Main[2]?.Count ?? 0}");
+            World.SetBlock(fx, fy + 2, fz + 4, B.Fire, 0);
+            for (int i = 0; i < 200; i++) World.Tick();
+        });
+        Step(20, () =>
+        {
+            int fire = 0, wood = 0;
+            for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = 0; dy < 6; dy++)
+            { byte b = World.GetBlock(fx + dx, fy + dy, fz + dz); if (b == B.Fire) fire++; else if (b is B.OakPlanks or B.OakLog) wood++; }
+            NeCheck("ogień się rozprzestrzenia", fire >= 5, $"ognia {fire}, drewna {wood}/76");
+            NeCheck("wieczny ogień na netherracku", World.GetBlock(fx, fy + 2, fz + 4) == B.Fire, "");
+            Player.SetPositionAndPrev(fx + 0.5, fy + 3, fz - 7.5); Player.Pitch = 15;
+        });
+        Step(20, () => Shot("ne_05b_fire_spread"));
+        Step(5, () =>
+        {
+            WorldHooks.IsRainingAt = (w, x, y, z) => true;
+            for (int i = 0; i < 120; i++) World.Tick();
+            int fire = 0;
+            for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = 0; dy < 6; dy++) if (World.GetBlock(fx + dx, fy + dy, fz + dz) == B.Fire) fire++;
+            NeCheck("deszcz gasi ogień", fire == 0, $"ognia {fire}");
+            NeCheck("deszcz nie gasi ognia na netherracku", World.GetBlock(fx, fy + 2, fz + 4) == B.Fire, "");
+            WorldHooks.IsRainingAt = null;
+        });
+        // oko Endu: rzut w stronę twierdzy (hak OW podstawiony na czas testu)
+        EnderEyeEntity eye = null; ItemStack eyes = null; Func<World.World, int, int, (int x, int y, int z)?> oldFind = null;
+        Step(5, () =>
+        {
+            oldFind = WorldHooks.FindStronghold;
+            WorldHooks.FindStronghold = (w, x, z) => (x + 600, 30, z + 100);
+            Player.SetPositionAndPrev(fx + 0.5, fy, fz - 7.5);
+            Player.Pitch = -10; Player.Inventory.Main[3] = eyes = new ItemStack(I.EyeOfEnder, 2); Player.Inventory.SelectedSlot = 3;
+            _rightPressed = true;
+        });
+        Step(10, () =>
+        {
+            WorldHooks.FindStronghold = oldFind;
+            eye = World.Entities.OfType<EnderEyeEntity>().FirstOrDefault();
+            NeCheck("rzut oka Endu", eye != null && eyes.Count == 1, $"oczu {eyes.Count}, cel {eye?.TargetX:F0} {eye?.TargetY:F0} {eye?.TargetZ:F0}");
+        });
+        Step(5, () => Shot("ne_05c_eye_flight"));
+        Step(5, () =>
+        {
+            double sx = eye?.X ?? 0;
+            for (int i = 0; i < 90; i++) World.Tick();
+            NeCheck("oko leci do twierdzy i znika", eye != null && eye.Removed && eye.X > sx, $"x {sx:F1} -> {eye?.X:F1}, upuszczone {World.Entities.OfType<ItemEntity>().Any(e => e.Stack.Id == I.EyeOfEnder)}");
+        });
         // portal Endu: rama 12 bloków z okami (tryb kreatywny)
         int ex = 0, ey = 0, ez = 0;
         Step(5, () =>

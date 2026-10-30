@@ -498,6 +498,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
         ControlTick();
         Dimensions.Tick();
+        DimensionMusicTick();
         w = World;
         if (!p.Dead && p.Removed) { }
         w.ChunkManager.Update(new[] { (MathUtil.FloorToInt(p.X) >> 4, MathUtil.FloorToInt(p.Z) >> 4) }, 5);

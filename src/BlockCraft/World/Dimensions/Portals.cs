@@ -174,12 +174,3 @@ public sealed partial class EndFrameBlock
         DimensionPortals.ActivateEnd(w,x,y,z);return true;
     }
 }
-
-public sealed partial class NetherFireBlock
-{
-    // MC 1.8 BlockFire.onBlockAdded: ogień na obsydianie próbuje zapalić ramę portalu (poza Endem).
-    public override void OnAdded(World w, int x, int y, int z)
-    {
-        if (w.GetBlock(x, y - 1, z) == B.Obsidian && DimensionPortals.Ignite(w, x, y, z)) return;
-    }
-}
