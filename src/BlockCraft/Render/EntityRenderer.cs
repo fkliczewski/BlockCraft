@@ -95,7 +95,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             GL.EnableVertexAttribArray(6); GL.VertexAttribPointer(6, 4, VertexAttribPointerType.Float, false, s, 52);
         });
         SkinGen.Ensure();
-        SkinTex = new TextureArray(64, SkinGen.Skins, false);
+        SkinTex = new TextureArray(SkinGen.TexSize, SkinGen.Layers(), false);
     }
 
     public void Flush(ModelBatch b, TextureArray tex)
@@ -216,7 +216,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         if (FindCustom(Custom, e.GetType()) is { } custom) { custom(this, e, pt, pos, cam); return; }
         switch (e)
         {
-            case LivingEntity le: RenderLiving(le, pt, pos); break;
+            case LivingEntity le: RenderLiving(le, pt, pos); if (le is Mob { LeashHolder: not null } lm) RenderLeash(lm, pt, pos, cam); break;
             case ItemEntity ie: RenderItemEntity(ie, pt, pos); break;
             case XpOrbEntity xp: RenderBillboardSprite(TextureGen.Layer("particle_crit"), pos + new Vector3(0, 0.25f, 0), 0.3f, new Vector4(0.6f, 1f, 0.3f, 1f), cam); break;
             case FallingBlockEntity fb: RenderBlockAt(fb.BlockId, fb.Meta, Matrix4.CreateTranslation(pos + new Vector3(0, 0.5f, 0))); break;
