@@ -29,7 +29,17 @@ public static class Program
         AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Error("Nieobsłużony wyjątek: " + e.ExceptionObject);
         try
         {
-            if (args.Contains("--selftest")) { EnsureConsole(); return SelfTest.Run(args); }
+            if (args.Contains("--selftest"))
+            {
+                int output = Array.IndexOf(args, "--selftest-output");
+                if (output >= 0 && output + 1 < args.Length)
+                {
+                    using var writer = new StreamWriter(args[output + 1], false, System.Text.Encoding.UTF8) { AutoFlush = true };
+                    Console.SetOut(writer);
+                    return SelfTest.Run(args);
+                }
+                EnsureConsole(); return SelfTest.Run(args);
+            }
             if (args.Contains("--server")) { EnsureConsole(); return Net.DedicatedServer.Run(args); }
             using var game = new Game(args);
             game.Run();

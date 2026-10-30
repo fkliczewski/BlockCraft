@@ -55,7 +55,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         new NativeWindowSettings { ClientSize = new Vector2i(1280, 720), Title = "BlockCraft", APIVersion = new Version(3, 3), Profile = ContextProfile.Core, Flags = ContextFlags.ForwardCompatible, StartVisible = true })
     {
         _args = args;
-        _autotest = args.Contains("--autotest");
+        _autotest = args.Contains("--autotest") || args.Contains("--autotest-host") || args.Contains("--autotest-join");
+        int profile = Array.IndexOf(args, "--net-profile");
+        if (profile >= 0 && profile + 1 < args.Length)
+        {
+            var name = args[profile + 1];
+            if (name.Length > 48 || name.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_'))
+                throw new ArgumentException("Profil sieci może zawierać litery ASCII, cyfry, '-' i '_' (do 48 znaków).");
+            Net.LinkSetup.Profile = name;
+        }
         _showcase = args.Contains("--showcase");
         Settings = Settings.Load();
         VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
@@ -78,7 +86,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         StartMenuWorld();
         SetScreen(new TitleScreen());
         _lastTime = _clock.Elapsed.TotalSeconds;
-        if (_autotest) SetupAutotest();
+        if (ArgsNetAutotest) SetupNetAutotest();
+        else if (_autotest) SetupAutotest();
         else if (_showcase) SetupShowcase();
     }
 
@@ -415,6 +424,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        if (_netTestOriginalSettings != null) Settings = _netTestOriginalSettings;
         try { NetShutdown(); Sound.Shutdown(); SaveWorld(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
         base.OnClosing(e);
     }

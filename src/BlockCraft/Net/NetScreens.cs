@@ -17,13 +17,16 @@ public sealed class NetHostScreen : Screen
         Rebuild();
     }
 
-    private int _lastClients = -1; private bool _lastHosting;
+    private int _lastClients = -1; private bool _lastHosting, _lastStarting;
+    private int CodeColumns => Math.Max(1, (W - 24) / 6);
+    private int HostButtonsY => Math.Max(74, 54 + ((G.HostLink?.Code?.Length ?? 0) + CodeColumns - 1) / CodeColumns * 10);
 
     private void Rebuild()
     {
         Widgets.Clear();
         bool hosting = G.HostLink != null;
         _lastHosting = hosting;
+        _lastStarting = G.HostStarting;
         _lastClients = G.Server?.Clients.Count ?? 0;
         if (!hosting)
         {
@@ -31,10 +34,10 @@ public sealed class NetHostScreen : Screen
         }
         else
         {
-            Add(new Button(W / 2 - 154, 74, 100, 20, () => _copiedTicks > 0 ? "Skopiowano!" : "Kopiuj kod", () => { G.SetClipboard(G.HostLink.Code); _copiedTicks = 40; }));
-            Add(new Button(W / 2 - 50, 74, 100, 20, "Nowy kod", () => G.NewInviteCode()));
-            Add(new Button(W / 2 + 54, 74, 100, 20, "Zamknij sieć", () => { G.StopNetwork(); Rebuild(); }));
-            int y = 122;
+            Add(new Button(W / 2 - 154, HostButtonsY, 100, 20, () => _copiedTicks > 0 ? "Skopiowano!" : "Kopiuj kod", () => { G.SetClipboard(G.HostLink.Code); _copiedTicks = 40; }));
+            Add(new Button(W / 2 - 50, HostButtonsY, 100, 20, "Nowy kod", () => G.NewInviteCode()));
+            Add(new Button(W / 2 + 54, HostButtonsY, 100, 20, "Zamknij sieć", () => { G.StopNetwork(); Rebuild(); }));
+            int y = HostButtonsY + 48;
             if (G.Server != null)
                 foreach (var c in G.Server.Clients.ToList())
                 {
@@ -53,8 +56,7 @@ public sealed class NetHostScreen : Screen
     {
         if (_copiedTicks > 0) _copiedTicks--;
         bool hosting = G.HostLink != null;
-        if (hosting != _lastHosting || (G.Server?.Clients.Count ?? 0) != _lastClients) Rebuild();
-        foreach (var w in Widgets) if (w is Button b && b.Text() == "Uruchamianie...") b.Enabled = false;
+        if (hosting != _lastHosting || G.HostStarting != _lastStarting || (G.Server?.Clients.Count ?? 0) != _lastClients) Rebuild();
     }
 
     public override void Render(int mx, int my, float pt)
@@ -71,10 +73,12 @@ public sealed class NetHostScreen : Screen
         else
         {
             sb.TextCentered("Kod zaproszenia (ważny godzinę, wielokrotny):", W / 2f, 32, 0xFFA0A0A0);
-            sb.TextCentered(G.HostLink.Code ?? "...", W / 2f, 46, 0xFF80FF80, true, 2);
-            if (G.HostStatus != null) sb.TextCentered(G.HostStatus, W / 2f, 98, 0xFFFF6060);
-            sb.Text("Gracze:", W / 2 - 154, 106, 0xFFFFFFFF);
-            int y = 122;
+            string code = G.HostLink.Code ?? "...";
+            for (int i = 0; i < code.Length; i += CodeColumns)
+                sb.TextCentered(code.Substring(i, Math.Min(CodeColumns, code.Length - i)), W / 2f, 46 + i / CodeColumns * 10, 0xFF80FF80);
+            if (G.HostStatus != null) sb.TextCentered(G.HostStatus, W / 2f, HostButtonsY + 24, 0xFFFF6060);
+            sb.Text("Gracze:", W / 2 - 154, HostButtonsY + 32, 0xFFFFFFFF);
+            int y = HostButtonsY + 48;
             var clients = G.Server?.Clients ?? new List<RemoteClient>();
             if (clients.Count == 0) sb.Text("§7(nikt jeszcze nie dołączył)", W / 2 - 150, y, 0xFFA0A0A0);
             foreach (var c in clients)
