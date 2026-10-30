@@ -629,7 +629,7 @@ public abstract class DiodeBlock : Block
         if (id == B.RedstoneWire) return w.GetMeta(x, y, z);
         return Redstone.StrongPower(w, x, y, z, side);
     }
-    protected bool ShouldBePowered(World w, int x, int y, int z, int meta) => InputStrength(w, x, y, z, meta) > 0;
+    protected virtual bool ShouldBePowered(World w, int x, int y, int z, int meta) => InputStrength(w, x, y, z, meta) > 0;
 
     /// <summary>MC isFacingTowardsRepeater: przed wyjściem stoi dioda, która nie patrzy wejściem w nas.</summary>
     protected static bool FacingTowardsDiode(World w, int x, int y, int z, int meta)

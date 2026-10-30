@@ -292,16 +292,16 @@ public sealed partial class PlayerController
                     if (e is LivingEntity && !e.Dead && !(e is Player pl && pl.Spectator)) return false;
             }
         }
-        if (bid == B.OakDoor)
+        if (nb is DoorBlock)
         {
             if (ty + 1 >= Chunk.Height || !Block.Get(W.GetBlock(tx, ty + 1, tz)).Replaceable || !Block.Get(W.GetBlock(tx, ty - 1, tz)).Opaque) return false;
             int d = (Dir.HorizFromYaw(p.Yaw) + 3) & 3;
             // zawias: zależnie od sąsiadów
             int lx = tx - Dir.HorizX[(d + 1) & 3], lz = tz - Dir.HorizZ[(d + 1) & 3];
-            bool hinge = W.GetBlock(lx, ty, lz) == B.OakDoor;
-            W.SetBlock(tx, ty, tz, B.OakDoor, d, false);
-            W.SetBlock(tx, ty + 1, tz, B.OakDoor, 8 | (hinge ? 1 : 0), true);
-            W.NotifyNeighbors(tx, ty, tz, B.OakDoor);
+            bool hinge = W.GetBlock(lx, ty, lz) == bid;
+            W.SetBlock(tx, ty, tz, bid, d, false);
+            W.SetBlock(tx, ty + 1, tz, bid, 8 | (hinge ? 1 : 0), true);
+            W.NotifyNeighbors(tx, ty, tz, bid);
             Consume(held); PlaceSound(nb, tx, ty, tz);
             return true;
         }
