@@ -19,6 +19,7 @@ public interface IWorldListener
 public sealed class GameRules
 {
     public bool DoDaylightCycle = true, KeepInventory = false, DoMobSpawning = true, MobGriefing = true, DoFireTick = true, NaturalRegeneration = true;
+    public bool DoEntityDrops = true;
     public bool Set(string name, string value, out string error)
     {
         error = null;
@@ -30,10 +31,11 @@ public sealed class GameRules
             case "domobspawning": DoMobSpawning = v; return true;
             case "mobgriefing": MobGriefing = v; return true;
             case "naturalregeneration": NaturalRegeneration = v; return true;
+            case "doentitydrops": DoEntityDrops = v; return true;
             default: error = "Nieznana reguła: " + name; return false;
         }
     }
-    public static readonly string[] Names = { "doDaylightCycle", "keepInventory", "doMobSpawning", "mobGriefing", "naturalRegeneration" };
+    public static readonly string[] Names = { "doDaylightCycle", "keepInventory", "doMobSpawning", "mobGriefing", "naturalRegeneration", "doEntityDrops" };
 }
 
 public enum Difficulty { Peaceful = 0, Easy = 1, Normal = 2, Hard = 3 }

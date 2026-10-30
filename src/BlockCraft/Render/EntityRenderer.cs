@@ -340,7 +340,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         {
             if (mb.Uv != null) { u0 = mb.Uv[f * 4]; v0 = mb.Uv[f * 4 + 1]; u1 = mb.Uv[f * 4 + 2]; v1 = mb.Uv[f * 4 + 3]; }
             Terrain.Layer = mb.Tex[f];
-            var pa = T(m, a.X, a.Y, a.Z); var pb = T(m, b.X, b.Y, b.Z); var pc = T(m, c.X, c.Y, c.Z); var pd = T(m, d.X, d.Y, d.Z);
+            var pa = T(m, a.X, a.Y + a.X * mb.SlopeX + a.Z * mb.SlopeZ, a.Z); var pb = T(m, b.X, b.Y + b.X * mb.SlopeX + b.Z * mb.SlopeZ, b.Z);
+            var pc = T(m, c.X, c.Y + c.X * mb.SlopeX + c.Z * mb.SlopeZ, c.Z); var pd = T(m, d.X, d.Y + d.X * mb.SlopeX + d.Z * mb.SlopeZ, d.Z);
             var n = Vector3.Cross(pb - pa, pd - pa); if (n.LengthSquared > 1e-12f) n.Normalize();
             float s = Terrain.ShadeFor(n);
             Terrain.Quad(pa, pb, pc, pd, u0, v0, u1, v1, s);

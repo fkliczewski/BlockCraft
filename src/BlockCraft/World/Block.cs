@@ -19,8 +19,10 @@ public struct ModelBox
     public float[] Uv;              // opcjonalnie: 6*4 (u0,v0,u1,v1) w pikselach /16
     public int[] UvRot;             // opcjonalnie rotacja UV per ściana
     public bool NoCull;
+    // Pochylenie płaskiego modelu (tory): y += x * SlopeX + z * SlopeZ.
+    public float SlopeX, SlopeZ;
     public ModelBox(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
-    { X0 = x0; Y0 = y0; Z0 = z0; X1 = x1; Y1 = y1; Z1 = z1; Tex = tex; Uv = null; UvRot = null; NoCull = false; }
+    { X0 = x0; Y0 = y0; Z0 = z0; X1 = x1; Y1 = y1; Z1 = z1; Tex = tex; Uv = null; UvRot = null; NoCull = false; SlopeX = SlopeZ = 0; }
     public static ModelBox Px(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
         => new(x0 / 16f, y0 / 16f, z0 / 16f, x1 / 16f, y1 / 16f, z1 / 16f, tex);
     public static int[] All(int t) => new[] { t, t, t, t, t, t };

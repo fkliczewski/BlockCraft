@@ -116,6 +116,11 @@ public abstract partial class LivingEntity : Entity
         }
         BaseLivingTick();
         if (Dead) return;
+        if (RidingEntity != null)
+        {
+            if (RidingEntity.Removed || this is Player && Sneaking) Mount(null);
+            else { MotionX = MotionY = MotionZ = 0; RidingEntity.UpdatePassenger(); UpdateLimbs(); return; }
+        }
         UpdateAI();
         LivingUpdate();
         UpdateLimbs();
@@ -294,7 +299,7 @@ public abstract partial class LivingEntity : Entity
 
     public virtual bool IsInvulnerableTo(DamageSource s) => false;
 
-    public virtual bool Attack(DamageSource src, float amount)
+    public override bool Attack(DamageSource src, float amount)
     {
         if (World.IsRemote) return false; // na kliencie obrażenia liczy host
         if (Dead || Health <= 0 || IsInvulnerableTo(src)) return false;

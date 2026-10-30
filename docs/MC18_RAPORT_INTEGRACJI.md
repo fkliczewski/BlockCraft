@@ -72,8 +72,9 @@ NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy int
 2. NE: ukończyć podłączenie przywoływania Withera do prawdziwych czaszek ME;
    sprawdzić zgodność generatorów i układu fortec z oryginałem. Smok, kryształy,
    Wither i napisy są już scalone - patrz aktualizacja Hiro poniżej.
-3. RS: tory i wagoniki; dalsza weryfikacja kolejności aktualizacji i złożonych
-   konstrukcji. Zestaw testów nie dowodzi zgodności każdego układu z MC 1.8.
+3. RS: dalsza weryfikacja kolejności aktualizacji, złożonych konstrukcji i
+   transportu w multiplayerze. Tory i wagoniki już scalone - aktualizacja Nami
+   poniżej. Testy nie dowodzą zgodności każdego układu z MC 1.8.
 4. ME: zaklinanie i działanie zaklęć, kowadło, mapy, wędka, tabliczki, ramki,
    obrazy, stojaki, sztandary, łódki, fajerwerki, osiągnięcia i pozostałe itemy.
 5. OW: pogoda oraz brakujące struktury; sprawdzenie zgodności terenu i dekoracji.
@@ -158,3 +159,30 @@ przy Handler typu Game. GUI konia i handlu nie jest jeszcze podłączone do
 RemoteClient, a wybór oferty wymaga komunikatu klient-host. Nie deklarować
 pełnej obsługi tych mechanik dla gościa sieciowego. Zgodność całości 1:1 nadal
 wymaga dalszych testów.
+
+## Aktualizacja po końcowym raporcie Nami, 18:43
+
+Przeczytano oba raporty `.modus/raporty/20261030-184310-Nami.md` i
+`20261030-184341-Nami.md`. Pierwszy wstrzymywał scalanie do zakończenia zapisu
+pasażerów. Po drugim scalono `mc18/rs` do 23827fc: cztery typy torów, dziesięć
+kształtów, zakręty, podjazdy, zwrotnice, propagację zasilania, pięć typów
+wagoników, kontenery, pasażerów, piec, lej, TNT, dozowanie oraz receptury.
+Zachowano obie zakładki Transport i Alchemia, wszystkie rodzaje drewna
+w recepturach oraz haki używania przedmiotów i odbijania kul ognia.
+
+Pierwszy selftest po scaleniu ujawnił rzeczywisty błąd integracji MO/RS:
+przeciążenie Mob.Mount(Player) przejmowało wywołanie cow.Mount(null),
+powodując NullReferenceException. Dodano obsługę wysiadania przez bazowe
+Entity.Mount(null). Log nieudanej próby zachowany jako
+`.modus/nami-integrated-selftest.log` (396 OK, 1 FAIL, dalsza część testów
+RS przerwana wyjątkiem). Po poprawce **442 OK, 0 FAIL** w
+`.modus/nami-integrated-fixed.log`; Release ma 0 błędów i 4 ostrzeżenia.
+
+Autotest `BC_AUTOTEST=rs` zakończony `AUTOTEST DONE`, warunki transportu OK.
+Obejrzano rs_10_tory, rs_11_wagoniki i rs_15_transport. Zrzuty zachowane
+w `.modus/nami-integrated-autotest`; zaktualizowano `BlockCraft_Gra`.
+Sam raport Nami podaje 221 testów na jej gałęzi; 442 to wynik scalonego kodu.
+
+Nie testowano jazdy i odtwarzania relacji pasażera przez sieć. GUI kontenerów
+wagonika używa RsGui.Open (wymaga lokalnego Game), więc udane testy GUI
+jednoosobowego nie oznaczają obsługi kontenerów wagonika dla gościa sieciowego.

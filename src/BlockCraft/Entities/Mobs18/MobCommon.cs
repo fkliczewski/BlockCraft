@@ -108,7 +108,11 @@ public abstract partial class Mob
     /// <summary>getMountedYOffset z MC: wysokość siodła nad stopami moba.</summary>
     public virtual double MountedYOffset => Height*.75 - .2;
     public bool Mount(Player p)
-    { if(Rider!=null || World.IsRemote) return false; p.RidingMob?.Dismount(); Rider=p; p.RidingMob=this; PersistenceRequired=true; Nav.Stop(); return true; }
+    {
+        // null wybiera to przeciążenie również dla moba wysiadającego z wagonika.
+        if (p == null) { base.Mount(null); Dismount(); return true; }
+        if(Rider!=null || World.IsRemote) return false; p.RidingMob?.Dismount(); Rider=p; p.RidingMob=this; PersistenceRequired=true; Nav.Stop(); return true;
+    }
     public void Dismount()
     { if(Rider==null) return; var p=Rider; Rider=null; p.RidingMob=null; p.SetPositionAndPrev(X,Y+Height,Z); p.FallDistance=0; }
     public bool InteractLead(Player p)

@@ -15,7 +15,7 @@ public sealed class Recipe
 public static partial class Recipes
 {
     public static readonly List<Recipe> All = new();
-    public const int AnyPlanks = -1, AnyLog = -2, AnyCoal = -3;
+    public const int AnyPlanks = -1, AnyLog = -2, AnyCoal = -3, AnyWoodSlab = -4;
 
     private static bool Matches(int want, int wantMeta, ItemStack s)
     {
@@ -23,6 +23,7 @@ public static partial class Recipes
         if (s == null) return false;
         if (want == AnyPlanks) return s.Id is B.OakPlanks or B.BirchPlanks or B.SprucePlanks or B.JunglePlanks or B.AcaciaPlanks or B.DarkOakPlanks;
         if (want == AnyLog) return s.Id is B.OakLog or B.BirchLog or B.SpruceLog or B.JungleLog or B.AcaciaLog or B.DarkOakLog;
+        if (want == AnyWoodSlab) return s.Id is B.OakSlab or B.BirchSlab or B.SpruceSlab or B.JungleSlab or B.AcaciaSlab or B.DarkOakSlab;
         if (want == AnyCoal) return s.Id == I.Coal || s.Id == I.Charcoal;
         return s.Id == want && (wantMeta < 0 || s.Damage == wantMeta);
     }

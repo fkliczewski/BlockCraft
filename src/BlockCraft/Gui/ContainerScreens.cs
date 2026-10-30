@@ -247,9 +247,10 @@ public sealed class CreativeScreen : Screen
     private static readonly string[] TabNames = { "Budulce", "Dekoracje", "Redstone", "Różne", "Jedzenie", "Narzędzia", "Walka", "Materiały", "Szukaj", "Ekwipunek przetrwania", "Transport", "Alchemia" };
     private static readonly int[] TabIcons = { B.Bricks, B.Poppy, I.Redstone, I.LavaBucket, I.Apple, I.IronAxe, I.GoldSword, I.Stick, I.Book, B.Chest, B.Rail, I.Potion };
     private static readonly int[] TabOrder = { 0, 1, 2, 10, 3, 8, 4, 5, 6, 11, 7, 9 };
+
     private readonly PlayerContainer _inv;
 
-    public CreativeScreen(Player p) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; }
+    public CreativeScreen(Player p, int tab = -1) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; if (tab >= 0) _tab = Math.Clamp(tab, 0, TabNames.Length - 1); }
     public override bool PausesGame => false;
 
     protected override void Init()
@@ -278,6 +279,7 @@ public sealed class CreativeScreen : Screen
         int pos = Array.IndexOf(TabOrder, t);
         return (_left + pos % 6 * 29, pos < 6 ? _top - 28 : _top + PH - 4);
     }
+
 
     public override void Render(int mx, int my, float pt)
     {
@@ -361,6 +363,7 @@ public sealed class CreativeScreen : Screen
         var (x, y) = TabPos(t);
         G.Sb.DrawPx(G.Gui.Widgets, x, y, active ? 28 : 0, 110, 28, 32);
         G.DrawItem(new ItemStack(TabIcons[t]), x + 6, y + (Array.IndexOf(TabOrder, t) < 6 ? 9 : 7), false);
+
     }
 
     public override void MouseDown(int mx, int my, int btn)

@@ -444,6 +444,7 @@ public partial class Player : LivingEntity
     public void AttackEntity(Entity target)
     {
         if (target is not LivingEntity && target.AttackedByPlayer(this)) return;
+        if (target is not LivingEntity) { target.Attack(DamageSource.PlayerAttack(this), Inventory.Selected?.Item?.AttackDamage ?? 1f); return; }
         if (target is not LivingEntity le || le.Dead) return;
         var held = Inventory.Selected;
         float dmg = EffectLogic.Melee(this, held?.Item?.AttackDamage ?? 1f);
@@ -471,7 +472,7 @@ public partial class Player : LivingEntity
             Dimension = (int)World.Dimension,
             Name = Name, X = X, Y = Y, Z = Z, Yaw = Yaw, Pitch = Pitch, Health = Health, Food = FoodLevel, Saturation = Saturation, Exhaustion = Exhaustion,
             GameMode = GameMode, Flying = Flying, XpLevel = XpLevel, XpProgress = XpProgress, XpTotal = XpTotal, Selected = Inventory.SelectedSlot, Air = Air,
-            HasSpawn = HasSpawn, SpawnX = SpawnX, SpawnY = SpawnY, SpawnZ = SpawnZ, Dead = Dead
+            HasSpawn = HasSpawn, SpawnX = SpawnX, SpawnY = SpawnY, SpawnZ = SpawnZ, Dead = Dead, RidingVehicleId = RidingEntity?.SaveId ?? PendingVehicleId
         };
         for (int i = 0; i < 40; i++) { var s = Inventory.Get(i); if (s != null) d.Inventory.Add(SlotData.From(i, s)); }
         SaveMechanics(d);
@@ -480,6 +481,8 @@ public partial class Player : LivingEntity
 
     public void FromData(PlayerData d)
     {
+        if (RidingEntity != null) Mount(null);
+        PendingVehicleId = d.RidingVehicleId;
         SetPositionAndPrev(d.X, d.Y, d.Z); Yaw = PrevYaw = d.Yaw; Pitch = PrevPitch = d.Pitch;
         Health = d.Health; FoodLevel = d.Food; Saturation = d.Saturation; Exhaustion = d.Exhaustion;
         SetGameMode(d.GameMode); Flying = d.Flying && AllowFlying; XpLevel = d.XpLevel; XpProgress = d.XpProgress; XpTotal = d.XpTotal;
