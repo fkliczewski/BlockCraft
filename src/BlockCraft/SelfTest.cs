@@ -429,16 +429,18 @@ public static partial class SelfTest
         Ticks(w, 25);
         bool beef = w.Entities.OfType<ItemEntity>().Any(e => e.Stack.Id == I.RawBeef || e.Stack.Id == I.Leather);
         Check(beef || p2.Inventory.CountOf(I.RawBeef) > 0, "Drop z krowy");
-        // rozmnażanie
-        var c1 = new Cow(w); c1.SetPositionAndPrev(20.5, 4, 20.5); w.AddEntityNow(c1);
-        var c2 = new Cow(w); c2.SetPositionAndPrev(21.5, 4, 20.5); w.AddEntityNow(c2);
-        var p3 = SpawnPlayer(w, 23, 4, 23);
+        // Osobny świat: potwory z wcześniejszej walki i naturalnego spawnu nie mogą zabijać rodziców.
+        var breedingWorld = MakeWorld(1, WorldType.Superflat, 2);
+        breedingWorld.Rules.DoMobSpawning = false;
+        var c1 = new Cow(breedingWorld); c1.SetPositionAndPrev(20.5, 4, 20.5); breedingWorld.AddEntityNow(c1);
+        var c2 = new Cow(breedingWorld); c2.SetPositionAndPrev(21.5, 4, 20.5); breedingWorld.AddEntityNow(c2);
+        var p3 = SpawnPlayer(breedingWorld, 23, 4, 23);
         p3.Inventory.Selected = new ItemStack(I.Wheat, 2);
         c1.Interact(p3); c2.Interact(p3);
-        int cowsBefore = w.Entities.OfType<Cow>().Count();
-        Ticks(w, 200);
-        Check(w.Entities.OfType<Cow>().Count() > cowsBefore, "Rozmnażanie krów", $"{cowsBefore} -> {w.Entities.OfType<Cow>().Count()}");
-        Check(w.Entities.OfType<Cow>().Any(c => c.IsBaby), "Młode krowy");
+        int cowsBefore = breedingWorld.Entities.OfType<Cow>().Count();
+        Ticks(breedingWorld, 200);
+        Check(breedingWorld.Entities.OfType<Cow>().Count() > cowsBefore, "Rozmnażanie krów", $"{cowsBefore} -> {breedingWorld.Entities.OfType<Cow>().Count()}");
+        Check(breedingWorld.Entities.OfType<Cow>().Any(c => c.IsBaby), "Młode krowy");
         // owca nożyce
         var sh = new Sheep(w); sh.SetPositionAndPrev(-30.5, 4, 30.5); w.AddEntityNow(sh);
         var p4 = SpawnPlayer(w, -31.5, 4, 30.5); p4.Inventory.Selected = new ItemStack(I.Shears);

@@ -124,3 +124,11 @@ Naprawy integracyjne po tym scaleniu: uniknięto pokazania napisów końcowych
 przy odrodzeniu po śmierci w Endzie; przemianowano pomocniczą metodę Withera,
 która zasłaniała właściwość LivingEntity.IsUndead. Pełna lista braków z innych
 modułów pozostaje aktualna. Napisy używają własnego tekstu BlockCraft.
+
+Powtórka testów gotowego wydania ujawniła wcześniejszą niestabilność krów:
+316 OK / 2 FAIL (liczba krów spadła z 2 do 0). Test rozmnażania współdzielił
+świat z wcześniejszymi walkami i włączonym naturalnym spawnem potworów.
+Odizolowano go w osobnym świecie bez naturalnego spawnu; reguły rozmnażania
+w grze nie zostały zmienione. Log pierwszej nieudanej próby pozostawiono
+w `.modus/hiro-published-selftest.log`, wyniki po poprawce w
+`.modus/hiro-published-fixed.log` i `.modus/hiro-repeat-*.log`.
