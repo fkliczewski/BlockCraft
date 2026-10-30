@@ -56,6 +56,11 @@ namespace BlockCraft.Items
             var cmp = Simple(I.ComparatorItem, "comparator", "Komparator", Red); cmp.BlockId = B.Comparator;
             // nić stawia linkę (MC ItemReed(Blocks.tripwire))
             Item.ById[I.String].BlockId = B.Tripwire;
+            new MinecartItem(I.Minecart, "minecart", "Wagonik", MinecartKind.Rideable);
+            new MinecartItem(I.ChestMinecart, "chest_minecart", "Wagonik ze skrzynią", MinecartKind.Chest);
+            new MinecartItem(I.FurnaceMinecart, "furnace_minecart", "Wagonik z piecem", MinecartKind.Furnace);
+            new MinecartItem(I.TntMinecart, "tnt_minecart", "Wagonik z TNT", MinecartKind.Tnt);
+            new MinecartItem(I.HopperMinecart, "hopper_minecart", "Wagonik z lejem", MinecartKind.Hopper);
         }
     }
 }
@@ -74,6 +79,13 @@ namespace BlockCraft.Entities
             Tile(15, () => new DispenserTileEntity(true));
             Tile(16, () => new NoteTileEntity());
             Render.EntityRenderer.Custom[typeof(PistonMovingVisual)] = Render.EntityRenderer.RenderMovingBlock;
+            Entity("minecart", w => new MinecartEntity(w));
+            Entity("chest_minecart", w => new ChestMinecartEntity(w));
+            Entity("furnace_minecart", w => new FurnaceMinecartEntity(w));
+            Entity("tnt_minecart", w => new TntMinecartEntity(w));
+            Entity("hopper_minecart", w => new HopperMinecartEntity(w));
+            foreach (var type in new[] { typeof(MinecartEntity), typeof(ChestMinecartEntity), typeof(FurnaceMinecartEntity), typeof(TntMinecartEntity), typeof(HopperMinecartEntity) })
+                Render.EntityRenderer.Custom[type] = Render.EntityRenderer.RenderMinecart;
         }
     }
 }

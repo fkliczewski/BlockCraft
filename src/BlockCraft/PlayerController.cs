@@ -32,7 +32,7 @@ public sealed partial class PlayerController
         if (best > er) best = er;
         foreach (var e in W.Entities)
         {
-            if (e == p || !e.CanBeAttacked || e.Removed) continue;
+            if (e == p || e == p.RidingEntity || !e.CanBeAttacked || e.Removed) continue;
             if (e.DistanceSq(ex, ey, ez) > 64) continue;
             var bb = e.BoundingBox.Grow(0.1);
             if (bb.Contains(ex, ey, ez)) { HitEntity = e; best = 0; continue; }
@@ -209,6 +209,7 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (it is IBlockUseItem use) return use.UseOnBlock(W, p, held, x, y, z, face);
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {

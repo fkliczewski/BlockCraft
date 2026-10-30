@@ -66,6 +66,40 @@ public abstract class Entity
     // interpolacja sieciowa
     public double NetX, NetY, NetZ; public float NetYaw, NetPitch; public int NetSteps;
     public int RiddenTicks;
+    public Entity RidingEntity, Passenger;
+
+    public virtual bool Attack(DamageSource source, float amount) => false;
+    public bool Mount(Entity vehicle)
+    {
+        if (vehicle == this || vehicle != null && (vehicle.Removed || vehicle.Passenger != null)) return false;
+        for (var parent = vehicle; parent != null; parent = parent.RidingEntity) if (parent == this) return false;
+        var old = RidingEntity;
+        if (old != null) old.Passenger = null;
+        RidingEntity = vehicle;
+        MotionX = MotionY = MotionZ = 0; FallDistance = 0;
+        if (vehicle != null) { vehicle.Passenger = this; vehicle.UpdatePassenger(); }
+        else if (old != null)
+        {
+            // Wysiadanie na wolne miejsce obok pojazdu.
+            var boxes = new List<AABB>();
+            bool found = false;
+            foreach (var (dx, dz) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                var bb = new AABB(old.X + dx - Width / 2, old.Y + 0.5, old.Z + dz - Width / 2,
+                    old.X + dx + Width / 2, old.Y + 0.5 + Height, old.Z + dz + Width / 2);
+                if (World.GetCollisionBoxes(bb, boxes).Count != 0) continue;
+                SetPosition(old.X + dx, old.Y + 0.5, old.Z + dz); found = true; break;
+            }
+            if (!found) SetPosition(old.X, old.Y + old.Height, old.Z);
+        }
+        return true;
+    }
+    public virtual void UpdatePassenger()
+    {
+        if (Passenger == null) return;
+        if (Passenger.Dead || Passenger.Removed) { Passenger.Mount(null); return; }
+        Passenger.SetPosition(X, Y + 0.35, Z); Passenger.FallDistance = 0;
+    }
 
     protected Entity(World.World w) { World = w; }
 
@@ -276,7 +310,7 @@ public abstract class Entity
 
     protected virtual void OnFall(float distance) { }
 
-    public void Kill() { Dead = true; Removed = true; }
+    public void Kill() { Passenger?.Mount(null); if (RidingEntity != null) Mount(null); Dead = true; Removed = true; }
 
     public double DistanceSq(Entity o) { double dx = X - o.X, dy = Y - o.Y, dz = Z - o.Z; return dx * dx + dy * dy + dz * dz; }
     public double DistanceSq(double x, double y, double z) { double dx = X - x, dy = Y - y, dz = Z - z; return dx * dx + dy * dy + dz * dz; }

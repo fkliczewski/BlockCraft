@@ -12,6 +12,29 @@ public static partial class TextureGen
             if (kind != "normal") Add("rail_" + kind + "_powered", RailTexture(kind, true));
         }
         for (int s = 6; s < 10; s++) Add("rail_turn_" + s, RailCurve(s));
+        var side = New(); var inside = New();
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
+        {
+            side[y * 16 + x] = Hex(y is 0 or 1 or 14 or 15 ? 0x777777u : y % 4 == 0 ? 0x999999u : x % 5 == 0 ? 0xBBBBBBu : 0xAAAAAAu);
+            inside[y * 16 + x] = Hex(x % 4 == 0 || y % 4 == 0 ? 0x666666u : 0x888888u);
+        }
+        Add("minecart_side", side); Add("minecart_inside", inside);
+        foreach (string key in new[] { "minecart", "chest_minecart", "furnace_minecart", "tnt_minecart", "hopper_minecart" })
+        {
+            var p = New();
+            if (key != "minecart")
+            {
+                string content = key == "chest_minecart" ? "chest_front" : key == "furnace_minecart" ? "furnace_front_off" : key == "tnt_minecart" ? "tnt_side" : "hopper_outside";
+                var block = Get16(content);
+                for (int y = 0; y < 8; y++) for (int x = 0; x < 10; x++) p[(y + 1) * 16 + x + 3] = block[(y * 2) * 16 + x * 16 / 10];
+            }
+            for (int y = 6; y < 14; y++) for (int x = 1; x < 15; x++)
+            {
+                if (y < 8 && (x < 3 || x > 12) || y >= 12 && (x < 3 || x > 12)) continue;
+                p[y * 16 + x] = Hex(y == 6 || y == 13 || x == 1 || x == 14 ? 0x555555u : y % 3 == 0 ? 0xBBBBBBu : 0x949494u);
+            }
+            Add("item_" + key, p);
+        }
     }
     private static uint[] RailTexture(string kind, bool on)
     {
