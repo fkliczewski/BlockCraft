@@ -474,6 +474,7 @@ public static partial class SelfTest
     {
         Console.WriteLine("[Głód]");
         var w = MakeWorld(1, WorldType.Superflat, 2);
+        w.Rules.DoMobSpawning = false; // szlamy z chunków szlamu (spawn 1.8 w superpłaskim) zabijały gracza
         var p = SpawnPlayer(w, 0.5, 4, 0.5);
         p.Saturation = 0; p.FoodLevel = 20;
         p.Yaw = 0; p.MoveForward = 1; p.Sprinting = true;

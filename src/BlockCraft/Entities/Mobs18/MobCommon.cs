@@ -84,7 +84,7 @@ public abstract partial class Mob
         }
         if(Vehicle!=null) {
             if(Vehicle.Dead||Vehicle.Removed) Vehicle=null;
-            else { Nav.Stop(); SetPosition(Vehicle.X,Vehicle.Y+Vehicle.Height*.75,Vehicle.Z); MotionX=MotionY=MotionZ=0; return Vehicle is not Mob; }
+            else { Nav.Stop(); SetPosition(Vehicle.X,RideY,Vehicle.Z); MotionX=MotionY=MotionZ=0; return Vehicle is not Mob; }
         }
         if(LeashHolder!=null) {
             double d=Distance(LeashHolder);
@@ -97,12 +97,14 @@ public abstract partial class Mob
     public override void Tick()
     {
         base.Tick();
-        if(Vehicle!=null&&!Vehicle.Removed) { SetPosition(Vehicle.X,Vehicle.Y+Vehicle.Height*.75,Vehicle.Z); MotionX=MotionY=MotionZ=0; FallDistance=0; }
+        if(Vehicle!=null&&!Vehicle.Removed) { SetPosition(Vehicle.X,RideY,Vehicle.Z); MotionX=MotionY=MotionZ=0; FallDistance=0; }
         if(Rider!=null) {
             if(Dead||Removed||Rider.Dead||Rider.Removed||Rider.Sneaking) Dismount();
             else { Rider.SetPosition(X,Y+MountedYOffset,Z); Rider.MotionX=Rider.MotionY=Rider.MotionZ=0; Rider.FallDistance=0; }
         }
     }
+    /// <summary>Wysokość stóp moba-jeźdźca: posY pojazdu + getMountedYOffset (pająk i kurczak połowa wysokości, reszta 3/4) + getYOffset jeźdźca (dorosły szkielet i zombie -0.35).</summary>
+    private double RideY => Vehicle.Y + (Vehicle is Spider or Chicken ? Vehicle.Height*.5 : Vehicle.Height*.75) + (this is Skeleton || this is Zombie { Baby: false } ? -.35 : 0);
     /// <summary>getMountedYOffset z MC: wysokość siodła nad stopami moba.</summary>
     public virtual double MountedYOffset => Height*.75 - .2;
     public bool Mount(Player p)

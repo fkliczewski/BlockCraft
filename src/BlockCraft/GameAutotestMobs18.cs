@@ -70,7 +70,7 @@ public sealed partial class Game
         {
             World.DayTime = 6000; World.Rules.DoDaylightCycle = false; World.Rules.DoMobSpawning = false;
             _moX = MathUtil.FloorToInt(Player.X); _moY = MathUtil.FloorToInt(Player.Y); _moZ = MathUtil.FloorToInt(Player.Z);
-            Player.Flying = true;
+            Player.Flying = true; HideGui = true;
             Log.Info($"MO-TEST plac {_moX} {_moY} {_moZ}");
         });
         var w = (Func<World.World>)(() => World);
@@ -150,9 +150,9 @@ public sealed partial class Game
         MoGallery("mo_14_woda", () =>
         {
             for (int dx = -6; dx <= 6; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -3; dy <= -1; dy++) World.SetBlock(_moX + dx, _moY + dy, _moZ + dz, B.Water, 0);
-            MoAdd(new Squid(w()), -3, -2, 0); MoAdd(new Guardian(w()), 2, -2.2, 0);
-            MoAdd(new Bat(w()), 0, 2.5, 0);
-        }, 6, 25, 1.6);
+            MoAdd(new Squid(w()), -2, -2, 0); MoAdd(new Guardian(w()), 2, -2.2, 0);
+        }, 5, 0, -2.4);
+        MoGallery("mo_14b_nietoperz", () => MoAdd(new Bat(w()), 0, 1.5, 0), 3, -10, 1.2);
         Step(5, () => { for (int dx = -6; dx <= 6; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -3; dy <= -1; dy++) World.SetBlock(_moX + dx, _moY + dy, _moZ + dz, dy == -1 ? B.Grass : B.Dirt, 0); });
         MoGallery("mo_15_smycze", () =>
         {
@@ -180,6 +180,7 @@ public sealed partial class Game
         Horse gh = null;
         Step(10, () =>
         {
+            HideGui = false;
             MoClear();
             gh = MoHorse(World, 0, 4 | (1 << 8), I.GoldHorseArmor, true); gh.Owner = Player.Name;
             gh.SetPositionAndPrev(_moX + .5, _moY, _moZ + 2.5); World.SpawnEntity(gh);

@@ -411,6 +411,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         la.RX = MathF.Cos(limb * 0.6662f) * 2f * amt * 0.5f;
         rl.RX = MathF.Cos(limb * 0.6662f) * 1.4f * amt;
         ll.RX = MathF.Cos(limb * 0.6662f + MathF.PI) * 1.4f * amt;
+        if (e is Player { RidingMob: not null } || e is Mob { Vehicle: not null }) // ModelBiped.isRiding
+        { ra.RX -= MathF.PI / 5f; la.RX -= MathF.PI / 5f; rl.RX = ll.RX = -MathF.PI * 2f / 5f; rl.RY = MathF.PI / 10f; ll.RY = -MathF.PI / 10f; }
         if (e.HeldItem != null || e is Player p && p.Inventory.Selected != null) ra.RX = ra.RX * 0.5f - MathF.PI / 10f;
         float swing = e.PrevSwingProgress + (e.SwingProgress - e.PrevSwingProgress) * pt;
         if (swing > 0)

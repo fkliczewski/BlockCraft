@@ -55,7 +55,7 @@ public static partial class SkinGen
     static partial void SkinsMobs()
     {
         CaveSpiderSkin(); SlimeSkin(); SilverfishSkin(); WitchSkin(); GuardianSkins(); ZombieVillagerSkin();
-        WolfSkins(); OcelotSkins(); RabbitSkins(); BatSkin(); SquidSkin(); MooshroomSkin(); IronGolemSkin(); SnowGolemSkin();
+        WolfSkins(); OcelotSkins(); RabbitSkins(); BatSkin(); SquidSkin(); MooshroomSkin(); PigSaddleSkin(); LeashSkins(); IronGolemSkin(); SnowGolemSkin();
         VillagerSkins(); HorseSkins(); CreeperChargeSkin(); BeamSkin();
     }
 
@@ -120,11 +120,11 @@ public static partial class SkinGen
     private static void VillagerSkins()
     {
         uint skin = 0xB98266;
-        var farmer = new Cv(110); VillagerBase(farmer, skin, 0x6B4A2A, 0x5A3E22, (f, x, y) => f == 13 && y < 6 && x is 1 or 6 ? Hx(0x2E2414) : 0); Add("villager_farmer", farmer);
-        var lib = new Cv(111); VillagerBase(lib, skin, 0xE6E6E6, 0xE0E0E0, (f, x, y) => f is 3 or 13 && x is 3 or 4 && y < 10 ? Hx(0xB0B0B0) : 0); Add("villager_librarian", lib);
-        var priest = new Cv(112); VillagerBase(priest, skin, 0x7A3E8C, 0x6B3279, (f, x, y) => f is 3 && y == 0 && x is >= 2 and <= 5 ? Hx(0xE0C040) : 0); Add("villager_priest", priest);
-        var smith = new Cv(113); VillagerBase(smith, skin, 0x3B3B3B, 0x2E2E2E, (f, x, y) => f is 3 or 13 && x >= 1 && x <= 6 && y >= 1 ? Hx(0x1E1E1E) : 0); Add("villager_smith", smith);
-        var butcher = new Cv(114); VillagerBase(butcher, skin, 0xE8E8E8, 0xE4E4E4, (f, x, y) => f is 3 or 13 && (x + y * 3) % 11 == 0 ? Hx(0xA02020) : 0); Add("villager_butcher", butcher);
+        var farmer = new Cv(110); VillagerBase(farmer, skin, 0x6B4A2A, 0x5A3E22, (f, x, y) => f == 13 && y < 6 && x is 1 or 6 ? 0x2E2414u : 0); Add("villager_farmer", farmer);
+        var lib = new Cv(111); VillagerBase(lib, skin, 0xE6E6E6, 0xE0E0E0, (f, x, y) => f is 3 or 13 && x is 3 or 4 && y < 10 ? 0xB0B0B0u : 0); Add("villager_librarian", lib);
+        var priest = new Cv(112); VillagerBase(priest, skin, 0x7A3E8C, 0x6B3279, (f, x, y) => f is 3 && y == 0 && x is >= 2 and <= 5 ? 0xE0C040u : 0); Add("villager_priest", priest);
+        var smith = new Cv(113); VillagerBase(smith, skin, 0x3B3B3B, 0x2E2E2E, (f, x, y) => f is 3 or 13 && x >= 1 && x <= 6 && y >= 1 ? 0x1E1E1Eu : 0); Add("villager_smith", smith);
+        var butcher = new Cv(114); VillagerBase(butcher, skin, 0xE8E8E8, 0xE4E4E4, (f, x, y) => f is 3 or 13 && (x + y * 3) % 11 == 0 ? 0xA02020u : 0); Add("villager_butcher", butcher);
     }
 
     private static void ZombieVillagerSkin()
@@ -339,6 +339,32 @@ public static partial class SkinGen
         c.Fill(52, 0, 4, 6, 1, 0xE0A0A0, .08f);
         c.Box(0, 16, 4, 12, 4, (f, x, y, w, h) => V(r, y > 9 ? 0x2A1E14 : y > 6 ? wh : red, .12f));
         Add("mooshroom", c);
+    }
+
+    /// <summary>pig_saddle.png: skórzane siodło na grzbiecie (przednia ściana obróconego tułowia) i popręg po bokach, reszta przezroczysta.</summary>
+    private static void PigSaddleSkin()
+    {
+        var c = new Cv(154); var r = c.R;
+        c.Box(28, 8, 10, 16, 8, (f, x, y, w, h) =>
+        {
+            bool seat = y >= 4 && y <= 11;
+            if (f == 3 && seat) return x == 0 || x == w - 1 || y == 4 || y == 11 ? V(r, 0x4A2C14, .1f) : V(r, 0x7A4A24, .12f);
+            if (f is 2 or 4 && y >= 6 && y <= 8) return V(r, 0x3A2412, .1f);
+            if (f == 1 && y >= 6 && y <= 8) return V(r, 0x3A2412, .1f);
+            return 1;
+        });
+        Add("pig_saddle", c);
+    }
+
+    /// <summary>lead_knot.png i lina smyczy: skręcony sznur w odcieniach brązu.</summary>
+    private static void LeashSkins()
+    {
+        var k = new Cv(155); var r = k.R;
+        k.Box(0, 0, 6, 8, 6, (f, x, y, w, h) => V(r, (x + y) % 3 == 0 ? 0x5C4024 : (x + y) % 3 == 1 ? 0x8A6A3E : 0x7A5A32, .1f));
+        Add("leash_knot", k);
+        var l = new Cv(156); r = l.R;
+        l.Box(0, 0, 1, 1, 16, (f, x, y, w, h) => V(r, (x + y) % 2 == 0 ? 0x806040 : 0x5E4428, .08f));
+        Add("leash", l);
     }
 
     private static void IronGolemSkin()

@@ -114,7 +114,6 @@ namespace BlockCraft.Gui
                 for (int i = 0; i < 14; i++) { sb.Fill(Left + 87 + i, Top + 52 + i, 2, 2, 0xFFE02020); sb.Fill(Left + 100 - i, Top + 52 + i, 2, 2, 0xFFE02020); }
                 if (In(mx, my, Left + 83, Top + 51, 24, 16)) GuiDraw.Tooltip(G, "Oferta wyczerpana\n§7Handluj innymi, by ją odnowić", mx, my);
             }
-            sb.TextCentered($"{_mc.Index + 1}/{Count}", Left + C.Width / 2f, Top + 42, 0xFF404040, false);
         }
         private void Button((int x, int y) p, int mx, int my, bool on, bool right)
         {

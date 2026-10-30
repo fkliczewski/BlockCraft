@@ -25,6 +25,7 @@ namespace BlockCraft.Render
             CustomLiving[typeof(Rabbit)] = (r, e, p) => r.RenderRabbit((Rabbit)e, p);
             CustomLiving[typeof(Bat)] = (r, e, p) => r.RenderBat((Bat)e, p);
             CustomLiving[typeof(Squid)] = (r, e, p) => r.RenderSquid((Squid)e, p);
+            CustomLiving[typeof(Pig)] = (r, e, p) => r.RenderPig((Pig)e, p);
             CustomLiving[typeof(Mooshroom)] = (r, e, p) => r.RenderMooshroom((Mooshroom)e, p);
             CustomLiving[typeof(IronGolem)] = (r, e, p) => r.RenderIronGolem((IronGolem)e, p);
             CustomLiving[typeof(SnowGolem)] = (r, e, p) => r.RenderSnowGolem((SnowGolem)e, p);
@@ -247,11 +248,36 @@ namespace BlockCraft.Render
             _cowHead.RY = Rad(p.HeadYaw); _cowHead.RX = Rad(p.Pitch); _cowBody.RX = MathF.PI / 2; Quad4(_cowLegs, p.Limb, p.LimbAmt);
             RenderPart(Skin, _cowHead, root); RenderPart(Skin, _cowBody, root); foreach (var l in _cowLegs) RenderPart(Skin, l, root);
             if (c.IsBaby || Block.Get(B.RedMushroom).Id != B.RedMushroom) return;
-            // LayerMooshroomMushroom: dwa grzyby na grzbiecie i jeden na głowie (pełne modele bloków)
-            var flip = Matrix4.CreateTranslation(0, .5f, 0) * Matrix4.CreateScale(1, -1, 1);
-            RenderBlockAt(B.RedMushroom, 0, flip * Matrix4.CreateRotationY(Rad(42)) * Matrix4.CreateTranslation(.2f, 2 / 16f, .4f) * root);
-            RenderBlockAt(B.RedMushroom, 0, flip * Matrix4.CreateRotationY(Rad(84)) * Matrix4.CreateTranslation(-.15f, 2 / 16f, -.2f) * root);
-            RenderBlockAt(B.RedMushroom, 0, flip * Matrix4.CreateRotationY(Rad(12)) * Matrix4.CreateTranslation(0, -4 / 16f, -3 / 16f) * PartMatrix(_cowHead, root));
+            // LayerMooshroomMushroom: dwa grzyby na grzbiecie i jeden na głowie (model krzyżowy bloku grzyba)
+            int tex = Block.Get(B.RedMushroom).GetTexture(0, 0);
+            var back = Matrix4.CreateTranslation(.2f, .35f, .5f) * Matrix4.CreateScale(1, -1, 1) * root;
+            var r42 = Matrix4.CreateRotationY(Rad(42));
+            RenderCrossAt(tex, r42 * back);
+            RenderCrossAt(tex, r42 * Matrix4.CreateTranslation(.1f, 0, -.6f) * r42 * back);
+            RenderCrossAt(tex, Matrix4.CreateRotationY(Rad(12)) * Matrix4.CreateTranslation(0, .7f, -.2f) * Matrix4.CreateScale(1, -1, 1) * PartMatrix(_cowHead, root));
+        }
+
+        /// <summary>Blok krzyżowy (dwie płaszczyzny po przekątnej) wyśrodkowany w początku macierzy, jak renderBlockBrightness dla roślin.</summary>
+        private void RenderCrossAt(int tex, Matrix4 m)
+        {
+            var t = new int[6]; Array.Fill(t, tex);
+            var plane = new ModelBox(0, 0, .5f, 1, 1, .5f, t) { Uv = Full() };
+            var off = Matrix4.CreateTranslation(-.5f, -.5f, -.5f);
+            EmitModelBox(plane, off * Matrix4.CreateRotationY(MathF.PI / 4) * m);
+            EmitModelBox(plane, off * Matrix4.CreateRotationY(-MathF.PI / 4) * m);
+        }
+
+        // ===================== świnia z siodłem (ModelPig, LayerSaddle) =====================
+        private readonly ModelPart _pigSaddle = P(0, 11, 2).Box(28, 8, -5, -10, -7, 10, 16, 8, .5f);
+        private void RenderPig(Pig pig, LivingPose p)
+        {
+            var root = MobRoot(pig, p, pig.IsBaby ? .5f : 1f);
+            Skin.Layer = SkinGen.Get("pig");
+            _pigHead.RY = Rad(p.HeadYaw); _pigHead.RX = Rad(p.Pitch); _pigBody.RX = MathF.PI / 2; Quad4(_pigLegs, p.Limb, p.LimbAmt);
+            RenderPart(Skin, _pigHead, root); RenderPart(Skin, _pigBody, root); foreach (var l in _pigLegs) RenderPart(Skin, l, root);
+            if (!pig.Saddled) return;
+            Skin.Layer = SkinGen.Get("pig_saddle"); _pigSaddle.RX = MathF.PI / 2;
+            RenderPart(Skin, _pigSaddle, root);
         }
 
         // ===================== golem żelazny (ModelIronGolem, 128x128) =====================
@@ -575,10 +601,10 @@ namespace BlockCraft.Render
         private readonly ModelPart _knot = P(0, 0, 0).Box(0, 0, -3, -6, -3, 6, 8, 6);
         private void RenderLeashKnot(Vector3 pos)
         {
-            Skin.Layer = SkinGen.Get("horse_brown");
-            RenderPart(Skin, _knot, Matrix4.CreateScale(-1, -1, 1) * Matrix4.CreateTranslation(pos + new Vector3(0, .5f, 0)), 32, 32);
+            Skin.Layer = SkinGen.Get("leash_knot");
+            RenderPart(Skin, _knot, Matrix4.CreateScale(-1, -1, 1) * Matrix4.CreateTranslation(pos + new Vector3(0, .5f, 0)), 64, 64);
         }
-        private readonly ModelPart _rope = P(0, 0, 0).Box(78, 51, -.5f, -.5f, 0, 1, 1, 16);
+        private readonly ModelPart _rope = P(0, 0, 0).Box(0, 0, -.5f, -.5f, 0, 1, 1, 16);
         /// <summary>RenderLiving.renderLeash: lina zwisająca łukiem między mobem a trzymającym.</summary>
         public void RenderLeash(Mob m, float pt, Vector3 mobPos, Vector3 cam)
         {
@@ -590,7 +616,7 @@ namespace BlockCraft.Render
                 b = new Vector3((float)(pl.IX(pt) - cam.X) - MathF.Cos(yaw) * .35f, (float)(pl.IY(pt) - cam.Y) + pl.EyeHeight * .7f, (float)(pl.IZ(pt) - cam.Z) - MathF.Sin(yaw) * .35f);
             }
             else b = new Vector3((float)(holder.IX(pt) - cam.X), (float)(holder.IY(pt) - cam.Y) + .3f, (float)(holder.IZ(pt) - cam.Z));
-            Skin.Layer = SkinGen.Get("horse_brown"); Skin.Color = new Vector4(.55f, .42f, .25f, 1);
+            Skin.Layer = SkinGen.Get("leash");
             const int N = 16;
             var prev = a;
             for (int i = 1; i <= N; i++)
@@ -601,11 +627,10 @@ namespace BlockCraft.Render
                 if (len > 1e-4f)
                 {
                     var mm = Matrix4.CreateScale(.6f, .6f, len) * Matrix4.CreateRotationX(-MathF.Asin(Math.Clamp(d.Y / len, -1, 1))) * Matrix4.CreateRotationY(MathF.Atan2(d.X, d.Z)) * Matrix4.CreateTranslation(prev);
-                    RenderPart(Skin, _rope, mm, 128, 128);
+                    RenderPart(Skin, _rope, mm, 64, 64);
                 }
                 prev = cur;
             }
-            Skin.Color = Vector4.One;
         }
     }
 }
