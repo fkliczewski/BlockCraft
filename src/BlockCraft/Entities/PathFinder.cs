@@ -27,13 +27,13 @@ public static class PathFinder
     private static bool IsDanger(World.World w, int x, int y, int z)
     {
         int id = w.GetBlock(x, y, z);
-        return id == B.Lava || id == B.Cactus;
+        return id == B.Lava || id == B.Cactus || id == B.Fire;
     }
 
     /// <summary>Czy mob może stać w (x,y,z): miejsce wolne na height bloków i grunt pod spodem.</summary>
-    private static bool CanStand(World.World w, int x, int y, int z, int h, bool allowWater)
+    private static bool CanStand(World.World w, int x, int y, int z, int h, bool allowWater, bool doors = false)
     {
-        for (int i = 0; i < h; i++) if (!IsPassable(w, x, y + i, z) || IsDanger(w, x, y + i, z)) return false;
+        for (int i = 0; i < h; i++) if (!(IsPassable(w, x, y + i, z) || doors && w.GetBlock(x, y + i, z) == B.OakDoor) || IsDanger(w, x, y + i, z)) return false;
         int below = w.GetBlock(x, y - 1, z);
         if (below == B.Water) return allowWater;
         var bb = Block.Get(below);
@@ -45,7 +45,7 @@ public static class PathFinder
     public static List<(int x, int y, int z)> Find(World.World w, Entity e, int tx, int ty, int tz, int maxNodes = 600, float maxDist = 32)
     {
         int sx = MathUtil.FloorToInt(e.X), sy = MathUtil.FloorToInt(e.Y + 0.01), sz = MathUtil.FloorToInt(e.Z);
-        int h = (int)Math.Ceiling(e.Height);
+        int h = (int)Math.Ceiling(e.Height); bool doors = e is Mob m && m.CanOpenDoors;
         if (!w.IsLoadedAt(tx, tz)) return null;
         var open = new PriorityQueue<Node, float>();
         var all = new Dictionary<long, Node>();
@@ -69,8 +69,8 @@ public static class PathFinder
             {
                 int nx = n.X + Dir.HorizX[d], nz = n.Z + Dir.HorizZ[d];
                 int ny = -999;
-                if (CanStand(w, nx, n.Y, nz, h, true)) ny = n.Y;
-                else if (CanStand(w, nx, n.Y + 1, nz, h, true) && IsPassable(w, n.X, n.Y + h, n.Z)) ny = n.Y + 1;
+                if (CanStand(w, nx, n.Y, nz, h, true, doors)) ny = n.Y;
+                else if (CanStand(w, nx, n.Y + 1, nz, h, true, doors) && IsPassable(w, n.X, n.Y + h, n.Z)) ny = n.Y + 1;
                 else
                 {
                     for (int dy = 1; dy <= 3; dy++)
@@ -78,7 +78,7 @@ public static class PathFinder
                         bool free = true;
                         for (int i = 0; i < h; i++) if (!IsPassable(w, nx, n.Y - dy + 1 + i, nz)) { free = false; break; }
                         if (!free) break;
-                        if (CanStand(w, nx, n.Y - dy, nz, h, true)) { ny = n.Y - dy; break; }
+                        if (CanStand(w, nx, n.Y - dy, nz, h, true, doors)) { ny = n.Y - dy; break; }
                     }
                 }
                 if (ny == -999) continue;
@@ -131,6 +131,7 @@ public sealed class Navigator
     {
         if (!HasPath) return;
         var (x, y, z) = _path[_idx];
+        if (_m.CanOpenDoors && _m.World.GetBlock(x,y,z)==B.OakDoor) { int meta=_m.World.GetMeta(x,y,z); if ((meta&8)==0 && (meta&4)==0) { _m.World.SetMeta(x,y,z,meta|4); _m.World.PlaySound("random.door_open",x,y,z); } }
         double tx = x + 0.5, tz = z + 0.5;
         double dx = tx - _m.X, dz = tz - _m.Z;
         double dist = Math.Sqrt(dx * dx + dz * dz);
