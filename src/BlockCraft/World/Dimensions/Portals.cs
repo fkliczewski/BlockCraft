@@ -125,6 +125,8 @@ public static class DimensionPortals
         foreach(var e in w.Entities)
         {
             var c=Contacts.GetOrCreateValue(e);if(c.Cooldown>0)c.Cooldown--;c.Touched=false;
+            // MC 1.8: kontakt z blokami tylko w moveEntity; noClip (smok, kule) i nieruchomy kryształ go nie mają
+            if(e.NoClip&&e is not Player||e is EnderCrystal)continue;
             var box=e.BoundingBox;bool portal=false;
             for(int x=MathUtil.FloorToInt(box.MinX+.001);x<=MathUtil.FloorToInt(box.MaxX-.001);x++)
             for(int y=MathUtil.FloorToInt(box.MinY-.001);y<=MathUtil.FloorToInt(box.MaxY-.001);y++)

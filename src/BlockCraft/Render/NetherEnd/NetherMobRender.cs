@@ -20,6 +20,7 @@ public sealed partial class EntityRenderer
         private long _seed;
         public JavaRandom(long seed) { _seed = (seed ^ 0x5DEECE66DL) & ((1L << 48) - 1); }
         private int Next(int bits) { _seed = (_seed * 0x5DEECE66DL + 0xBL) & ((1L << 48) - 1); return (int)((ulong)_seed >> (48 - bits)); }
+        public float NextFloat() => Next(24) / (float)(1 << 24);
         public int NextInt(int bound)
         {
             if ((bound & -bound) == bound) return (int)((bound * (long)Next(31)) >> 31);

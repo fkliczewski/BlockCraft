@@ -6,6 +6,7 @@ public static partial class SkinGen
     static partial void SkinsNetherEnd()
     {
         Ghast(false); Ghast(true); BlazeSkin(); MagmaCubeSkin(); ZombiePigmanSkin(); WitherSkeletonSkin(); EndermiteSkin();
+        WitherSkin(false); WitherSkin(true); for (int i = 0; i < 4; i++) WitherArmorSkin(i); EnderCrystalSkin();
     }
 
     private static void Ghast(bool shooting)
@@ -135,5 +136,52 @@ public static partial class SkinGen
         Func<int, int, int, int, int, uint> shell = (f, x, y, w, h) => V(r, (x + y) % 4 == 0 ? 0x2A1F38 : 0x4B3A5C, .25f);
         for (int i = 0; i < 4; i++) c.Box(new[] { 0, 0, 0, 0 }[i], new[] { 0, 5, 14, 18 }[i], new[] { 4, 6, 3, 1 }[i], new[] { 3, 4, 3, 2 }[i], new[] { 2, 5, 1, 1 }[i], shell);
         Add("endermite", c);
+    }
+
+    /// <summary>Wither (64x64): głowa 8x8x8, boczne głowy 6x6x6, kręgosłup, żebra i ogon; wersja nietykalna jest niebieska.</summary>
+    private static void WitherSkin(bool invulnerable)
+    {
+        var c = new Canvas(invulnerable ? 194 : 193); var r = c.R;
+        uint bone = invulnerable ? 0x3A4C7Au : 0x2B2B2Bu, dark = invulnerable ? 0x1E2A4Eu : 0x141414u, eye = invulnerable ? 0xBFD8FFu : 0xD8D8D8u;
+        Func<int, int, int, int, int, uint> head = (f, x, y, w, h) =>
+        {
+            if (f == 3)
+            {
+                int ey = h / 2 - 1;
+                if (y == ey && (x >= 1 && x <= w / 2 - 2 || x >= w / 2 + 1 && x <= w - 2)) return Hx(eye);
+                if (y == ey + 2 && x >= 2 && x < w - 2) return Hx(dark);
+            }
+            return V(r, bone, .22f);
+        };
+        c.Box(0, 0, 8, 8, 8, head);
+        c.Box(32, 0, 6, 6, 6, head);
+        c.Box(0, 16, 20, 3, 3, (f, x, y, w, h) => V(r, bone, .2f));
+        c.Box(0, 22, 3, 10, 3, (f, x, y, w, h) => V(r, y % 3 == 0 ? dark : bone, .2f));
+        c.Box(24, 22, 11, 2, 2, (f, x, y, w, h) => V(r, bone, .25f));
+        c.Box(12, 22, 3, 6, 3, (f, x, y, w, h) => V(r, bone, .2f));
+        Add(invulnerable ? "wither_invulnerable" : "wither", c);
+    }
+
+    /// <summary>Tarcza Withera (wither_armor): ukośne błękitne pasy z przezroczystymi przerwami, 4 klatki przesunięcia.</summary>
+    private static void WitherArmorSkin(int frame)
+    {
+        var c = new Canvas(195 + frame); var r = c.R;
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
+            if (((x + y + frame * 4) & 15) < 5) c.Set(x, y, V(r, 0x8FB4FF, .25f));
+        Add("wither_armor_" + frame, c);
+    }
+
+    /// <summary>Kryształ Endu (64x32): szklana ramka (przezroczyste wnętrze), różowy rdzeń i podstawa jak bedrock.</summary>
+    private static void EnderCrystalSkin()
+    {
+        var c = new Canvas(199); var r = c.R;
+        c.Box(0, 0, 8, 8, 8, (f, x, y, w, h) => x == 0 || y == 0 || x == w - 1 || y == h - 1 ? V(r, 0xE6D8F2, .1f) : (x + y) % 5 == 0 ? TextureGen.Hex(0xF4EAFF, 120) : 0);
+        c.Box(32, 0, 8, 8, 8, (f, x, y, w, h) =>
+        {
+            int cx = Math.Abs(x * 2 - 7), cy = Math.Abs(y * 2 - 7);
+            return V(r, cx + cy < 6 ? 0xFFC8F4u : (x + y) % 3 == 0 ? 0xD03CC8u : 0xA81E9Cu, .15f);
+        });
+        c.Box(0, 16, 12, 4, 12, (f, x, y, w, h) => V(r, (x * 7 + y * 3) % 5 == 0 ? 0x1E1E1Eu : 0x5A5A5Au, .3f));
+        Add("ender_crystal", c);
     }
 }

@@ -263,6 +263,7 @@ public sealed partial class Game
             sb.Flush();
             GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
         }
+        DrawBossBar();
         if (ShowDebug) DrawDebug();
         if (p.Spectator) { DrawChat(); return; }
         // hotbar
