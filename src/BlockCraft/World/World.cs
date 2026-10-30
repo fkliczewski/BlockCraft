@@ -508,7 +508,7 @@ public sealed partial class World : IBlockAccess
     private void TickTileEntities()
     {
         _teTmp.Clear();
-        foreach (var c in Chunks.Values) foreach (var te in c.TileEntities.Values) if (te is FurnaceTileEntity) _teTmp.Add(te);
+        foreach (var c in Chunks.Values) foreach (var te in c.TileEntities.Values) _teTmp.Add(te);
         foreach (var te in _teTmp) te.Tick(this);
     }
 
