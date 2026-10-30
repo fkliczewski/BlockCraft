@@ -18,7 +18,11 @@ public static partial class SelfTest
 
         var horse = new Horse(home); horse.SetPosition(8, 5, 8);
         horse.Tame(p); p.Inventory.Selected = new ItemStack(I.Saddle);
-        Check(horse.Interact(p) && horse.Saddled && p.Inventory.Selected == null, "Oswojony koń przyjmuje siodło");
+        // jak w 1.8: prawy klik siodłem otwiera GUI konia, siodło trafia do slotu 0
+        bool gui = horse.Interact(p) && p.OpenContainer is HorseContainer;
+        if (p.OpenContainer is HorseContainer hc) { hc.Slots[0].Stack = p.Inventory.Selected; p.Inventory.Selected = null; }
+        p.CloseContainer();
+        Check(gui && horse.Saddled && p.Inventory.Selected == null, "Oswojony koń przyjmuje siodło");
         Check(horse.Interact(p) && horse.Rider == p && p.RidingMob == horse, "Wsiadanie na konia");
         horse.Dismount();
         Check(horse.Rider == null && p.RidingMob == null, "Zsiadanie z konia");

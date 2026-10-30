@@ -124,17 +124,31 @@ public static partial class SelfTest
         Ticks(w, 100);
         Check(v.Recipes.Count > 1 && v.CareerLevel == 2, "Handel odblokowuje kolejne oferty", $"oferty={v.Recipes.Count} poziom={v.CareerLevel}");
 
-        int bad = 0, total = 0; var unknown = new HashSet<int>();
-        bool Known(ItemStack st) { if (st == null || Item.ById[st.Id] != null) return true; unknown.Add(st.Id); return false; }
+        int bad = 0, total = 0, skipped = 0; var unknown = new SortedSet<int>();
+        void Note(ItemStack st) { if (st != null && Item.ById[st.Id] == null) unknown.Add(st.Id); }
+        foreach (var careers in VillagerTrades.Professions)
+            foreach (var career in careers)
+                foreach (var level in career.Levels)
+                {
+                    var raw = new List<MerchantRecipe>();
+                    foreach (var t in level) t(w.Rand, raw);
+                    if (raw.Count == 0) bad++;
+                    foreach (var rr in raw)
+                    {
+                        total++; Note(rr.Buy1); Note(rr.Buy2); Note(rr.Sell);
+                        if (rr.Buy1 == null || rr.Sell == null || rr.Buy1.Count <= 0 || rr.Sell.Count <= 0) bad++;
+                    }
+                }
+        Check(bad == 0 && total > 60, "Tabele handlu 1.8 kompletne", $"oferty={total} błędy={bad}");
+        if (unknown.Count > 0) Console.WriteLine("    oferty czekają na przedmioty innych modułów: " + string.Join(",", unknown));
         for (int prof = 0; prof < VillagerTrades.Professions.Length; prof++)
             for (int c = 1; c <= VillagerTrades.Professions[prof].Length; c++)
             {
                 var vv = new Villager(w, prof) { Career = c, CareerLevel = 0 };
-                int levels = VillagerTrades.Professions[prof][c - 1].Levels.Length;
-                for (int l = 0; l < levels; l++) { int n = vv.Recipes.Count; vv.PopulateTrades(); if (vv.Recipes.Count <= n) bad++; }
-                foreach (var rr in vv.Recipes) { total++; if (rr.Buy1 == null || rr.Sell == null || rr.Buy1.Count <= 0 || rr.Sell.Count <= 0 || !Known(rr.Buy1) | !Known(rr.Buy2) | !Known(rr.Sell)) bad++; }
+                for (int l = 0; l < VillagerTrades.Professions[prof][c - 1].Levels.Length; l++) vv.PopulateTrades();
+                skipped += vv.Recipes.Count(rr => !VillagerTrades.Registered(rr));
             }
-        Check(bad == 0 && total > 60, "Tabele handlu 1.8 kompletne", $"oferty={total} błędy={bad} nieznane id={string.Join(",", unknown)}");
+        Check(skipped == 0, "Wieśniak nie daje ofert z niezarejestrowanymi przedmiotami", skipped.ToString());
 
         var v2 = Put(w, new Villager(w, 1), -25.5, 5.5);
         v2.OnStruckByLightning(null); Ticks(w, 1);

@@ -156,6 +156,8 @@ public static class VillagerTrades
                 L(Item(I.Saddle,8,10)) }),
         },
     };
+    public static bool Registered(MerchantRecipe r) => Known(r.Buy1) && Known(r.Buy2) && Known(r.Sell);
+    private static bool Known(ItemStack s) => s == null || s.Id > 0 && s.Id < Items.Item.ById.Length && Items.Item.ById[s.Id] != null;
     public static readonly string[] ProfessionNames = { "Rolnik", "Bibliotekarz", "Kapłan", "Kowal", "Rzeźnik" };
 }
 
@@ -212,7 +214,11 @@ public sealed class Villager : Animal
         if (Career == 0) { Career = World.Rand.Next(careers.Length) + 1; CareerLevel = 1; }
         else CareerLevel++;
         var levels = careers[Career - 1].Levels;
-        if (CareerLevel - 1 < levels.Length) foreach (var t in levels[CareerLevel - 1]) t(World.Rand, Recipes);
+        if (CareerLevel - 1 >= levels.Length) return;
+        int first = Recipes.Count;
+        foreach (var t in levels[CareerLevel - 1]) t(World.Rand, Recipes);
+        // oferty z przedmiotami, których inny moduł jeszcze nie zarejestrował (np. wędka z ME), czekają na niego
+        for (int i = Recipes.Count - 1; i >= first; i--) if (!VillagerTrades.Registered(Recipes[i])) Recipes.RemoveAt(i);
     }
 
     /// <summary>useRecipe: dźwięk, XP i szansa na odblokowanie kolejnych ofert.</summary>

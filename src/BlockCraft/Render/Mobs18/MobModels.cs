@@ -82,7 +82,7 @@ namespace BlockCraft.Render
 
         // ===================== wilk (ModelWolf) =====================
         private readonly ModelPart _wHead = P(-1, 13.5f, -7).Box(0, 0, -3, -3, -2, 6, 6, 4).Box(16, 14, -3, -5, 0, 2, 2, 1).Box(16, 14, 1, -5, 0, 2, 2, 1).Box(0, 10, -1.5f, 0, -5, 3, 3, 4);
-        private readonly ModelPart _wBody = P(0, 14, 2).Box(18, 14, -4, -2, -3, 6, 9, 6);
+        private readonly ModelPart _wolfBody = P(0, 14, 2).Box(18, 14, -4, -2, -3, 6, 9, 6);
         private readonly ModelPart _wMane = P(-1, 14, 2).Box(21, 0, -4, -3, -3, 8, 6, 7);
         private readonly ModelPart _wCollar = P(-1, 14, 2).Box(21, 0, -4, -3, -3, 8, 6, 7, .05f);
         private readonly ModelPart _wTail = P(-1, 12, 8).Box(9, 18, 0, 0, -1, 2, 8, 2);
@@ -95,19 +95,19 @@ namespace BlockCraft.Render
             _wTail.RY = w.Angry ? 0 : MathF.Cos(p.Limb * .6662f) * 1.4f * p.LimbAmt;
             if (w.Sitting)
             {
-                _wMane.Reset(-1, 16, -3); _wMane.RX = MathF.PI * 2 / 5; _wBody.Reset(0, 18, 0); _wBody.RX = MathF.PI / 4; _wTail.PX = -1; _wTail.PY = 21; _wTail.PZ = 6;
+                _wMane.Reset(-1, 16, -3); _wMane.RX = MathF.PI * 2 / 5; _wolfBody.Reset(0, 18, 0); _wolfBody.RX = MathF.PI / 4; _wTail.PX = -1; _wTail.PY = 21; _wTail.PZ = 6;
                 _wLegs[0].Reset(-2.5f, 22, 2); _wLegs[0].RX = MathF.PI * 1.5f; _wLegs[1].Reset(.5f, 22, 2); _wLegs[1].RX = MathF.PI * 1.5f;
                 _wLegs[2].Reset(-2.49f, 17, -4); _wLegs[2].RX = 5.811947f; _wLegs[3].Reset(.51f, 17, -4); _wLegs[3].RX = 5.811947f;
             }
             else
             {
-                _wBody.Reset(0, 14, 2); _wBody.RX = MathF.PI / 2; _wMane.Reset(-1, 14, -3); _wMane.RX = _wBody.RX; _wTail.PX = -1; _wTail.PY = 12; _wTail.PZ = 8;
+                _wolfBody.Reset(0, 14, 2); _wolfBody.RX = MathF.PI / 2; _wMane.Reset(-1, 14, -3); _wMane.RX = _wolfBody.RX; _wTail.PX = -1; _wTail.PY = 12; _wTail.PZ = 8;
                 float[] lx = { -2.5f, .5f, -2.5f, .5f }, lz = { 7, 7, -4, -4 };
                 for (int i = 0; i < 4; i++) { _wLegs[i].Reset(lx[i], 16, lz[i]); _wLegs[i].RX = MathF.Cos(p.Limb * .6662f + (i is 1 or 2 ? MathF.PI : 0)) * 1.4f * p.LimbAmt; }
             }
             _wHead.RX = Rad(p.Pitch); _wHead.RY = Rad(p.HeadYaw); _wHead.RZ = w.Begging ? .15f * MathF.PI : 0;
             _wTail.RX = w.TailRotation;
-            Parts(root, _wHead, _wBody, _wMane, _wTail, _wLegs[0], _wLegs[1], _wLegs[2], _wLegs[3]);
+            Parts(root, _wHead, _wolfBody, _wMane, _wTail, _wLegs[0], _wLegs[1], _wLegs[2], _wLegs[3]);
             if (w.Tamed)
             {
                 _wCollar.PX = _wMane.PX; _wCollar.PY = _wMane.PY; _wCollar.PZ = _wMane.PZ; _wCollar.RX = _wMane.RX;
