@@ -296,7 +296,7 @@ public abstract partial class LivingEntity : Entity
 
     public virtual bool Attack(DamageSource src, float amount)
     {
-        if (World.IsRemote && this is not Player) return false;
+        if (World.IsRemote) return false; // na kliencie obrażenia liczy host
         if (Dead || Health <= 0 || IsInvulnerableTo(src)) return false;
         if (src.IsFire && (ImmuneToFire || HasEffect(Effect.FireResistance))) return false;
         if (HurtResistantTime > 10)

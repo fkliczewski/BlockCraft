@@ -367,6 +367,7 @@ public sealed partial class World : IBlockAccess
     // ---------- encje ----------
     public void SpawnEntity(Entity e)
     {
+        if (IsRemote && !e.IsRemoteControlled && e is not Player) return; // klient nie tworzy encji sam, przysyła je host
         if (e.Id == 0) e.Id = _nextEntityId++;
         else if (e.Id >= _nextEntityId) _nextEntityId = e.Id + 1;
         _toAdd.Add(e);

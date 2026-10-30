@@ -199,8 +199,13 @@ public abstract class Container
     }
 
     /// <summary>Kliknięcie w slot (logika jak MC). slot = -999 poza oknem.</summary>
+    /// <summary>Sieć: klient przekazuje kliknięcia hostowi (lokalnie wykonuje je dalej jako przewidywanie).</summary>
+    public static Action<Container, int, int, ClickType, Player> NetClickHook;
+    public static Action<Container, List<int>, int, Player> NetDistributeHook;
+
     public void Click(int slotIdx, int button, ClickType type, Player p)
     {
+        NetClickHook?.Invoke(this, slotIdx, button, type, p);
         if (type == ClickType.QuickMove && slotIdx >= 0)
         {
             var slot = Slots[slotIdx];
@@ -336,6 +341,7 @@ public abstract class Container
     /// <summary>Rozkładanie przeciąganiem (lewy: równo, prawy: po 1).</summary>
     public void Distribute(List<int> slotIdxs, int button, Player p)
     {
+        NetDistributeHook?.Invoke(this, slotIdxs, button, p);
         var cur = p.Cursor;
         if (cur == null || slotIdxs.Count == 0) return;
         var valid = slotIdxs.Where(i => { var sl = Slots[i]; var s = sl.Stack; return sl.CanPlace(cur) && (s == null || s.CanStackWith(cur)); }).ToList();

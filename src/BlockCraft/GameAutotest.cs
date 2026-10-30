@@ -186,12 +186,24 @@ public sealed partial class Game
 
     private void AutotestStep()
     {
+        if (ArgsNetAutotest && !_netTestFinished && DateTime.UtcNow > _netTestDeadline)
+        {
+            Shot("99_timeout");
+            NetTestFinish(false, "Przekroczony czas testu; ekran=" + _screen?.GetType().Name + "; " + HostStatus);
+            return;
+        }
         if (_steps.Count == 0) return;
         if (_waitFrames > 0) { _waitFrames--; return; }
         var (frames, act) = _steps.Peek();
         bool ok;
         try { ok = act(); }
-        catch (Exception ex) { Log.Error("Autotest step: " + ex); ok = true; }
+        catch (Exception ex)
+        {
+            Log.Error("Autotest step: " + ex);
+            if (ArgsNetAutotest) { NetTestFinish(false, ex.Message); return; }
+            ok = true;
+        }
+        if (_steps.Count == 0) return;
         if (ok) { _steps.Dequeue(); if (_steps.Count > 0) _waitFrames = _steps.Peek().frames; }
     }
 }

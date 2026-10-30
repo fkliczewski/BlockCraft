@@ -55,7 +55,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         new NativeWindowSettings { ClientSize = new Vector2i(1280, 720), Title = "BlockCraft", APIVersion = new Version(3, 3), Profile = ContextProfile.Core, Flags = ContextFlags.ForwardCompatible, StartVisible = true })
     {
         _args = args;
-        _autotest = args.Contains("--autotest");
+        _autotest = args.Contains("--autotest") || args.Contains("--autotest-host") || args.Contains("--autotest-join");
+        int profile = Array.IndexOf(args, "--net-profile");
+        if (profile >= 0 && profile + 1 < args.Length)
+        {
+            var name = args[profile + 1];
+            if (name.Length > 48 || name.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_'))
+                throw new ArgumentException("Profil sieci może zawierać litery ASCII, cyfry, '-' i '_' (do 48 znaków).");
+            Net.LinkSetup.Profile = name;
+        }
         _showcase = args.Contains("--showcase");
         Settings = Settings.Load();
         VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
@@ -78,7 +86,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         StartMenuWorld();
         SetScreen(new TitleScreen());
         _lastTime = _clock.Elapsed.TotalSeconds;
-        if (_autotest) SetupAutotest();
+        if (ArgsNetAutotest) SetupNetAutotest();
+        else if (_autotest) SetupAutotest();
         else if (_showcase) SetupShowcase();
     }
 
@@ -253,6 +262,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     public void SaveWorld()
     {
         if (World == null || _storage == null || !_sessionStarted) return;
+        Server?.SavePlayers();
         try
         {
             var home = Dimensions?.Get(DimensionId.Overworld) ?? World;
@@ -274,6 +284,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     public void QuitToTitle()
     {
+        NetShutdown();
         SaveWorld();
         Dimensions?.Dispose(); Dimensions = null;
         Renderer.SetWorld(null);
@@ -285,6 +296,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     public void Respawn()
     {
         if (Player == null) return;
+        if (Client != null) { Client.SendRespawn(); return; } // odrodzenie robi host
         if (World.Hardcore) { Player.Respawn(); Player.SetGameMode(3); Player.SetPositionAndPrev(Player.X, Player.Y + 2, Player.Z); }
         else Player.Respawn();
         if (!World.Entities.Contains(Player)) World.AddEntityNow(Player);
@@ -294,18 +306,13 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= IPlayerHandler =================
     public void OpenBlockGui(GuiKind kind, int x, int y, int z)
     {
+        if (Client != null) return; // klient sieciowy: okno otworzy host (S2C.OpenWindow)
         var p = Player;
-        switch (kind)
-        {
-            case GuiKind.Brewing:
-                if (World.GetTileEntity(x, y, z) is not BrewingStandTile stand) return;
-                var brewing = new BrewingContainer(p.Inventory, stand); p.OpenContainer = brewing; SetScreen(new BrewingScreen(p, brewing)); return;
-            case GuiKind.Crafting: p.OpenContainer = new WorkbenchContainer(p.Inventory, x, y, z); break;
-            case GuiKind.Furnace: if (World.GetTileEntity(x, y, z) is FurnaceTileEntity f) p.OpenContainer = new FurnaceContainer(p.Inventory, f); else return; break;
-            case GuiKind.Chest: if (World.GetTileEntity(x, y, z) is ChestTileEntity c) p.OpenContainer = new ChestContainer(p.Inventory, c, "Skrzynia"); else return; break;
-            default: return;
-        }
-        SetScreen(new ContainerScreen(p, p.OpenContainer));
+        var c = ContainerFactory.Create(World, p, kind, x, y, z);
+        if (c == null) return;
+        p.OpenContainer = c;
+        SetScreen(ContainerFactory.ScreenFor(p, c));
+
     }
     public void OnMessage(string msg) => AddChat(msg);
     public void OnDeath(string message) { SetScreen(new DeathScreen(message)); }
@@ -321,6 +328,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     public void SendChat(string s)
     {
         if (World == null || Player == null) return;
+        if (Client != null) { if (s.StartsWith("/")) AddChat("§7" + s); Client.SendChat(s); return; } // czat i komendy wykonuje host
         if (s.StartsWith("/")) { AddChat("§7" + s); Cmds.Execute(Player, s); }
         else World.BroadcastMessage($"<{Player.Name}> {s}");
     }
@@ -405,6 +413,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                     var s = p.Inventory.Selected;
                     if (s != null && !p.Spectator)
                     {
+                        Client?.SendDrop(ctrl);
                         var drop = ctrl ? s.Copy() : s.CopyWith(1);
                         s.Count -= drop.Count; if (s.Count <= 0) p.Inventory.Selected = null;
                         p.DropStack(drop, false); p.SwingArm();
@@ -419,7 +428,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        try { Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        if (_netTestOriginalSettings != null) Settings = _netTestOriginalSettings;
+        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+
         base.OnClosing(e);
     }
 
@@ -484,7 +495,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         var w = World; var p = Player;
         if (!_sessionStarted)
         {
-            w.ChunkManager.Update(new[] { (MathUtil.FloorToInt(p.X) >> 4, MathUtil.FloorToInt(p.Z) >> 4) }, 12);
+            NetLoadingTick();
+            if (World == null) return;
+            w.ChunkManager?.Update(new[] { (MathUtil.FloorToInt(p.X) >> 4, MathUtil.FloorToInt(p.Z) >> 4) }, 12);
             Renderer.Update(new Vector3d(p.X, p.Y, p.Z));
             _loadTicks++;
             int pcx = MathUtil.FloorToInt(p.X) >> 4, pcz = MathUtil.FloorToInt(p.Z) >> 4;
@@ -496,15 +509,20 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             if (ready == total && (Renderer.PendingMeshes < 8 || _loadTicks > 200)) FinishLoading();
             return;
         }
-        bool paused = _screen != null && _screen.PausesGame;
+        bool paused = _screen != null && _screen.PausesGame && Server == null && Client == null; // w sieci gra nie staje
         if (paused) { Renderer.Update(new Vector3d(p.X, p.Y, p.Z)); return; }
 
+        NetBeforeTick();
+        if (World == null) return;
+        NetCaptureButtons();
         ControlTick();
-        Dimensions.Tick();
+        if (Dimensions != null) Dimensions.Tick(); else w.Tick();
         DimensionMusicTick();
         w = World;
+        NetAfterTick();
+
         if (!p.Dead && p.Removed) { }
-        w.ChunkManager.Update(new[] { (MathUtil.FloorToInt(p.X) >> 4, MathUtil.FloorToInt(p.Z) >> 4) }, 5);
+        w.ChunkManager?.Update(ChunkCenters(), 5);
         Renderer.TickAnimations();
         Renderer.TickParticles();
         // ekwipowanie

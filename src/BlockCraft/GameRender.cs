@@ -108,6 +108,7 @@ public sealed partial class Game
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         World.World.HitResult? sel = Ctrl.Hit.Hit && !p.Spectator && !HideGui ? Ctrl.Hit : null;
         Renderer.Render(cam, view, _proj, pt, p, third, sel, Ctrl.BreakStage);
+        NetCaptureCamera(cam, view);
 
         // ręka
         if (!third && !p.Spectator && !p.Sleeping && !HideGui)
@@ -242,6 +243,7 @@ public sealed partial class Game
             if (w.GetBlock(bx, by, bz) == B.Lava) sb.Fill(0, 0, W, H, 0xA00050FF);
             if (p.IsInsideOpaqueBlock() && !p.Spectator) sb.Fill(0, 0, W, H, 0xC0101010);
         }
+        NetDrawNameTags(pt);
         // winieta
         sb.Gradient(0, 0, W, H / 6f, 0x30000000, 0x00000000);
         sb.Gradient(0, H - H / 6f, W, H / 6f, 0x00000000, 0x30000000);
@@ -363,7 +365,7 @@ public sealed partial class Game
         {
             $"BlockCraft 1.0 ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
             $"C: {Renderer.RenderedSections}/{Renderer.TotalSections} sekcji, E: {w.Entities.Count}, P: {Renderer.Particles.Count}",
-            $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager.PendingCount} w kolejce",
+            $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager?.PendingCount ?? 0} w kolejce",
             "",
             $"XYZ: {p.X:F3} / {p.Y:F5} / {p.Z:F3}",
             $"Blok: {bx} {by} {bz}   Chunk: {bx & 15} {by & 15} {bz & 15} w {bx >> 4} {by >> 4} {bz >> 4}",

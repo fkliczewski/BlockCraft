@@ -9,14 +9,17 @@ namespace BlockCraft;
 public sealed partial class PlayerController
 {
     private readonly Game _g;
-    public World.World W => _g.World;
-    public Player P => _g.Player;
+    private readonly World.World _w; private readonly Player _p;
+    public World.World W => _w ?? _g.World;
+    public Player P => _p ?? _g.Player;
     public float BreakProgress; public int BreakX, BreakY, BreakZ = int.MinValue; private int _breakSoundTicks;
     public int BlockHitDelay, RightClickDelay;
     public World.World.HitResult Hit; public Entity HitEntity;
     public bool LeftWasDown;
 
     public PlayerController(Game g) { _g = g; }
+    /// <summary>Sterowanie graczem bez okna gry (zdalny gracz na hoście).</summary>
+    public PlayerController(World.World w, Player p) { _w = w; _p = p; }
 
     public double Reach => P.Creative ? 5.0 : 4.5;
 
@@ -86,7 +89,7 @@ public sealed partial class PlayerController
         if (_breakSoundTicks++ % 4 == 0)
         {
             W.PlaySound("step_" + b.Sound.ToString().ToLowerInvariant(), x + 0.5, y + 0.5, z + 0.5, 0.25f, 0.5f);
-            _g.Renderer.BlockCrackParticle(x, y, z, Hit.Face);
+            _g?.Renderer.BlockCrackParticle(x, y, z, Hit.Face);
         }
         if (BreakProgress >= 1f)
         {

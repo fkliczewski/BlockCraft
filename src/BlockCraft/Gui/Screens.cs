@@ -18,7 +18,7 @@ public sealed class TitleScreen : Screen
         _splash ??= Splashes[new Random().Next(Splashes.Length)];
         int y = H / 4 + 48;
         Add(new Button(W / 2 - 100, y, 200, 20, "Tryb jednoosobowy", () => G.SetScreen(new WorldSelectScreen())));
-        Add(new Button(W / 2 - 100, y + 24, 200, 20, "Tryb wieloosobowy", () => { }) { Enabled = false });
+        Add(new Button(W / 2 - 100, y + 24, 200, 20, "Tryb wieloosobowy", () => G.SetScreen(new Net.MultiplayerScreen(this))));
         Add(new Button(W / 2 - 100, y + 48, 200, 20, "Twórcy i pomoc", () => G.SetScreen(new HelpScreen(this))));
         Add(new Button(W / 2 - 100, y + 72 + 12, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 72 + 12, 98, 20, "Wyjdź z gry", () => G.Quit()));
@@ -284,7 +284,8 @@ public sealed class PauseScreen : Screen
         Add(new Button(W / 2 - 100, y + 24 - 16, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
         Add(new Button(W / 2 - 100, y + 96 - 16, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 96 - 16, 98, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
-        Add(new Button(W / 2 - 100, y + 120 - 16, 200, 20, "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
+        if (G.Client == null) Add(new Button(W / 2 - 100, y + 48 - 16, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));
+        Add(new Button(W / 2 - 100, y + 120 - 16, 200, 20, G.Client != null ? "Rozłącz się" : "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
     }
     public override void Render(int mx, int my, float pt)
     {
