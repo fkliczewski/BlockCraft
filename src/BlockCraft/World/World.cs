@@ -138,7 +138,7 @@ public sealed partial class World : IBlockAccess
         if (ob.LightOpacity != nb.LightOpacity)
         {
             int h = c.GetHeight(lx, lz);
-            if (nb.LightOpacity > 0 && y >= h) c.HeightMap[(lz << 4) | lx] = (byte)(y + 1);
+            if (nb.LightOpacity > 0 && y >= h) c.HeightMap[(lz << 4) | lx] = (short)(y + 1);
             else if (nb.LightOpacity == 0 && y == h - 1) c.RecalcHeight(lx, lz);
         }
         Light.OnBlockChanged(x, y, z, ob, nb);

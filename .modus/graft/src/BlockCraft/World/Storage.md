@@ -1,0 +1,66 @@
+# src/BlockCraft/World/Storage.cs
+
+- Count · variable · L9-L9 — public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
+- Damage · variable · L9-L9 — public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
+- Id · variable · L9-L9 — public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
+- Slot · variable · L9-L9 — public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
+- SlotData · class · L9-L9 — public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
+- PlayerData · class · L11-L36 — public sealed class PlayerData
+- Name · variable · L13-L13 — public string Name { get; set; } = "Steve";
+- X · variable · L14-L14 — public double X { get; set; }
+- Y · variable · L15-L15 — public double Y { get; set; }
+- Z · variable · L16-L16 — public double Z { get; set; }
+- Yaw · variable · L17-L17 — public float Yaw { get; set; }
+- Pitch · variable · L18-L18 — public float Pitch { get; set; }
+- Health · variable · L19-L19 — public float Health { get; set; } = 20;
+- Food · variable · L20-L20 — public int Food { get; set; } = 20;
+- Saturation · variable · L21-L21 — public float Saturation { get; set; } = 5;
+- Exhaustion · variable · L22-L22 — public float Exhaustion { get; set; }
+- GameMode · variable · L23-L23 — public int GameMode { get; set; }
+- Flying · variable · L24-L24 — public bool Flying { get; set; }
+- XpLevel · variable · L25-L25 — public int XpLevel { get; set; }
+- XpProgress · variable · L26-L26 — public float XpProgress { get; set; }
+- XpTotal · variable · L27-L27 — public int XpTotal { get; set; }
+- Selected · variable · L28-L28 — public int Selected { get; set; }
+- Air · variable · L29-L29 — public int Air { get; set; } = 300;
+- HasSpawn · variable · L30-L30 — public bool HasSpawn { get; set; }
+- SpawnX · variable · L31-L31 — public int SpawnX { get; set; }
+- SpawnY · variable · L32-L32 — public int SpawnY { get; set; }
+- SpawnZ · variable · L33-L33 — public int SpawnZ { get; set; }
+- Dead · variable · L34-L34 — public bool Dead { get; set; }
+- Inventory · variable · L35-L35 — public List<SlotData> Inventory { get; set; } = new();
+- LevelData · class · L38-L56 — public sealed class LevelData
+- Name · variable · L40-L40 — public string Name { get; set; }
+- Seed · variable · L41-L41 — public long Seed { get; set; }
+- Type · variable · L42-L42 — public int Type { get; set; }
+- GameMode · variable · L43-L43 — public int GameMode { get; set; }
+- Time · variable · L44-L44 — public long Time { get; set; }
+- DayTime · variable · L45-L45 — public long DayTime { get; set; }
+- SpawnX · variable · L46-L46 — public int SpawnX { get; set; }
+- SpawnY · variable · L47-L47 — public int SpawnY { get; set; }
+- SpawnZ · variable · L48-L48 — public int SpawnZ { get; set; }
+- AllowCheats · variable · L49-L49 — public bool AllowCheats { get; set; }
+- Hardcore · variable · L50-L50 — public bool Hardcore { get; set; }
+- Difficulty · variable · L51-L51 — public int Difficulty { get; set; } = 2;
+- Rules · variable · L52-L52 — public Dictionary<string, bool> Rules { get; set; } = new();
+- Player · variable · L53-L53 — public PlayerData Player { get; set; }
+- LastPlayed · variable · L54-L54 — public DateTime LastPlayed { get; set; }
+- Version · variable · L55-L55 — public int Version { get; set; } = 1;
+- WorldStorage · class · L58-L193 — public sealed class WorldStorage
+- Root · variable · L61-L69 — public static string Root
+- SavesRoot · variable · L70-L70 — public static string SavesRoot { get { var d = Path.Combine(Root, "saves"); Directory.CreateDirectory(d); return d; } }
+- WorldStorage · method · L72-L78 — public WorldStorage(string dir)
+- SafeFolderName · method · L82-L90 — public static string SafeFolderName(string name)
+- SaveLevel · method · L92-L98 — public void SaveLevel(LevelData d)
+- LoadLevel · method · L100-L106 — public static LevelData LoadLevel(string dir)
+- SavePlayer · method · L108-L111 — public void SavePlayer(PlayerData d)
+- LoadPlayer · method · L112-L117 — public PlayerData LoadPlayer(string name)
+- SafeName · method · L118-L118 — private static string SafeName(string n) => new string(n.Where(char.IsLetterOrDigit).ToArray());
+- ListWorlds · method · L120-L129 — public static List<(string dir, LevelData data)> ListWorlds()
+- ChunkPath · method · L131-L131 — private string ChunkPath(int cx, int cz) => Path.Combine(Dir, "chunks", $"c.{cx}.{cz}.dat");
+- SaveChunk · method · L133-L158 — public void SaveChunk(Chunk c, byte[] entityData)
+- LoadChunk · method · L160-L192 — public Chunk LoadChunk(int cx, int cz)
+- StreamExt · class · L195-L217 — public static class StreamExt
+- ReadFully · method · L198-L203 — public static int ReadFully(this int n, BinaryReader br, byte[] buf)
+- WriteStack · method · L204-L208 — public static void WriteStack(this BinaryWriter bw, ItemStack s)
+- ReadStack · method · L209-L216 — public static ItemStack ReadStack(this BinaryReader br)

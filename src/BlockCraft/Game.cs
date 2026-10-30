@@ -66,7 +66,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         base.OnLoad();
         Log.Info("Start BlockCraft, GL: " + GL.GetString(StringName.Renderer) + " / " + GL.GetString(StringName.Version));
         SharedQuadIndices.Init();
-        ItemRegistry.Init(); Recipes.Init();
+        ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
         Gui = new GuiTextures();
         Renderer = new WorldRenderer();

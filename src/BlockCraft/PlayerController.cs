@@ -6,7 +6,7 @@ using BlockCraft.World;
 namespace BlockCraft;
 
 /// <summary>Logika interakcji gracza: kopanie, stawianie, używanie przedmiotów, atak.</summary>
-public sealed class PlayerController
+public sealed partial class PlayerController
 {
     private readonly Game _g;
     public World.World W => _g.World;

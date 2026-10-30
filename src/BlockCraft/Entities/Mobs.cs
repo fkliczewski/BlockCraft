@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public abstract class Mob : LivingEntity
+public abstract partial class Mob : LivingEntity
 {
     public readonly Navigator Nav;
     public LivingEntity Target;

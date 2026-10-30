@@ -12,7 +12,7 @@ public sealed class Recipe
     public ItemStack Result;
 }
 
-public static class Recipes
+public static partial class Recipes
 {
     public static readonly List<Recipe> All = new();
     public const int AnyPlanks = -1, AnyLog = -2, AnyCoal = -3;
@@ -206,6 +206,7 @@ public static class Recipes
         Shapeless(S(B.StickyPiston), B.Piston, I.String);
 
         Smelting.Init();
+        ModuleRecipes();
     }
 }
 

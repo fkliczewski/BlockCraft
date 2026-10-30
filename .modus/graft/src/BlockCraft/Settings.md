@@ -1,0 +1,21 @@
+# src/BlockCraft/Settings.cs
+
+- Settings · class · L7-L38 — public sealed class Settings
+- Fov · variable · L9-L9 — public float Fov { get; set; } = 70;
+- RenderDistance · variable · L10-L10 — public int RenderDistance { get; set; } = 8;
+- Sensitivity · variable · L11-L11 — public float Sensitivity { get; set; } = 0.5f;
+- InvertMouse · variable · L12-L12 — public bool InvertMouse { get; set; }
+- GuiScale · variable · L13-L13 — public int GuiScale { get; set; } = 0; // 0 = auto
+- SmoothLighting · variable · L14-L14 — public bool SmoothLighting { get; set; } = true;
+- FancyGraphics · variable · L15-L15 — public bool FancyGraphics { get; set; } = true;
+- Clouds · variable · L16-L16 — public bool Clouds { get; set; } = true;
+- ViewBobbing · variable · L17-L17 — public bool ViewBobbing { get; set; } = true;
+- Brightness · variable · L18-L18 — public float Brightness { get; set; } = 0.5f;
+- VSync · variable · L19-L19 — public bool VSync { get; set; } = true;
+- MaxFps · variable · L20-L20 — public int MaxFps { get; set; } = 120;
+- Difficulty · variable · L21-L21 — public int Difficulty { get; set; } = 2;
+- PlayerName · variable · L22-L22 — public string PlayerName { get; set; } = "Steve";
+- ShowFps · variable · L23-L23 — public bool ShowFps { get; set; }
+- PathFile · variable · L25-L25 — private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
+- Load · method · L27-L32 — public static Settings Load()
+- Save · method · L33-L37 — public void Save()

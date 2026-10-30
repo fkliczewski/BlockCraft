@@ -1,0 +1,22 @@
+# src/BlockCraft/PlayerController.cs
+
+- PlayerController · class · L9-L347 — public sealed class PlayerController
+- W · variable · L12-L12 — public World.World W => _g.World;
+- P · variable · L13-L13 — public Player P => _g.Player;
+- PlayerController · method · L19-L19 — public PlayerController(Game g) { _g = g; }
+- Reach · variable · L21-L21 — public double Reach => P.Creative ? 5.0 : 4.5;
+- UpdateTarget · method · L23-L42 — public void UpdateTarget(float pt)
+- BreakStage · variable · L44-L44 — public int BreakStage => BreakProgress > 0 && BreakX != int.MinValue ? (int)(BreakProgress * 10) - 1 : -1;
+- BreakDelta · method · L46-L54 — public static float BreakDelta(Player p, Block b, ItemStack tool)
+- ResetBreak · method · L56-L56 — public void ResetBreak() { BreakProgress = 0; BreakX = int.MinValue; }
+- TickLeft · method · L59-L100 — public void TickLeft(bool pressedNow)
+- DestroyBlock · method · L102-L116 — private void DestroyBlock(int x, int y, int z, bool drop)
+- TickRight · method · L119-L140 — public void TickRight(bool pressedNow)
+- UseInAir · method · L142-L164 — private bool UseInAir(ItemStack held)
+- Consume · method · L166-L172 — private void Consume(ItemStack held, bool force = false)
+- UseBucket · method · L174-L206 — private bool UseBucket(ItemStack held)
+- UseOnBlock · method · L208-L235 — private bool UseOnBlock(ItemStack held, int x, int y, int z, int face, double hx, double hy, double hz)
+- BoneMeal · method · L237-L255 — private bool BoneMeal(ItemStack held, int x, int y, int z)
+- PlaceBlock · method · L257-L324 — private bool PlaceBlock(ItemStack held, int x, int y, int z, int face, double hx, double hy, double hz)
+- PlaceSound · method · L326-L326 — private void PlaceSound(Block b, int x, int y, int z) => W.PlaySound("place_" + b.Sound.ToString().ToLowerInvariant(), x + 0.5, y + 0.5, z + 0.5, 1f, 0.8f);
+- PickBlock · method · L328-L346 — public void PickBlock()

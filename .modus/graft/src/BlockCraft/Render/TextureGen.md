@@ -1,0 +1,86 @@
+# src/BlockCraft/Render/TextureGen.cs
+
+- TextureGen · class · L6-L1205 — public static partial class TextureGen
+- Textures · variable · L15-L15 — public static IReadOnlyList<uint[]> Textures { get { Ensure(); return _tex; } }
+- Count · variable · L16-L16 — public static int Count { get { Ensure(); return _tex.Count; } }
+- Has · method · L17-L17 — public static bool Has(string name) { Ensure(); return _index.ContainsKey(name); }
+- Layer · method · L19-L25 — public static int Layer(string name)
+- Get · method · L27-L27 — public static uint[] Get(string name) { Ensure(); return _tex[Layer(name)]; }
+- Ensure · method · L29-L43 — private static void Ensure()
+- Add · method · L46-L50 — private static void Add(string name, uint[] px)
+- Rgba · method · L53-L54 — public static uint Rgba(int r, int g, int b, int a = 255)
+- Hex · method · L55-L55 — public static uint Hex(uint rgb, int a = 255) => Rgba((int)(rgb >> 16) & 255, (int)(rgb >> 8) & 255, (int)rgb & 255, a);
+- R · method · L56-L56 — public static int R(uint c) => (int)(c & 255);
+- G · method · L57-L57 — public static int G(uint c) => (int)((c >> 8) & 255);
+- Bl · method · L58-L58 — public static int Bl(uint c) => (int)((c >> 16) & 255);
+- A · method · L59-L59 — public static int A(uint c) => (int)(c >> 24);
+- Mul · method · L60-L60 — public static uint Mul(uint c, float f) => Rgba((int)(R(c) * f), (int)(G(c) * f), (int)(Bl(c) * f), A(c));
+- WithA · method · L61-L61 — public static uint WithA(uint c, int a) => (c & 0x00FFFFFF) | ((uint)a << 24);
+- Lerp · method · L62-L62 — public static uint Lerp(uint a, uint b, float t) => Rgba((int)(R(a) + (R(b) - R(a)) * t), (int)(G(a) + (G(b) - G(a)) * t), (int)(Bl(a) + (Bl(b) - Bl(a)) * t), (int)(A(a) + (A(b) - A(a)) * t));
+- Gray · method · L63-L63 — public static uint Gray(float v, int a = 255) { int g = (int)(v * 255); return Rgba(g, g, g, a); }
+- New · method · L65-L65 — private static uint[] New(uint fill = 0) { var p = new uint[S * S]; if (fill != 0) Array.Fill(p, fill); return p; }
+- Missing16 · method · L66-L71 — private static uint[] Missing16()
+- TileNoise · method · L74-L93 — public static float[] TileNoise(int seed, int cells)
+- Fbm · method · L95-L101 — public static float[] Fbm(int seed, float wRand = 0.35f)
+- Pick · method · L103-L107 — private static uint Pick(uint[] pal, float v)
+- Palette · method · L109-L109 — private static uint[] Palette(params uint[] hex) => hex.Select(h => Hex(h)).ToArray();
+- Noisy · method · L111-L116 — private static uint[] Noisy(int seed, uint[] pal, float randW = 0.35f, float contrast = 1.3f)
+- Stone · method · L119-L131 — private static uint[] Stone(int seed = 1)
+- Dirt · method · L133-L141 — private static uint[] Dirt(int seed = 2)
+- GrassTop · method · L143-L149 — private static uint[] GrassTop(int seed = 3)
+- GrassSide · method · L151-L163 — private static uint[] GrassSide()
+- Cobble · method · L165-L199 — private static uint[] Cobble(int seed, bool mossy)
+- Planks · method · L201-L221 — private static uint[] Planks(uint[] pal, uint seam, int seed)
+- LogSide · method · L223-L236 — private static uint[] LogSide(uint[] pal, int seed)
+- LogTop · method · L238-L257 — private static uint[] LogTop(uint bark, uint[] rings, int seed)
+- Leaves · method · L259-L273 — private static uint[] Leaves(int seed, bool transparent)
+- Ore · method · L275-L297 — private static uint[] Ore(int seed, uint light, uint mid, uint dark, int clusters = 5)
+- StorageBlock · method · L299-L317 — private static uint[] StorageBlock(uint baseC, uint light, uint dark, int seed, bool pattern)
+- Wool · method · L319-L330 — private static uint[] Wool(uint c, int seed)
+- GenerateBlocks · method · L332-L436 — private static void GenerateBlocks()
+- Gravel · method · L438-L463 — private static uint[] Gravel()
+- BirchSide · method · L465-L477 — private static uint[] BirchSide()
+- Glass · method · L479-L487 — private static uint[] Glass()
+- SandstoneSide · method · L489-L506 — private static uint[] SandstoneSide()
+- SandstoneBottom · method · L507-L513 — private static uint[] SandstoneBottom()
+- Dandelion · method · L515-L525 — private static uint[] Dandelion()
+- Poppy · method · L527-L542 — private static uint[] Poppy()
+- TallGrass · method · L544-L559 — private static uint[] TallGrass()
+- DeadBush · method · L561-L572 — private static uint[] DeadBush()
+- CactusSide · method · L574-L592 — private static uint[] CactusSide()
+- CactusTop · method · L593-L605 — private static uint[] CactusTop(bool bottom)
+- Reeds · method · L607-L623 — private static uint[] Reeds()
+- Sapling · method · L625-L641 — private static uint[] Sapling(uint leaf, uint dark, uint light)
+- RedstoneBlock · method · L643-L657 — private static uint[] RedstoneBlock()
+- StoneBrick · method · L659-L668 — private static uint[] StoneBrick()
+- Bricks · method · L670-L684 — private static uint[] Bricks()
+- CraftingTop · method · L686-L694 — private static uint[] CraftingTop()
+- CraftingSide · method · L696-L720 — private static uint[] CraftingSide(bool front)
+- FurnaceSide · method · L722-L727 — private static uint[] FurnaceSide()
+- FurnaceTop · method · L728-L734 — private static uint[] FurnaceTop()
+- FurnaceFront · method · L735-L756 — private static uint[] FurnaceFront(bool lit)
+- ChestTex · method · L758-L778 — private static uint[] ChestTex(int kind)
+- Torch · method · L780-L789 — private static uint[] Torch(uint head, uint headLight, uint headDark)
+- Farmland · method · L791-L803 — private static uint[] Farmland(bool wet)
+- Wheat · method · L805-L826 — private static uint[] Wheat(int stage)
+- Ladder · method · L828-L839 — private static uint[] Ladder()
+- Door · method · L841-L866 — private static uint[] Door(bool upper)
+- TntSide · method · L868-L883 — private static uint[] TntSide()
+- TntTop · method · L884-L896 — private static uint[] TntTop(bool top)
+- RedDust · method · L898-L910 — private static uint[] RedDust(bool cross)
+- LeverTex · method · L912-L917 — private static uint[] LeverTex()
+- SlabTop · method · L919-L924 — private static uint[] SlabTop()
+- SlabSide · method · L925-L930 — private static uint[] SlabSide()
+- Lamp · method · L932-L944 — private static uint[] Lamp(bool on)
+- Repeater · method · L946-L953 — private static uint[] Repeater(bool on)
+- PistonTop · method · L955-L965 — private static uint[] PistonTop(bool sticky)
+- PistonSide · method · L966-L973 — private static uint[] PistonSide()
+- PistonBottom · method · L974-L979 — private static uint[] PistonBottom()
+- PistonInner · method · L980-L985 — private static uint[] PistonInner()
+- AddBed · method · L987-L1033 — private static void AddBed()
+- Bookshelf · method · L1035-L1054 — private static uint[] Bookshelf()
+- Destroy · method · L1056-L1077 — private static uint[] Destroy(int stage)
+- WaterFrame · method · L1079-L1094 — private static uint[] WaterFrame(int f)
+- LavaFrame · method · L1096-L1110 — private static uint[] LavaFrame(int f)
+- GenerateParticles · method · L1113-L1190 — private static void GenerateParticles()
+- Stamp · method · L1192-L1204 — public static void Stamp(uint[] p, string[] rows, Dictionary<char, uint> pal, int ox = 0, int oy = 0)

@@ -1,0 +1,39 @@
+# src/BlockCraft/Render/GL.cs
+
+- Shader · class · L7-L47 — public sealed class Shader : IDisposable
+- Shader · method · L12-L22 — public Shader(string vert, string frag, string name = "")
+- Compile · method · L24-L32 — private static int Compile(ShaderType t, string src, string name)
+- Use · method · L34-L34 — public void Use() => GL.UseProgram(Handle);
+- Loc · method · L35-L39 — public int Loc(string n)
+- Set · method · L40-L40 — public void Set(string n, float v) => GL.Uniform1(Loc(n), v);
+- Set · method · L41-L41 — public void Set(string n, int v) => GL.Uniform1(Loc(n), v);
+- Set · method · L42-L42 — public void Set(string n, Vector2 v) => GL.Uniform2(Loc(n), v);
+- Set · method · L43-L43 — public void Set(string n, Vector3 v) => GL.Uniform3(Loc(n), v);
+- Set · method · L44-L44 — public void Set(string n, Vector4 v) => GL.Uniform4(Loc(n), v);
+- Set · method · L45-L45 — public void Set(string n, Matrix4 m) => GL.UniformMatrix4(Loc(n), false, ref m);
+- Dispose · method · L46-L46 — public void Dispose() => GL.DeleteProgram(Handle);
+- Texture2D · class · L49-L71 — public sealed class Texture2D : IDisposable
+- Texture2D · method · L52-L63 — public Texture2D(int w, int h, uint[] pixels, bool linear = false)
+- Update · method · L64-L68 — public void Update(uint[] pixels)
+- Bind · method · L69-L69 — public void Bind(int unit = 0) { GL.ActiveTexture(TextureUnit.Texture0 + unit); GL.BindTexture(TextureTarget.Texture2D, Handle); }
+- Dispose · method · L70-L70 — public void Dispose() => GL.DeleteTexture(Handle);
+- TextureArray · class · L73-L151 — public sealed class TextureArray : IDisposable
+- TextureArray · method · L77-L107 — public TextureArray(int size, IReadOnlyList<uint[]> layers, bool mipmaps, int levels = 4)
+- Downsample · method · L109-L132 — private static uint[] Downsample(uint[] src, int s)
+- UpdateLayer · method · L134-L148 — public void UpdateLayer(int layer, uint[] px)
+- Bind · method · L149-L149 — public void Bind(int unit = 0) { GL.ActiveTexture(TextureUnit.Texture0 + unit); GL.BindTexture(TextureTarget.Texture2DArray, Handle); }
+- Dispose · method · L150-L150 — public void Dispose() => GL.DeleteTexture(Handle);
+- Mesh · class · L154-L205 — public sealed class Mesh : IDisposable
+- Mesh · method · L160-L173 — public Mesh(int stride, Action setupAttribs, bool indexed = true)
+- Upload · method · L175-L182 — public unsafe void Upload(byte[] data, int bytes, BufferUsageHint hint = BufferUsageHint.StaticDraw)
+- Upload · method · L183-L190 — public unsafe void Upload(float[] data, int floats, BufferUsageHint hint = BufferUsageHint.StreamDraw)
+- DrawQuads · method · L192-L197 — public void DrawQuads()
+- DrawArrays · method · L198-L203 — public void DrawArrays(PrimitiveType t)
+- Dispose · method · L204-L204 — public void Dispose() { GL.DeleteBuffer(Vbo); GL.DeleteVertexArray(Vao); }
+- SharedQuadIndices · class · L207-L226 — public static class SharedQuadIndices
+- Init · method · L211-L211 — public static void Init() { Ebo = GL.GenBuffer(); Ensure(65536); }
+- Ensure · method · L212-L225 — public static void Ensure(int quads)
+- Framebuffer · class · L228-L254 — public sealed class Framebuffer : IDisposable
+- Framebuffer · method · L231-L231 — public Framebuffer(int w, int h) { Resize(w, h); }
+- Resize · method · L232-L249 — public void Resize(int w, int h)
+- Dispose · method · L250-L253 — public void Dispose()

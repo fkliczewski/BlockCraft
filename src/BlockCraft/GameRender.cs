@@ -168,11 +168,10 @@ public sealed partial class Game
         else
         {
             var it = s.Item;
-            int sp = it.Sprite > 0 ? it.Sprite : (it.IsBlock ? Block.Get(it.BlockId).Tex[0] : 0);
-            uint col = 0xFFFFFFFF;
-            var b = it.IsBlock ? Block.Get(it.BlockId) : null;
-            if (b != null && b.Tint == TintType.Grass) col = 0xFF5AC079;
+            int sp = it.GetSprite(s);
+            uint col = it.GetColor(s, 0);
             Sb.DrawLayer(Renderer.Terrain, sp, x, y, 16, 16, col);
+            if (it.OverlayFn != null) { var (ol, oc) = it.OverlayFn(s); if (ol > 0) Sb.DrawLayer(Renderer.Terrain, ol, x, y, 16, 16, oc); }
         }
         if (count && s.Count > 1)
         {

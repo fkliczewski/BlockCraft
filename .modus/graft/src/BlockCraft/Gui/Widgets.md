@@ -1,0 +1,47 @@
+# src/BlockCraft/Gui/Widgets.cs
+
+- Widget · class · L6-L17 — public abstract class Widget
+- Hover · method · L10-L10 — public bool Hover(int mx, int my) => Visible && mx >= X && my >= Y && mx < X + W && my < Y + H;
+- Draw · method · L11-L11 — public abstract void Draw(Game g, int mx, int my);
+- MouseDown · method · L12-L12 — public virtual bool MouseDown(Game g, int mx, int my, int btn) => false;
+- MouseUp · method · L13-L13 — public virtual void MouseUp(Game g, int mx, int my, int btn) { }
+- MouseDrag · method · L14-L14 — public virtual void MouseDrag(Game g, int mx, int my) { }
+- Key · method · L15-L15 — public virtual bool Key(Game g, Keys k, bool ctrl, bool shift) => false;
+- Char · method · L16-L16 — public virtual bool Char(Game g, char c) => false;
+- Button · class · L19-L52 — public sealed class Button : Widget
+- Button · method · L23-L23 — public Button(int x, int y, int w, int h, string text, Action click) { X = x; Y = y; W = w; H = h; Text = () => text; OnClick = click; }
+- Button · method · L24-L24 — public Button(int x, int y, int w, int h, Func<string> text, Action click) { X = x; Y = y; W = w; H = h; Text = text; OnClick = click; }
+- DrawButton · method · L26-L35 — public static void DrawButton(Game g, int x, int y, int w, int h, int state)
+- Draw · method · L37-L44 — public override void Draw(Game g, int mx, int my)
+- MouseDown · method · L45-L51 — public override bool MouseDown(Game g, int mx, int my, int btn)
+- Slider · class · L54-L83 — public sealed class Slider : Widget
+- Slider · method · L61-L62 — public Slider(int x, int y, int w, int h, float value, Func<float, string> label, Action<float> change, int steps = 0)
+- Draw · method · L63-L69 — public override void Draw(Game g, int mx, int my)
+- Set · method · L70-L75 — private void Set(int mx)
+- MouseDown · method · L76-L80 — public override bool MouseDown(Game g, int mx, int my, int btn)
+- MouseDrag · method · L81-L81 — public override void MouseDrag(Game g, int mx, int my) { if (_drag) Set(mx); }
+- MouseUp · method · L82-L82 — public override void MouseUp(Game g, int mx, int my, int btn) { if (_drag) { _drag = false; g.PlayUiClick(); } }
+- TextField · class · L85-L120 — public sealed class TextField : Widget
+- TextField · method · L93-L93 — public TextField(int x, int y, int w, int h) { X = x; Y = y; W = w; H = h; }
+- Draw · method · L94-L105 — public override void Draw(Game g, int mx, int my)
+- MouseDown · method · L106-L106 — public override bool MouseDown(Game g, int mx, int my, int btn) { Focused = Hover(mx, my); return Focused; }
+- Char · method · L107-L111 — public override bool Char(Game g, char c)
+- Key · method · L112-L119 — public override bool Key(Game g, Keys k, bool ctrl, bool shift)
+- Screen · class · L122-L173 — public abstract class Screen
+- PausesGame · variable · L127-L127 — public virtual bool PausesGame => true;
+- ShowWorld · variable · L128-L128 — public virtual bool ShowWorld => true;
+- Open · method · L130-L130 — public void Open(Game g, int w, int h) { G = g; W = w; H = h; Widgets.Clear(); Init(); }
+- Init · method · L131-L131 — protected virtual void Init() { }
+- Tick · method · L132-L132 — public virtual void Tick() { }
+- OnClose · method · L133-L133 — public virtual void OnClose() { }
+- Add · method · L135-L135 — protected T Add<T>(T w) where T : Widget { Widgets.Add(w); return w; }
+- Render · method · L137-L140 — public virtual void Render(int mx, int my, float pt)
+- MouseDown · method · L142-L146 — public virtual void MouseDown(int mx, int my, int btn)
+- MouseUp · method · L147-L147 — public virtual void MouseUp(int mx, int my, int btn) { foreach (var w in Widgets) w.MouseUp(G, mx, my, btn); }
+- MouseMove · method · L148-L148 — public virtual void MouseMove(int mx, int my) { foreach (var w in Widgets) w.MouseDrag(G, mx, my); }
+- Scroll · method · L149-L149 — public virtual void Scroll(int mx, int my, float delta) { }
+- KeyDown · method · L150-L159 — public virtual void KeyDown(Keys k, bool ctrl, bool shift)
+- CharTyped · method · L160-L160 — public virtual void CharTyped(char c) { foreach (var w in Widgets) if (w.Char(G, c)) return; }
+- Escape · method · L161-L161 — protected virtual void Escape() => G.SetScreen(null);
+- DrawDirtBackground · method · L163-L168 — protected void DrawDirtBackground()
+- DrawDim · method · L169-L172 — protected void DrawDim()

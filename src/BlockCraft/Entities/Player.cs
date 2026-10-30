@@ -14,7 +14,7 @@ public interface IPlayerHandler
     void OnPickup(Entity item, Entity collector);
 }
 
-public class Player : LivingEntity
+public partial class Player : LivingEntity
 {
     public string Name = "Steve";
     public readonly PlayerInventory Inventory = new();
@@ -467,7 +467,7 @@ public class Player : LivingEntity
             GameMode = GameMode, Flying = Flying, XpLevel = XpLevel, XpProgress = XpProgress, XpTotal = XpTotal, Selected = Inventory.SelectedSlot, Air = Air,
             HasSpawn = HasSpawn, SpawnX = SpawnX, SpawnY = SpawnY, SpawnZ = SpawnZ, Dead = Dead
         };
-        for (int i = 0; i < 40; i++) { var s = Inventory.Get(i); if (s != null) d.Inventory.Add(new SlotData { Slot = i, Id = s.Id, Count = s.Count, Damage = s.Damage }); }
+        for (int i = 0; i < 40; i++) { var s = Inventory.Get(i); if (s != null) d.Inventory.Add(SlotData.From(i, s)); }
         return d;
     }
 
@@ -479,7 +479,7 @@ public class Player : LivingEntity
         Inventory.SelectedSlot = Math.Clamp(d.Selected, 0, 8); Air = d.Air;
         HasSpawn = d.HasSpawn; SpawnX = d.SpawnX; SpawnY = d.SpawnY; SpawnZ = d.SpawnZ;
         Inventory.Clear();
-        foreach (var s in d.Inventory) if (Item.ById[s.Id] != null && s.Slot >= 0 && s.Slot < 40) Inventory.Set(s.Slot, new ItemStack(s.Id, s.Count, s.Damage));
+        foreach (var s in d.Inventory) if (Item.ById[s.Id] != null && s.Slot >= 0 && s.Slot < 40) Inventory.Set(s.Slot, s.ToStack());
         if (d.Dead || Health <= 0) { Health = 0; }
     }
 }

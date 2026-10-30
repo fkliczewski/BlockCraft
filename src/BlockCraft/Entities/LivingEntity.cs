@@ -55,10 +55,43 @@ public abstract class LivingEntity : Entity
         SwingProgress = (float)SwingTicks / len;
     }
 
+    // ---- efekty statusu (mikstury) ----
+    public readonly Dictionary<Effect, EffectInstance> Effects = new();
+    public bool HasEffect(Effect id) => Effects.ContainsKey(id);
+    /// <summary>Poziom efektu (0 = I) albo -1 gdy brak.</summary>
+    public int EffectLevel(Effect id) => Effects.TryGetValue(id, out var e) ? e.Amplifier : -1;
+    public virtual bool CanHaveEffect(Effect id) => true;
+    public void AddEffect(EffectInstance ef)
+    {
+        if (!CanHaveEffect(ef.Id)) return;
+        if (Effects.TryGetValue(ef.Id, out var cur))
+        {
+            // jak w MC: wyższy poziom nadpisuje, ten sam poziom przedłuża
+            if (ef.Amplifier > cur.Amplifier) { cur.Amplifier = ef.Amplifier; cur.Duration = ef.Duration; }
+            else if (ef.Amplifier == cur.Amplifier && cur.Duration < ef.Duration) cur.Duration = ef.Duration;
+            cur.Ambient = ef.Ambient; cur.ShowParticles = ef.ShowParticles;
+            EffectLogic.Applied(this, cur);
+        }
+        else { Effects[ef.Id] = ef; EffectLogic.Applied(this, ef); }
+    }
+    public void AddEffect(Effect id, int duration, int amplifier = 0) => AddEffect(new EffectInstance(id, duration, amplifier));
+    public void RemoveEffect(Effect id) { if (Effects.Remove(id, out var e)) EffectLogic.Removed(this, e); }
+    public void ClearEffects() { foreach (var id in Effects.Keys.ToList()) RemoveEffect(id); }
+    private void TickEffects()
+    {
+        if (Effects.Count == 0) return;
+        foreach (var ef in Effects.Values.ToList())
+        {
+            EffectLogic.Tick(this, ef);
+            if (--ef.Duration <= 0) RemoveEffect(ef.Id);
+        }
+    }
+
     public override void Tick()
     {
         base.Tick();
         UpdateSwing();
+        if (!IsRemoteControlled) TickEffects();
         if (IsRemoteControlled)
         {
             UpdateLimbs();
@@ -364,11 +397,15 @@ public abstract class LivingEntity : Entity
     {
         base.Save(bw);
         bw.Write(Health); bw.Write(Air);
+        bw.Write(Effects.Count);
+        foreach (var e in Effects.Values) { bw.Write((int)e.Id); bw.Write(e.Duration); bw.Write(e.Amplifier); bw.Write(e.Ambient); bw.Write(e.ShowParticles); }
     }
     public override void Load(BinaryReader br)
     {
         base.Load(br);
         Health = br.ReadSingle(); Air = br.ReadInt32();
+        int ne = br.ReadInt32();
+        for (int i = 0; i < ne; i++) { var e = new EffectInstance((Effect)br.ReadInt32(), br.ReadInt32(), br.ReadInt32(), br.ReadBoolean(), br.ReadBoolean()); Effects[e.Id] = e; }
         BodyYaw = PrevBodyYaw = HeadYaw = PrevHeadYaw = Yaw;
     }
 }

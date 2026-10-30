@@ -1,0 +1,53 @@
+# src/BlockCraft/Entities/MiscEntities.cs
+
+- ItemEntity · class · L7-L66 — public sealed class ItemEntity : Entity
+- ItemEntity · method · L14-L20 — public ItemEntity(World.World w, double x, double y, double z, ItemStack s) : base(w)
+- TypeKey · variable · L21-L21 — public override string TypeKey => "item";
+- Persistent · variable · L22-L22 — public override bool Persistent => true;
+- Tick · method · L24-L47 — public override void Tick()
+- OnCollideWithPlayer · method · L49-L60 — public override void OnCollideWithPlayer(Player p)
+- Save · method · L62-L62 — public override void Save(BinaryWriter bw) { base.Save(bw); bw.WriteStack(Stack); bw.Write(Lifetime); bw.Write(PickupDelay); }
+- Load · method · L63-L63 — public override void Load(BinaryReader br) { base.Load(br); Stack = br.ReadStack() ?? new ItemStack(1); Lifetime = br.ReadInt32(); PickupDelay = br.ReadInt32(); }
+- NetData · variable · L64-L64 — public override int NetData => Stack.Id | (Stack.Damage << 16);
+- SetNetData · method · L65-L65 — public override void SetNetData(int d) { Stack = new ItemStack(d & 0xFFFF, 1, d >> 16); }
+- XpOrbEntity · class · L68-L106 — public sealed class XpOrbEntity : Entity
+- XpOrbEntity · method · L72-L75 — public XpOrbEntity(World.World w, double x, double y, double z, int value) : base(w)
+- TypeKey · variable · L76-L76 — public override string TypeKey => "xp_orb";
+- Tick · method · L77-L96 — public override void Tick()
+- OnCollideWithPlayer · method · L97-L103 — public override void OnCollideWithPlayer(Player p)
+- NetData · variable · L104-L104 — public override int NetData => Value;
+- SetNetData · method · L105-L105 — public override void SetNetData(int d) => Value = d;
+- FallingBlockEntity · class · L108-L138 — public sealed class FallingBlockEntity : Entity
+- FallingBlockEntity · method · L111-L114 — public FallingBlockEntity(World.World w, double x, double y, double z, byte id, int meta) : base(w)
+- TypeKey · variable · L115-L115 — public override string TypeKey => "falling_block";
+- Tick · method · L116-L133 — public override void Tick()
+- Save · method · L134-L134 — public override void Save(BinaryWriter bw) { base.Save(bw); bw.Write(BlockId); bw.Write(Meta); }
+- Load · method · L135-L135 — public override void Load(BinaryReader br) { base.Load(br); BlockId = br.ReadByte(); Meta = br.ReadInt32(); }
+- NetData · variable · L136-L136 — public override int NetData => BlockId | (Meta << 8);
+- SetNetData · method · L137-L137 — public override void SetNetData(int d) { BlockId = (byte)(d & 0xFF); Meta = d >> 8; }
+- TntEntity · class · L140-L168 — public sealed class TntEntity : Entity
+- TntEntity · method · L144-L149 — public TntEntity(World.World w, double x, double y, double z, int fuse) : base(w)
+- TypeKey · variable · L150-L150 — public override string TypeKey => "tnt";
+- Tick · method · L151-L165 — public override void Tick()
+- NetData · variable · L166-L166 — public override int NetData => Fuse;
+- SetNetData · method · L167-L167 — public override void SetNetData(int d) => Fuse = d;
+- ArrowEntity · class · L170-L280 — public sealed class ArrowEntity : Entity
+- ArrowEntity · method · L177-L177 — public ArrowEntity(World.World w) : base(w) { Width = 0.5f; Height = 0.5f; StepHeight = 0; }
+- ArrowEntity · method · L178-L188 — public ArrowEntity(World.World w, LivingEntity shooter, float velocity) : this(w)
+- Shoot · method · L189-L198 — public void Shoot(double x, double y, double z, float velocity, float inaccuracy)
+- TypeKey · variable · L199-L199 — public override string TypeKey => "arrow";
+- Persistent · variable · L200-L200 — public override bool Persistent => InGround;
+- Tick · method · L202-L264 — public override void Tick()
+- OnCollideWithPlayer · method · L266-L277 — public override void OnCollideWithPlayer(Player p)
+- Save · method · L278-L278 — public override void Save(BinaryWriter bw) { base.Save(bw); bw.Write(InGround); bw.Write(_gx); bw.Write(_gy); bw.Write(_gz); bw.Write(_gid); bw.Write(PickupAllowed); }
+- Load · method · L279-L279 — public override void Load(BinaryReader br) { base.Load(br); InGround = br.ReadBoolean(); _gx = br.ReadInt32(); _gy = br.ReadInt32(); _gz = br.ReadInt32(); _gid = br.ReadByte(); PickupAllowed = br.ReadBoolean(); }
+- ThrownEntity · class · L283-L349 — public sealed class ThrownEntity : Entity
+- ThrownEntity · method · L287-L296 — public ThrownEntity(World.World w, int kind, LivingEntity thrower) : base(w)
+- TypeKey · variable · L297-L297 — public override string TypeKey => "thrown";
+- Tick · method · L298-L321 — public override void Tick()
+- OnImpact · method · L322-L346 — private void OnImpact(Entity target)
+- NetData · variable · L347-L347 — public override int NetData => Kind;
+- SetNetData · method · L348-L348 — public override void SetNetData(int d) => Kind = d;
+- Explosion · class · L351-L440 — public static class Explosion
+- Explode · method · L353-L421 — public static void Explode(World.World w, Entity source, double x, double y, double z, float power, bool breakBlocks)
+- Exposure · method · L423-L439 — private static double Exposure(World.World w, double x, double y, double z, AABB bb)

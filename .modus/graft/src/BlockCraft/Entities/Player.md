@@ -1,0 +1,55 @@
+# src/BlockCraft/Entities/Player.cs
+
+- GuiKind · enum · L7-L7 — public enum GuiKind { Inventory, Crafting, Furnace, Chest }
+- IPlayerHandler · interface · L9-L15 — public interface IPlayerHandler
+- OpenBlockGui · method · L11-L11 — void OpenBlockGui(GuiKind kind, int x, int y, int z);
+- OnMessage · method · L12-L12 — void OnMessage(string msg);
+- OnDeath · method · L13-L13 — void OnDeath(string message);
+- OnPickup · method · L14-L14 — void OnPickup(Entity item, Entity collector);
+- Player · class · L17-L485 — public class Player : LivingEntity
+- Player · method · L42-L46 — public Player(World.World w) : base(w)
+- TypeKey · variable · L48-L48 — public override string TypeKey => "player";
+- DisplayName · variable · L49-L49 — public override string DisplayName => Name;
+- EyeHeight · variable · L50-L50 — public override float EyeHeight => Sneaking ? 1.54f : 1.62f;
+- Creative · variable · L51-L51 — public bool Creative => GameMode == 1;
+- Spectator · variable · L52-L52 — public bool Spectator => GameMode == 3;
+- ArmorValue · variable · L53-L53 — public override int ArmorValue => Inventory.ArmorValue;
+- IsFlyingNow · variable · L54-L54 — protected override bool IsFlyingNow => Flying;
+- HurtSound · variable · L55-L55 — public override string HurtSound => "player_hurt";
+- SetGameMode · method · L57-L65 — public void SetGameMode(int gm)
+- IsInvulnerableTo · method · L67-L67 — public override bool IsInvulnerableTo(DamageSource s) => Invulnerable && (s.Type != "outOfWorld" || GameMode == 3) && s.Type != "kill";
+- PrevTick · method · L69-L73 — public override void PrevTick()
+- Tick · method · L75-L114 — public override void Tick()
+- LivingUpdate · method · L116-L134 — protected override void LivingUpdate()
+- Jump · method · L136-L140 — public override void Jump()
+- JumpMovementFactor · variable · L142-L142 — protected override float JumpMovementFactor => Flying ? FlySpeed * (Sprinting ? 2f : 1f) : (Sprinting ? 0.026f : 0.02f);
+- Travel · method · L144-L157 — public override void Travel(float strafe, float forward)
+- GetSpeed · method · L159-L159 — public override float GetSpeed() => 0.1f * (Sprinting ? 1.3f : 1f);
+- OnFall · method · L161-L177 — protected override void OnFall(float distance)
+- AddExhaustion · method · L180-L180 — public void AddExhaustion(float f) { if (!Creative && !Spectator) Exhaustion = Math.Min(40f, Exhaustion + f); }
+- FoodTick · method · L182-L214 — private void FoodTick()
+- CanEat · method · L216-L216 — public bool CanEat(bool always) => always || Creative || FoodLevel < 20;
+- Eat · method · L218-L226 — public void Eat(Item food)
+- StartUsing · method · L229-L233 — public void StartUsing(ItemStack s)
+- StopUsing · method · L235-L239 — public void StopUsing()
+- UseItemTick · method · L241-L257 — private void UseItemTick()
+- FinishUsing · method · L259-L276 — private void FinishUsing()
+- BowCharge · variable · L278-L288 — public float BowCharge
+- ReleaseBow · method · L290-L301 — private void ReleaseBow()
+- DamageHeld · method · L304-L315 — public void DamageHeld(int amount)
+- XpBarCap · variable · L318-L318 — public int XpBarCap => XpLevel >= 30 ? 112 + (XpLevel - 30) * 9 : XpLevel >= 15 ? 37 + (XpLevel - 15) * 5 : 7 + XpLevel * 2;
+- AddXp · method · L319-L330 — public void AddXp(int amount)
+- OnCrafted · method · L332-L332 — public void OnCrafted(ItemStack s) { }
+- SendMessage · method · L335-L335 — public void SendMessage(string msg) => Handler?.OnMessage(msg);
+- OpenBlockGui · method · L337-L337 — public void OpenBlockGui(GuiKind kind, int x, int y, int z) => Handler?.OpenBlockGui(kind, x, y, z);
+- CloseContainer · method · L339-L343 — public void CloseContainer()
+- DropStack · method · L345-L359 — public void DropStack(ItemStack s, bool fromCursor)
+- StartSleeping · method · L365-L370 — public void StartSleeping(int x, int y, int z)
+- WakeUp · method · L371-L387 — public void WakeUp()
+- OnDeath · method · L389-L417 — public override void OnDeath(DamageSource src)
+- Respawn · method · L419-L428 — public void Respawn()
+- OnArmorDamaged · method · L430-L430 — protected override void OnArmorDamaged(float amount) { Inventory.DamageArmor(amount); }
+- DamageEntity · method · L432-L437 — protected override void DamageEntity(DamageSource src, float amount)
+- AttackEntity · method · L440-L460 — public void AttackEntity(Entity target)
+- ToData · method · L462-L472 — public PlayerData ToData()
+- FromData · method · L474-L484 — public void FromData(PlayerData d)

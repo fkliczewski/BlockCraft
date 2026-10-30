@@ -1,0 +1,22 @@
+# src/BlockCraft/World/Chunk.cs
+
+- Chunk · class · L7-L81 — public sealed class Chunk
+- Chunk · method · L29-L29 — public Chunk(int cx, int cz) { Cx = cx; Cz = cz; }
+- Index · method · L31-L32 — [MethodImpl(MethodImplOptions.AggressiveInlining)]
+- GetBlock · method · L34-L35 — [MethodImpl(MethodImplOptions.AggressiveInlining)]
+- GetMeta · method · L36-L37 — [MethodImpl(MethodImplOptions.AggressiveInlining)]
+- SetBlockRaw · method · L39-L45 — public void SetBlockRaw(int x, int y, int z, byte id, int meta)
+- RecountSections · method · L47-L51 — public void RecountSections()
+- GetSky · method · L53-L53 — public int GetSky(int x, int y, int z) => Light[Index(x, y, z)] >> 4;
+- GetBlockLight · method · L54-L54 — public int GetBlockLight(int x, int y, int z) => Light[Index(x, y, z)] & 15;
+- RecalcHeightMap · method · L56-L61 — public void RecalcHeightMap()
+- RecalcHeight · method · L62-L67 — public void RecalcHeight(int x, int z)
+- GetHeight · method · L68-L68 — public int GetHeight(int x, int z) => HeightMap[(z << 4) | x];
+- TopSolidY · method · L70-L78 — public int TopSolidY(int x, int z)
+- MarkAllDirty · method · L80-L80 — public void MarkAllDirty() => DirtySections = (1 << Sections) - 1;
+- TileEntity · class · L83-L97 — public abstract class TileEntity
+- Tick · method · L86-L86 — public virtual void Tick(World w) { }
+- Save · method · L87-L87 — public abstract void Save(BinaryWriter bw);
+- Load · method · L88-L88 — public abstract void Load(BinaryReader br);
+- TypeId · variable · L89-L89 — public abstract int TypeId { get; }
+- Create · method · L91-L96 — public static TileEntity Create(int type) => type switch

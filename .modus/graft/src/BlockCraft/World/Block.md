@@ -1,0 +1,58 @@
+# src/BlockCraft/World/Block.cs
+
+- RenderType · enum · L8-L8 — public enum RenderType { None, Cube, Cross, Crops, Liquid, Torch, Model, Wire, Cactus }
+- RenderLayer · enum · L9-L9 — public enum RenderLayer { Solid, Cutout, Translucent }
+- ToolType · enum · L10-L10 — public enum ToolType { None, Pickaxe, Axe, Shovel, Sword, Shears, Hoe }
+- TintType · enum · L11-L11 — public enum TintType { None, Grass, Foliage, Birch, RedstoneWire }
+- SoundType · enum · L12-L12 — public enum SoundType { Stone, Wood, Gravel, Grass, Sand, Glass, Wool, Metal, Ladder }
+- ModelBox · struct · L15-L27 — public struct ModelBox
+- ModelBox · method · L22-L23 — public ModelBox(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
+- Px · method · L24-L25 — public static ModelBox Px(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
+- All · method · L26-L26 — public static int[] All(int t) => new[] { t, t, t, t, t, t };
+- Block · class · L29-L176 — public class Block
+- Block · method · L64-L68 — public Block(byte id, string key, string name)
+- Get · method · L70-L70 — public static Block Get(int id) => ById[id] ?? ById[0];
+- T · method · L73-L73 — public Block T(string all) { int t = TextureGen.Layer(all); for (int i = 0; i < 6; i++) Tex[i] = t; return this; }
+- T · method · L74-L78 — public Block T(string top, string bottom, string side)
+- H · method · L79-L79 — public Block H(float hardness, float blast = -1) { Hardness = hardness; BlastResistance = blast < 0 ? hardness : blast; return this; }
+- Tool_ · method · L80-L80 — public Block Tool_(ToolType t, int level = -1) { Tool = t; HarvestLevel = level; return this; }
+- Snd · method · L81-L81 — public Block Snd(SoundType s) { Sound = s; return this; }
+- Transparent · method · L82-L83 — public Block Transparent(RenderLayer layer = RenderLayer.Cutout, int opacity = 0)
+- Plant · method · L84-L88 — public Block Plant(RenderType r = RenderType.Cross)
+- Light · method · L89-L89 — public Block Light(int l) { LightEmit = l; return this; }
+- Tab · method · L90-L90 — public Block Tab(int t) { CreativeTab = t; return this; }
+- NotCreative · method · L91-L91 — public Block NotCreative() { InCreative = false; return this; }
+- GetTexture · method · L94-L94 — public virtual int GetTexture(int face, int meta) => Tex[face];
+- IsOpaqueCube · method · L95-L95 — public virtual bool IsOpaqueCube(int meta) => Opaque;
+- GetCollisionBoxes · method · L98-L102 — public virtual void GetCollisionBoxes(IBlockAccess w, int x, int y, int z, int meta, List<AABB> list)
+- GetSelectionBoxes · method · L104-L113 — public virtual void GetSelectionBoxes(IBlockAccess w, int x, int y, int z, int meta, List<AABB> list)
+- GetModel · method · L116-L116 — public virtual void GetModel(IBlockAccess w, int x, int y, int z, int meta, List<ModelBox> boxes) { }
+- CanPlaceAt · method · L118-L118 — public virtual bool CanPlaceAt(World w, int x, int y, int z) => true;
+- CanStay · method · L119-L119 — public virtual bool CanStay(World w, int x, int y, int z) => CanPlaceAt(w, x, y, z);
+- GetPlacementMeta · method · L120-L120 — public virtual int GetPlacementMeta(World w, int x, int y, int z, int face, double hx, double hy, double hz, Player p, int itemMeta) => itemMeta;
+- OnPlaced · method · L122-L122 — public virtual void OnPlaced(World w, int x, int y, int z, Player p) { }
+- OnAdded · method · L123-L123 — public virtual void OnAdded(World w, int x, int y, int z) { }
+- OnRemoved · method · L124-L124 — public virtual void OnRemoved(World w, int x, int y, int z, int oldMeta) { }
+- OnActivated · method · L125-L125 — public virtual bool OnActivated(World w, int x, int y, int z, Player p) => false;
+- OnClicked · method · L126-L126 — public virtual void OnClicked(World w, int x, int y, int z, Player p) { }
+- OnNeighborChanged · method · L127-L130 — public virtual void OnNeighborChanged(World w, int x, int y, int z, int neighborId)
+- OnScheduledTick · method · L131-L131 — public virtual void OnScheduledTick(World w, int x, int y, int z, Rng r) { }
+- OnRandomTick · method · L132-L132 — public virtual void OnRandomTick(World w, int x, int y, int z, Rng r) { }
+- OnEntityCollide · method · L133-L133 — public virtual void OnEntityCollide(World w, int x, int y, int z, Entity e) { }
+- OnEntityWalk · method · L134-L134 — public virtual void OnEntityWalk(World w, int x, int y, int z, Entity e) { }
+- OnDestroyedByPlayer · method · L135-L135 — public virtual void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p) { }
+- GetDrops · method · L137-L142 — public virtual void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
+- DropId · method · L143-L143 — public virtual int DropId(int meta, Rng r) => Id;
+- DropCount · method · L144-L144 — public virtual int DropCount(Rng r) => 1;
+- DropMeta · method · L145-L145 — public virtual int DropMeta(int meta) => 0;
+- PickStack · method · L146-L146 — public virtual ItemStack PickStack(int meta) => Item.ById[Id] != null ? new ItemStack(Id, 1, DropMeta(meta)) : null;
+- GetWeakPower · method · L150-L150 — public virtual int GetWeakPower(IBlockAccess w, int x, int y, int z, int meta, int side) => 0;
+- GetStrongPower · method · L151-L151 — public virtual int GetStrongPower(IBlockAccess w, int x, int y, int z, int meta, int side) => 0;
+- ConnectsToRedstone · method · L152-L152 — public virtual bool ConnectsToRedstone(int meta, int side) => IsPowerSource;
+- DisplayName · method · L154-L154 — public virtual string DisplayName(int meta) => Name;
+- CanHarvest · method · L156-L162 — public bool CanHarvest(ItemStack tool)
+- GetDigSpeed · method · L164-L173 — public float GetDigSpeed(ItemStack tool)
+- GetRenderBounds · method · L175-L175 — public virtual AABB? GetRenderBounds() => null;
+- IBlockAccess · interface · L178-L182 — public interface IBlockAccess
+- GetBlock · method · L180-L180 — byte GetBlock(int x, int y, int z);
+- GetMeta · method · L181-L181 — int GetMeta(int x, int y, int z);

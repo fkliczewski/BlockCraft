@@ -35,7 +35,7 @@ public sealed class VertexBuffer
     }
 }
 
-public sealed class ChunkMesher
+public sealed partial class ChunkMesher
 {
     // wyściełane dane 18x18x18
     private const int P = 18;

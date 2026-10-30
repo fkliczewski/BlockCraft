@@ -38,6 +38,7 @@ public static partial class TextureGen
             GenerateBlocks();
             GenerateItems();
             GenerateParticles();
+            ModuleTextures();
             _index = idx;
         }
     }

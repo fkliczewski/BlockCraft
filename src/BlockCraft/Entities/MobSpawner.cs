@@ -17,13 +17,14 @@ public sealed class MobSpawner
         (w => new Sheep(w), 12), (w => new Pig(w), 10), (w => new Chicken(w), 10), (w => new Cow(w), 8)
     };
 
-    public static Mob Create(string key, World.World w) => key.ToLowerInvariant() switch
+    /// <summary>Tworzy dowolną zarejestrowaną encję (moby i inne, np. /summon minecart).</summary>
+    public static Entity Create(string key, World.World w)
     {
-        "zombie" => new Zombie(w), "skeleton" => new Skeleton(w), "creeper" => new Creeper(w), "spider" => new Spider(w),
-        "enderman" => new Enderman(w), "cow" => new Cow(w), "pig" => new Pig(w), "sheep" => new Sheep(w), "chicken" => new Chicken(w),
-        _ => null
-    };
-    public static readonly string[] MobKeys = { "zombie", "skeleton", "creeper", "spider", "enderman", "cow", "pig", "sheep", "chicken" };
+        key = key.ToLowerInvariant();
+        if (key.StartsWith("minecraft:")) key = key[10..];
+        return EntitySerializer.Create(key, w);
+    }
+    public static IEnumerable<string> MobKeys => Registries.MobKeys;
 
     private static Func<World.World, Mob> Pick((Func<World.World, Mob> f, int weight)[] list, Rng r)
     {

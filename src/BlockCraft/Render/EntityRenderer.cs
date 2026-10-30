@@ -46,7 +46,7 @@ public sealed class ModelBatch
     }
 }
 
-public sealed class EntityRenderer : IDisposable
+public sealed partial class EntityRenderer : IDisposable
 {
     public readonly Shader Shader;
     private readonly Mesh _mesh;
@@ -213,6 +213,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         if (e.FireTicks > 0) blk = 15;
         Skin.Sky = Terrain.Sky = sky; Skin.Blk = Terrain.Blk = blk;
         Skin.Color = Terrain.Color = Vector4.One; Skin.Overlay = Terrain.Overlay = Vector4.Zero;
+        if (FindCustom(Custom, e.GetType()) is { } custom) { custom(this, e, pt, pos, cam); return; }
         switch (e)
         {
             case LivingEntity le: RenderLiving(le, pt, pos); break;
@@ -281,7 +282,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
 
     public static bool IsBlockModel(Item it)
     {
-        if (it.Id >= 256 || it.Sprite > 0) return false;
+        if (it.Id >= 256 || it.Sprite > 0 || it.SpriteFn != null) return false;
         var b = Block.ById[it.BlockId];
         return b.Render is RenderType.Cube or RenderType.Model or RenderType.Cactus;
     }
@@ -292,7 +293,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         var it = s.Item;
         if (it == null) return;
         if (IsBlockModel(it)) RenderBlockAt(it.BlockId, s.Damage, m);
-        else RenderSpriteExtruded(it.IsBlock && it.Sprite < 0 ? Block.ById[it.BlockId].Tex[0] : it.Sprite, m);
+        else RenderSpriteExtruded(it.GetSprite(s), m);
     }
 
     private sealed class NullAccess : IBlockAccess { public byte GetBlock(int x, int y, int z) => 0; public int GetMeta(int x, int y, int z) => 0; }
@@ -442,6 +443,22 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         legs[3].RX = MathF.Cos(limb * 0.6662f) * 1.4f * amt;
     }
 
+    // ---- rejestr rendererów modułów (zamiast dopisywania gałęzi do switchy) ----
+    public delegate void CustomEntityRender(EntityRenderer r, Entity e, float pt, Vector3 pos, Vector3 cam);
+    /// <summary>Pozycja i animacja moba w chwili renderu (Root ma już obrót ciała i przewrócenie po śmierci).</summary>
+    public struct LivingPose { public float Pt, BodyYaw, HeadYaw, Pitch, Limb, LimbAmt, Age; public Vector3 Pos; public Matrix4 Root; public bool ForGui; }
+    public delegate void CustomLivingRender(EntityRenderer r, LivingEntity e, LivingPose pose);
+    /// <summary>Renderery encji nie-żywych (wagoniki, łódki, ramki...). Klucz: typ encji (dziedziczony też przez podklasy).</summary>
+    public static readonly Dictionary<Type, CustomEntityRender> Custom = new();
+    /// <summary>Renderery modeli mobów. Wołane z RenderLiving po ustawieniu oświetlenia, nakładki obrażeń i Root.</summary>
+    public static readonly Dictionary<Type, CustomLivingRender> CustomLiving = new();
+    private static T FindCustom<T>(Dictionary<Type, T> d, Type t) where T : class
+    {
+        if (d.Count == 0) return null;
+        for (var x = t; x != null && x != typeof(object); x = x.BaseType) if (d.TryGetValue(x, out var f)) return f;
+        return null;
+    }
+
     public void RenderLiving(LivingEntity e, float pt, Vector3 pos, bool forGui = false)
     {
         float bodyYaw = MathUtil.LerpAngle(e.PrevBodyYaw, e.BodyYaw, pt);
@@ -462,6 +479,11 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             // obrót na bok
             root = Matrix4.CreateTranslation(0, -1.5078125f, 0) * Matrix4.CreateScale(-1, -1, 1)
                    * Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(f * 90f)) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(180 - bodyYaw)) * Matrix4.CreateTranslation(pos);
+        }
+        if (FindCustom(CustomLiving, e.GetType()) is { } cl)
+        {
+            cl(this, e, new LivingPose { Pt = pt, BodyYaw = bodyYaw, HeadYaw = headYaw, Pitch = pitch, Limb = limb, LimbAmt = amt, Age = age, Pos = pos, Root = root, ForGui = forGui });
+            return;
         }
         switch (e)
         {
@@ -700,7 +722,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             gs.Rotate(-135f, 0, 1, 0);
             gs.Rotate(25f, 0, 0, 1);
             gs.Scale(1.05f, 1.05f, 1.05f);
-            RenderSpriteExtruded(it.IsBlock && it.Sprite < 0 ? Block.ById[it.BlockId].Tex[0] : it.Sprite, gs.M);
+            RenderSpriteExtruded(it.GetSprite(held), gs.M);
         }
     }
 

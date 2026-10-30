@@ -30,7 +30,7 @@ public struct Particle
     public bool Collide, Emissive, Grow;
 }
 
-public sealed class WorldRenderer : IWorldListener, IDisposable
+public sealed partial class WorldRenderer : IWorldListener, IDisposable
 {
     public World.World World;
     public TextureArray Terrain;
@@ -761,7 +761,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 if (data < 0)
                 {
                     var it = Item.ById[-data];
-                    int layer = it?.Sprite > 0 ? it.Sprite : 0;
+                    int layer = it != null ? it.GetSprite(new ItemStack(-data)) : 0;
                     for (int i = 0; i < count; i++)
                     {
                         float u = r.Next(12) / 16f, v = r.Next(12) / 16f;

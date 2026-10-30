@@ -5,9 +5,11 @@ using BlockCraft.Render;
 
 namespace BlockCraft.World;
 
-public static class Blocks
+public static partial class Blocks
 {
-    public const int TabBuilding = 0, TabDecoration = 1, TabRedstone = 2, TabMisc = 3, TabFood = 4, TabTools = 5, TabCombat = 6, TabMaterials = 7;
+    // 8 i 9 zajmują w GUI "Szukaj" i "Ekwipunek przetrwania"
+    public const int TabBuilding = 0, TabDecoration = 1, TabRedstone = 2, TabMisc = 3, TabFood = 4, TabTools = 5, TabCombat = 6, TabMaterials = 7,
+        TabTransport = 10, TabBrewing = 11;
     private static bool _init;
 
     public static void Init()
@@ -93,8 +95,10 @@ public static class Blocks
         new ClayBlock(B.Clay, "clay", "Glina").T("clay").H(0.6f).Tool_(ToolType.Shovel).Snd(SoundType.Gravel);
         new Block(B.DoubleStoneSlab, "double_stone_slab", "Podwójna kamienna płyta").T("stone_slab_top", "stone_slab_top", "stone_slab_side").H(2f, 6).Tool_(ToolType.Pickaxe, 0).NotCreative().DropAs(B.StoneSlab, 2);
 
+        ModuleBlocks();
+
         for (int i = 0; i < 256; i++) if (Block.ById[i] == null) Block.ById[i] = Block.ById[0];
-        for (int i = 0; i < B.Count; i++) { var b = Block.ById[i]; if (b.BlastResistance < 0) b.BlastResistance = b.Hardness; }
+        for (int i = 0; i < 256; i++) { var b = Block.ById[i]; if (b.BlastResistance < 0) b.BlastResistance = b.Hardness; }
     }
 
     public static Block Flam(this Block b) { b.Flammable = true; return b; }
@@ -246,7 +250,7 @@ public class WoolBlock : Block
     public WoolBlock(byte id, string k, string n) : base(id, k, n)
     {
         for (int i = 0; i < 6; i++) _tex[i] = TextureGen.Layer("wool_" + i);
-        Tex = ModelBox.All(_tex[0]); Tab(Blocks.TabBuilding);
+        Tex = ModelBox.All(_tex[0]); Tab(Blocks.TabBuilding); Vars(6);
     }
     public override int GetTexture(int face, int meta) => _tex[Math.Clamp(meta, 0, 5)];
     public override int DropMeta(int meta) => meta;

@@ -60,6 +60,8 @@ public class Block
     public bool HasTileEntity;
     public bool Flammable;
     public int DropOverride = -1, DropOverrideCount = 1;
+    /// <summary>Warianty meta pokazywane w kreatywnym i jako osobne ikony (null = tylko 0).</summary>
+    public int[] Variants;
 
     public Block(byte id, string key, string name)
     {
@@ -89,6 +91,8 @@ public class Block
     public Block Light(int l) { LightEmit = l; return this; }
     public Block Tab(int t) { CreativeTab = t; return this; }
     public Block NotCreative() { InCreative = false; return this; }
+    public Block Vars(params int[] metas) { Variants = metas; return this; }
+    public Block Vars(int count) { Variants = Enumerable.Range(0, count).ToArray(); return this; }
 
     // --- zachowanie ---
     public virtual int GetTexture(int face, int meta) => Tex[face];

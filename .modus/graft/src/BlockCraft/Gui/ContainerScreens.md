@@ -1,0 +1,50 @@
+# src/BlockCraft/Gui/ContainerScreens.cs
+
+- GuiDraw · class · L8-L50 — public static class GuiDraw
+- Panel · method · L10-L19 — public static void Panel(Game g, int x, int y, int w, int h)
+- Slot · method · L20-L26 — public static void Slot(Game g, int x, int y, int size = 18)
+- Tooltip · method · L27-L38 — public static void Tooltip(Game g, string text, int mx, int my)
+- ItemTooltip · method · L39-L49 — public static string ItemTooltip(ItemStack s, bool adv)
+- ContainerScreen · class · L53-L233 — public class ContainerScreen : Screen
+- ContainerScreen · method · L62-L62 — public ContainerScreen(Player p, Container c) { P = p; C = c; }
+- PausesGame · variable · L63-L63 — public override bool PausesGame => false;
+- Init · method · L64-L64 — protected override void Init() { Left = (W - C.Width) / 2; Top = (H - C.Height) / 2; }
+- DrawBackground · method · L66-L97 — protected virtual void DrawBackground(int mx, int my)
+- DrawArmorGhost · method · L99-L104 — private void DrawArmorGhost(int x, int y, int slot)
+- DrawArrow · method · L106-L124 — protected void DrawArrow(int x, int y, float progress, bool furnace = false)
+- DrawFlame · method · L126-L144 — private void DrawFlame(int x, int y, float f)
+- SlotAt · method · L146-L156 — protected int SlotAt(int mx, int my)
+- Render · method · L158-L174 — public override void Render(int mx, int my, float pt)
+- MouseDown · method · L176-L195 — public override void MouseDown(int mx, int my, int btn)
+- MouseMove · method · L197-L206 — public override void MouseMove(int mx, int my)
+- MouseUp · method · L208-L215 — public override void MouseUp(int mx, int my, int btn)
+- KeyDown · method · L217-L223 — public override void KeyDown(Keys k, bool ctrl, bool shift)
+- Tick · method · L225-L230 — public override void Tick()
+- OnClose · method · L232-L232 — public override void OnClose() { P.CloseContainer(); }
+- CreativeScreen · class · L236-L443 — public sealed class CreativeScreen : Screen
+- CreativeScreen · method · L249-L249 — public CreativeScreen(Player p) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; }
+- PausesGame · variable · L250-L250 — public override bool PausesGame => false;
+- Init · method · L252-L257 — protected override void Init()
+- Refresh · method · L259-L268 — private void Refresh()
+- Rows · variable · L270-L270 — private int Rows => (_items.Count + 8) / 9;
+- ScrollRow · variable · L271-L271 — private int ScrollRow => (int)MathF.Round(_scroll * Math.Max(0, Rows - 5));
+- TabPos · method · L273-L273 — private (int x, int y) TabPos(int t) => t < 5 ? (_left + t * 29, _top - 28) : (_left + (t - 5) * 29, _top + PH - 4);
+- Render · method · L275-L343 — public override void Render(int mx, int my, float pt)
+- InvSlotPos · method · L345-L350 — private (int, int) InvSlotPos(int i)
+- DrawTab · method · L352-L357 — private void DrawTab(int t, bool active)
+- MouseDown · method · L359-L413 — public override void MouseDown(int mx, int my, int btn)
+- ScrollTo · method · L415-L415 — private void ScrollTo(int my) { _scroll = Math.Clamp((my - _top - 25) / 75f, 0, 1); }
+- MouseMove · method · L416-L416 — public override void MouseMove(int mx, int my) { if (_dragScroll) ScrollTo(my); base.MouseMove(mx, my); }
+- MouseUp · method · L417-L417 — public override void MouseUp(int mx, int my, int btn) { _dragScroll = false; base.MouseUp(mx, my, btn); }
+- Scroll · method · L418-L422 — public override void Scroll(int mx, int my, float d)
+- KeyDown · method · L423-L432 — public override void KeyDown(Keys k, bool ctrl, bool shift)
+- CharTyped · method · L433-L437 — public override void CharTyped(char c)
+- OnClose · method · L438-L442 — public override void OnClose()
+- ChatScreen · class · L445-L494 — public sealed class ChatScreen : Screen
+- ChatScreen · method · L451-L451 — public ChatScreen(string initial) { _f = new TextField(2, 0, 0, 12) { Text = initial, Focused = true, MaxLength = 100 }; }
+- PausesGame · variable · L452-L452 — public override bool PausesGame => false;
+- Init · method · L453-L457 — protected override void Init()
+- Render · method · L458-L469 — public override void Render(int mx, int my, float pt)
+- KeyDown · method · L470-L491 — public override void KeyDown(Keys k, bool ctrl, bool shift)
+- CharTyped · method · L492-L492 — public override void CharTyped(char c) { _completions = null; _f.Char(G, c); }
+- MouseDown · method · L493-L493 — public override void MouseDown(int mx, int my, int btn) { }

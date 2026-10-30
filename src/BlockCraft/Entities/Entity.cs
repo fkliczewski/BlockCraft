@@ -307,25 +307,28 @@ public abstract class Entity
 
 public static class EntitySerializer
 {
-    public static Entity Create(string key, World.World w) => key switch
+    /// <summary>Rejestr typów encji (klucz -> fabryka). Moduły rejestrują własne w Registries.cs (Registries.InitEntities).</summary>
+    public static readonly Dictionary<string, Func<World.World, Entity>> Types = new()
     {
-        "item" => new ItemEntity(w, 0, 0, 0, new ItemStack(1)),
-        "cow" => new Cow(w),
-        "pig" => new Pig(w),
-        "sheep" => new Sheep(w),
-        "chicken" => new Chicken(w),
-        "zombie" => new Zombie(w),
-        "skeleton" => new Skeleton(w),
-        "creeper" => new Creeper(w),
-        "spider" => new Spider(w),
-        "enderman" => new Enderman(w),
-        "arrow" => new ArrowEntity(w),
-        "tnt" => new TntEntity(w, 0, 0, 0, 80),
-        "falling_block" => new FallingBlockEntity(w, 0, 0, 0, B.Sand, 0),
-        "xp_orb" => new XpOrbEntity(w, 0, 0, 0, 1),
-        "thrown" => new ThrownEntity(w, 0, null),
-        _ => null
+        ["item"] = w => new ItemEntity(w, 0, 0, 0, new ItemStack(1)),
+        ["cow"] = w => new Cow(w),
+        ["pig"] = w => new Pig(w),
+        ["sheep"] = w => new Sheep(w),
+        ["chicken"] = w => new Chicken(w),
+        ["zombie"] = w => new Zombie(w),
+        ["skeleton"] = w => new Skeleton(w),
+        ["creeper"] = w => new Creeper(w),
+        ["spider"] = w => new Spider(w),
+        ["enderman"] = w => new Enderman(w),
+        ["arrow"] = w => new ArrowEntity(w),
+        ["tnt"] = w => new TntEntity(w, 0, 0, 0, 80),
+        ["falling_block"] = w => new FallingBlockEntity(w, 0, 0, 0, B.Sand, 0),
+        ["xp_orb"] = w => new XpOrbEntity(w, 0, 0, 0, 1),
+        ["thrown"] = w => new ThrownEntity(w, 0, null),
     };
+
+    public static Entity Create(string key, World.World w) => Types.TryGetValue(key, out var f) ? f(w) : null;
+
 
     public static byte[] SaveEntities(List<Entity> ents)
     {

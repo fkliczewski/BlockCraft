@@ -1,0 +1,63 @@
+# src/BlockCraft/Gui/Screens.cs
+
+- TitleScreen · class · L7-L48 — public sealed class TitleScreen : Screen
+- PausesGame · variable · L15-L15 — public override bool PausesGame => false;
+- Init · method · L16-L25 — protected override void Init()
+- Escape · method · L26-L26 — protected override void Escape() { }
+- Render · method · L27-L47 — public override void Render(int mx, int my, float pt)
+- HelpScreen · class · L50-L72 — public sealed class HelpScreen : Screen
+- HelpScreen · method · L53-L53 — public HelpScreen(Screen p) { _parent = p; }
+- PausesGame · variable · L54-L54 — public override bool PausesGame => false;
+- Init · method · L55-L55 — protected override void Init() { Add(new Button(W / 2 - 100, H - 30, 200, 20, "Gotowe", () => G.SetScreen(_parent))); }
+- Escape · method · L56-L56 — protected override void Escape() => G.SetScreen(_parent);
+- Render · method · L57-L71 — public override void Render(int mx, int my, float pt)
+- WorldSelectScreen · class · L74-L135 — public sealed class WorldSelectScreen : Screen
+- PausesGame · variable · L80-L80 — public override bool PausesGame => false;
+- Init · method · L81-L95 — protected override void Init()
+- Escape · method · L96-L96 — protected override void Escape() => G.SetScreen(new TitleScreen());
+- ListBottom · variable · L97-L97 — private int ListTop => 32; private int ListBottom => H - 64;
+- ListTop · variable · L97-L97 — private int ListTop => 32; private int ListBottom => H - 64;
+- Render · method · L98-L119 — public override void Render(int mx, int my, float pt)
+- MouseDown · method · L120-L132 — public override void MouseDown(int mx, int my, int btn)
+- Scroll · method · L134-L134 — public override void Scroll(int mx, int my, float d) { _scroll = Math.Clamp(_scroll - d * 20, 0, Math.Max(0, _worlds.Count * 36 - (ListBottom - ListTop) + 8)); }
+- CreateWorldScreen · class · L137-L180 — public sealed class CreateWorldScreen : Screen
+- CreateWorldScreen · method · L144-L144 — public CreateWorldScreen(Screen p) { _parent = p; }
+- PausesGame · variable · L145-L145 — public override bool PausesGame => false;
+- Init · method · L146-L158 — protected override void Init()
+- Escape · method · L159-L159 — protected override void Escape() => G.SetScreen(_parent);
+- Create · method · L160-L167 — private void Create()
+- Render · method · L168-L179 — public override void Render(int mx, int my, float pt)
+- OptionsScreen · class · L182-L211 — public sealed class OptionsScreen : Screen
+- OptionsScreen · method · L185-L185 — public OptionsScreen(Screen p) { _parent = p; }
+- PausesGame · variable · L186-L186 — public override bool PausesGame => true;
+- Init · method · L187-L201 — protected override void Init()
+- DiffName · method · L202-L202 — public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };
+- Done · method · L203-L203 — private void Done() { G.Settings.Save(); G.ApplySettings(); G.SetScreen(_parent); }
+- Escape · method · L204-L204 — protected override void Escape() => Done();
+- Render · method · L205-L210 — public override void Render(int mx, int my, float pt)
+- VideoScreen · class · L213-L240 — public sealed class VideoScreen : Screen
+- VideoScreen · method · L216-L216 — public VideoScreen(Screen p) { _parent = p; }
+- Init · method · L217-L231 — protected override void Init()
+- Done · method · L232-L232 — private void Done() { G.Settings.Save(); G.ApplySettings(); G.SetScreen(_parent); }
+- Escape · method · L233-L233 — protected override void Escape() => Done();
+- Render · method · L234-L239 — public override void Render(int mx, int my, float pt)
+- ControlsScreen · class · L242-L274 — public sealed class ControlsScreen : Screen
+- ControlsScreen · method · L245-L245 — public ControlsScreen(Screen p) { _parent = p; }
+- Init · method · L246-L252 — protected override void Init()
+- Escape · method · L253-L253 — protected override void Escape() { G.Settings.Save(); G.SetScreen(_parent); }
+- Render · method · L260-L273 — public override void Render(int mx, int my, float pt)
+- PauseScreen · class · L276-L292 — public sealed class PauseScreen : Screen
+- Init · method · L278-L285 — protected override void Init()
+- Render · method · L286-L291 — public override void Render(int mx, int my, float pt)
+- DeathScreen · class · L294-L316 — public sealed class DeathScreen : Screen
+- DeathScreen · method · L298-L298 — public DeathScreen(string msg) { _msg = msg; }
+- PausesGame · variable · L299-L299 — public override bool PausesGame => false;
+- Init · method · L300-L305 — protected override void Init()
+- Escape · method · L306-L306 — protected override void Escape() { }
+- Tick · method · L307-L307 — public override void Tick() { if (++_ticks == 20) foreach (var w in Widgets) w.Enabled = true; }
+- Render · method · L308-L315 — public override void Render(int mx, int my, float pt)
+- LoadingScreen · class · L318-L335 — public sealed class LoadingScreen : Screen
+- PausesGame · variable · L322-L322 — public override bool PausesGame => false;
+- ShowWorld · variable · L323-L323 — public override bool ShowWorld => false;
+- Escape · method · L324-L324 — protected override void Escape() { }
+- Render · method · L325-L334 — public override void Render(int mx, int my, float pt)

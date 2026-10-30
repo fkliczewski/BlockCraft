@@ -1,0 +1,70 @@
+# src/BlockCraft/World/World.cs
+
+- ParticleKind · enum · L8-L8 — public enum ParticleKind { BlockBreak, Smoke, Explosion, Flame, Splash, Bubble, Heart, Portal, Crit, RedDust, LargeSmoke, Angry, Note, Poof }
+- IWorldListener · interface · L10-L17 — public interface IWorldListener
+- OnBlockChanged · method · L12-L12 — void OnBlockChanged(int x, int y, int z, byte id, int meta);
+- PlaySound · method · L13-L13 — void PlaySound(string name, double x, double y, double z, float volume, float pitch);
+- SpawnParticles · method · L14-L14 — void SpawnParticles(ParticleKind kind, double x, double y, double z, int count, int data);
+- OnEntityAdded · method · L15-L15 — void OnEntityAdded(Entity e);
+- OnEntityRemoved · method · L16-L16 — void OnEntityRemoved(Entity e);
+- GameRules · class · L19-L37 — public sealed class GameRules
+- Set · method · L22-L35 — public bool Set(string name, string value, out string error)
+- Difficulty · enum · L39-L39 — public enum Difficulty { Peaceful = 0, Easy = 1, Normal = 2, Hard = 3 }
+- World · class · L41-L618 — public sealed partial class World : IBlockAccess
+- World · method · L69-L75 — public World(long seed, WorldType type, bool remote)
+- GetChunk · method · L78-L78 — public Chunk GetChunk(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) ? c : null;
+- GetChunkIfLit · method · L79-L79 — public Chunk GetChunkIfLit(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) && c.Lit ? c : null;
+- IsChunkLoaded · method · L80-L80 — public bool IsChunkLoaded(int cx, int cz) => Chunks.ContainsKey(MathUtil.ChunkKey(cx, cz));
+- IsLoadedAt · method · L81-L81 — public bool IsLoadedAt(int x, int z) => IsChunkLoaded(x >> 4, z >> 4);
+- IsAreaLoaded · method · L82-L88 — public bool IsAreaLoaded(int x, int z, int r)
+- GetBlock · method · L90-L95 — public byte GetBlock(int x, int y, int z)
+- GetMeta · method · L96-L101 — public int GetMeta(int x, int y, int z)
+- GetSkyLight · method · L102-L108 — public int GetSkyLight(int x, int y, int z)
+- GetBlockLight · method · L109-L114 — public int GetBlockLight(int x, int y, int z)
+- GetRawLight · method · L116-L116 — public int GetRawLight(int x, int y, int z) => Math.Max(GetSkyLight(x, y, z), GetBlockLight(x, y, z));
+- GetLight · method · L118-L118 — public int GetLight(int x, int y, int z) => Math.Max(GetSkyLight(x, y, z) - SkyLightSubtracted, GetBlockLight(x, y, z));
+- GetHeight · method · L119-L119 — public int GetHeight(int x, int z) { var c = GetChunk(x >> 4, z >> 4); return c?.GetHeight(x & 15, z & 15) ?? 0; }
+- CanSeeSky · method · L120-L120 — public bool CanSeeSky(int x, int y, int z) => y >= GetHeight(x, z);
+- GetBiome · method · L121-L121 — public byte GetBiome(int x, int z) { var c = GetChunk(x >> 4, z >> 4); return c?.Biomes[((z & 15) << 4) | (x & 15)] ?? Generator.BiomeAt(x, z); }
+- SetBlock · method · L126-L157 — public bool SetBlock(int x, int y, int z, byte id, int meta = 0, bool notify = true)
+- SetMeta · method · L159-L171 — public void SetMeta(int x, int y, int z, int meta, bool notify = true)
+- SetBlockRemote · method · L174-L189 — public void SetBlockRemote(int x, int y, int z, byte id, int meta)
+- NotifyNeighbors · method · L191-L201 — public void NotifyNeighbors(int x, int y, int z, int sourceId, int exceptFace = -1, bool skipWires = false)
+- NotifyBlock · method · L203-L212 — public void NotifyBlock(int x, int y, int z, int sourceId)
+- BreakBlock · method · L214-L228 — public void BreakBlock(int x, int y, int z, bool drop, Player player = null, ItemStack tool = null)
+- PlayEffectBreak · method · L230-L235 — public void PlayEffectBreak(int x, int y, int z, int id, int meta)
+- MarkDirty · method · L237-L248 — public void MarkDirty(int x, int y, int z)
+- MarkLightDirty · method · L250-L258 — public void MarkLightDirty(Chunk c, int x, int y, int z)
+- GetTileEntity · method · L261-L266 — public TileEntity GetTileEntity(int x, int y, int z)
+- SetTileEntity · method · L267-L274 — public void SetTileEntity(int x, int y, int z, TileEntity te)
+- RemoveTileEntity · method · L275-L279 — public void RemoveTileEntity(int x, int y, int z)
+- ScheduleTick · method · L285-L292 — public void ScheduleTick(int x, int y, int z, byte id, int delay, bool force = false)
+- ProcessScheduledTicks · method · L294-L305 — private void ProcessScheduledTicks()
+- PendingTicksSnapshot · method · L307-L312 — public List<(int x, int y, int z, byte id, long due)> PendingTicksSnapshot()
+- CelestialAngle · method · L315-L323 — public float CelestialAngle(float partial)
+- SkyDarken · method · L324-L329 — public float SkyDarken(float partial)
+- SkyLightSubtracted · variable · L330-L330 — public int SkyLightSubtracted => (int)SkyDarken(0);
+- SunBrightness · method · L331-L336 — public float SunBrightness(float partial)
+- IsDaytime · method · L337-L337 — public bool IsDaytime() => SkyLightSubtracted < 4;
+- IsNight · method · L338-L338 — public bool IsNight() { long t = DayTime % 24000; return t >= 12541 && t <= 23458; }
+- MoonPhase · variable · L339-L339 — public int MoonPhase => (int)(DayTime / 24000L % 8L + 8L) % 8;
+- SpawnEntity · method · L342-L347 — public void SpawnEntity(Entity e)
+- NextEntityId · method · L348-L348 — public int NextEntityId() => _nextEntityId++;
+- FlushAdds · method · L350-L361 — private void FlushAdds()
+- AddEntityNow · method · L363-L363 — public void AddEntityNow(Entity e) { SpawnEntity(e); FlushAdds(); }
+- RemoveEntity · method · L365-L374 — public void RemoveEntity(Entity e)
+- GetEntitiesInBox · method · L376-L382 — public List<Entity> GetEntitiesInBox(AABB box, Entity except = null)
+- DropItem · method · L384-L395 — public void DropItem(double x, double y, double z, ItemStack s, bool scatter = true)
+- SpawnXp · method · L397-L408 — public void SpawnXp(double x, double y, double z, int amount)
+- HasMonstersNear · method · L410-L415 — public bool HasMonstersNear(int x, int y, int z, double r)
+- PlaySound · method · L418-L421 — public void PlaySound(string name, double x, double y, double z, float volume = 1f, float pitch = 1f)
+- SpawnParticles · method · L422-L425 — public void SpawnParticles(ParticleKind k, double x, double y, double z, int count, int data = 0)
+- BroadcastMessage · method · L427-L430 — public void BroadcastMessage(string msg)
+- Tick · method · L433-L466 — public void Tick()
+- CheckSleeping · method · L468-L478 — private void CheckSleeping()
+- RandomTicks · method · L480-L505 — private void RandomTicks()
+- TickTileEntities · method · L508-L513 — private void TickTileEntities()
+- GetCollisionBoxes · method · L517-L545 — public List<AABB> GetCollisionBoxes(AABB box, List<AABB> res)
+- IsAnyLiquid · method · L547-L564 — public bool IsAnyLiquid(AABB box, bool lava)
+- HitResult · struct · L567-L570 — public struct HitResult
+- RayCast · method · L572-L617 — public HitResult RayCast(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist, bool hitLiquids = false)

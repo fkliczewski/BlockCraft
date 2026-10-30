@@ -20,7 +20,7 @@ public static class SelfTest
 
     public static World.World MakeWorld(long seed, WorldType type, int radius)
     {
-        ItemRegistry.Init(); Recipes.Init();
+        ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         var w = new World.World(seed, type, false);
         var list = new List<Chunk>();
         for (int cx = -radius; cx <= radius; cx++)
@@ -62,7 +62,7 @@ public static class SelfTest
     private static void TestRegistry()
     {
         Console.WriteLine("[Rejestry]");
-        ItemRegistry.Init(); Recipes.Init();
+        ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Check(Block.ById[B.Stone].Name == "Kamień", "Blok kamienia zarejestrowany");
         Check(Item.ById[I.DiamondPickaxe] != null && Item.ById[I.DiamondPickaxe].ToolLevel == 3, "Diamentowy kilof poziom 3");
         Check(Item.ById[I.IronHelmet].ArmorPoints == 2, "Żelazny hełm 2 pkt");
