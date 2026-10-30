@@ -40,6 +40,7 @@ public static class GuiDraw
     {
         var it = s.Item; if (it == null) return "?";
         string t = s.Name;
+        if (s.Id == I.Potion) foreach (var effect in Potions.Effects(s)) t += "\n" + EffectLogic.Name(effect.Id) + " " + EnchantHelper.Roman(effect.Amplifier + 1) + (EffectLogic.Instant(effect.Id) ? "" : " (" + EffectLogic.Time(effect) + ")");
         if (it.ArmorSlot >= 0) t += "\n§9+" + it.ArmorPoints + " Pancerz";
         if (it.IsTool && it.AttackDamage > 1) t += "\n§9+" + it.AttackDamage + " Obrażenia od ataku";
         if (it.IsFood) t += "\n§7Głód: +" + it.Hunger;
@@ -159,6 +160,7 @@ public class ContainerScreen : Screen
     {
         DrawDim();
         DrawBackground(mx, my);
+        if (C is PlayerContainer) EffectPanel.Draw(G, P, Left, Top);
         int hover = SlotAt(mx, my);
         foreach (var s in C.Slots)
             if (s.Stack != null) G.DrawItem(s.Stack, Left + s.X, Top + s.Y);
@@ -242,8 +244,9 @@ public sealed class CreativeScreen : Screen
     private TextField _search;
     private int _left, _top;
     private const int PW = 195, PH = 136;
-    private static readonly string[] TabNames = { "Budulce", "Dekoracje", "Redstone", "Różne", "Jedzenie", "Narzędzia", "Walka", "Materiały", "Szukaj", "Ekwipunek przetrwania" };
-    private static readonly int[] TabIcons = { B.Bricks, B.Poppy, I.Redstone, I.LavaBucket, I.Apple, I.IronAxe, I.GoldSword, I.Stick, I.Book, B.Chest };
+    private static readonly string[] TabNames = { "Budulce", "Dekoracje", "Redstone", "Różne", "Jedzenie", "Narzędzia", "Walka", "Materiały", "Szukaj", "Ekwipunek przetrwania", "Transport", "Alchemia" };
+    private static readonly int[] TabIcons = { B.Bricks, B.Poppy, I.Redstone, I.LavaBucket, I.Apple, I.IronAxe, I.GoldSword, I.Stick, I.Book, B.Chest, B.Rail, I.Potion };
+    private static readonly int[] TabOrder = { 0, 1, 2, 10, 3, 8, 4, 5, 6, 11, 7, 9 };
     private readonly PlayerContainer _inv;
 
     public CreativeScreen(Player p) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; }
@@ -263,14 +266,18 @@ public sealed class CreativeScreen : Screen
             string q = _search?.Text.ToLowerInvariant() ?? "";
             _items = ItemRegistry.CreativeItems(-1).Where(s => s.Name.ToLowerInvariant().Contains(q) || (s.Item?.Key ?? "").Contains(q)).ToList();
         }
-        else if (_tab < 8) _items = ItemRegistry.CreativeItems(_tab);
+        else if (_tab != 9) _items = ItemRegistry.CreativeItems(_tab);
         _scroll = 0;
     }
 
     private int Rows => (_items.Count + 8) / 9;
     private int ScrollRow => (int)MathF.Round(_scroll * Math.Max(0, Rows - 5));
 
-    private (int x, int y) TabPos(int t) => t < 5 ? (_left + t * 29, _top - 28) : (_left + (t - 5) * 29, _top + PH - 4);
+    private (int x, int y) TabPos(int t)
+    {
+        int pos = Array.IndexOf(TabOrder, t);
+        return (_left + pos % 6 * 29, pos < 6 ? _top - 28 : _top + PH - 4);
+    }
 
     public override void Render(int mx, int my, float pt)
     {
@@ -353,7 +360,7 @@ public sealed class CreativeScreen : Screen
     {
         var (x, y) = TabPos(t);
         G.Sb.DrawPx(G.Gui.Widgets, x, y, active ? 28 : 0, 110, 28, 32);
-        G.DrawItem(new ItemStack(TabIcons[t]), x + 6, y + (t < 5 ? 9 : 7), false);
+        G.DrawItem(new ItemStack(TabIcons[t]), x + 6, y + (Array.IndexOf(TabOrder, t) < 6 ? 9 : 7), false);
     }
 
     public override void MouseDown(int mx, int my, int btn)

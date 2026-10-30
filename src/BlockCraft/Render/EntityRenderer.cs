@@ -54,14 +54,16 @@ public sealed partial class EntityRenderer : IDisposable
     public TextureArray SkinTex;
     public TextureArray TerrainTex;
 
+    // End: światło przycięte do 1 przed pow(1-c), inaczej przy świetle 15 pow z ujemną podstawą daje NaN (czarne)
     public const string LightmapGlsl = @"
-uniform float uSun; uniform float uGamma;
-float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; return (1.0 - f1)/(f1*3.0 + 1.0); }
+uniform float uSun; uniform float uGamma; uniform int uDimension;
+float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; float a = uDimension == -1 ? 0.1 : 0.0; return (1.0 - f1)/(f1*3.0 + 1.0)*(1.0-a)+a; }
 vec3 lightmap(float sky, float blk){
   float f = uSun; float f1 = f*0.95+0.05;
   float f2 = tbl(sky)*f1; float f3 = tbl(blk)*1.5;
   vec3 c = vec3(f2*(f*0.65+0.35), f2*(f*0.65+0.35), f2) + vec3(f3, f3*((f3*0.6+0.4)*0.6+0.4), f3*(f3*f3*0.6+0.4));
   c = clamp(c*0.96+0.03, 0.0, 1.0);
+  if (uDimension == 1) c = clamp(vec3(0.22,0.28,0.25) + vec3(f3*0.75), 0.0, 1.0);
   vec3 g = 1.0 - pow(1.0 - c, vec3(4.0)); c = mix(c, g, uGamma);
   return clamp(c*0.96+0.03, 0.0, 1.0);
 }";
@@ -461,6 +463,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
 
     public void RenderLiving(LivingEntity e, float pt, Vector3 pos, bool forGui = false)
     {
+        if (e.HasEffect(Effect.Invisibility) && !forGui) return;
         float bodyYaw = MathUtil.LerpAngle(e.PrevBodyYaw, e.BodyYaw, pt);
         float headYawAbs = MathUtil.LerpAngle(e.PrevYaw, e.Yaw, pt);
         float headYaw = MathUtil.WrapDegrees(headYawAbs - bodyYaw);
@@ -597,8 +600,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
                         RenderPart(Skin, _shHead, aroot); RenderPart(Skin, _shBody, aroot); foreach (var l in _shLegs) RenderPart(Skin, l, aroot);
                         if (!sh.Sheared)
                         {
-                            uint[] wc = { 0xE9ECEC, 0x8E8E86, 0x3E4447, 0x141519, 0x724728, 0xED8DAC };
-                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[Math.Clamp(sh.Color, 0, 5)]);
+                            uint[] wc = Items.Dyes.Rgb;
+                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[sh.Color & 15]);
                             if (sh.Color == 0) Skin.Color = Vector4.One;
                             _fHead.RY = _shHead.RY; _fHead.RX = _shHead.RX; _fHead.PY = _shHead.PY; _fBody.RX = MathF.PI / 2;
                             for (int i = 0; i < 4; i++) _fLegs[i].RX = _shLegs[i].RX;

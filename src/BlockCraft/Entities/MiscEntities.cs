@@ -248,6 +248,7 @@ public sealed class ArrowEntity : Entity
             InGround = true; Shake = 7; Critical = false;
             World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
             if (_gid == B.Tnt && FireTicks > 0) TntBlock.Ignite(World, _gx, _gy, _gz, 80);
+            if (!World.IsRemote) Block.ById[_gid].OnEntityCollide(World, _gx, _gy, _gz, this); // MC 1.8: strzała trafia blok (drewniany przycisk, płyta)
             return;
         }
         X = ex; Y = ey; Z = ez;
@@ -328,6 +329,8 @@ public sealed class ThrownEntity : Entity
             World.SpawnParticles(ParticleKind.Portal, X, Y, Z, 32);
             if (Thrower is Player p && !p.Dead)
             {
+                // MC 1.8: 5% szans na endermita w miejscu gracza (moduł NE rejestruje "endermite")
+                if (World.Rand.NextFloat() < 0.05f && World.Rules.DoMobSpawning && EntitySerializer.Create("endermite", World) is { } mite) { mite.SetPositionAndPrev(p.X, p.Y, p.Z); mite.Yaw = p.Yaw; World.SpawnEntity(mite); }
                 p.SetPositionAndPrev(X, Y, Z); p.FallDistance = 0;
                 p.NetTeleportHook?.Invoke();
                 if (!p.Creative) p.Attack(DamageSource.Fall, 5f);

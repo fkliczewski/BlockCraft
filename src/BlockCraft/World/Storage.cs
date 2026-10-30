@@ -14,8 +14,9 @@ public sealed class SlotData
     public ItemStack ToStack() => new(Id, Count, Damage) { Tag = Tag != null ? Nbt.FromBytes(Convert.FromBase64String(Tag)) : null };
 }
 
-public sealed class PlayerData
+public sealed partial class PlayerData
 {
+    public int Dimension { get; set; }
     public string Name { get; set; } = "Steve";
     public double X { get; set; }
     public double Y { get; set; }

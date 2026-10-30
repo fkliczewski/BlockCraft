@@ -197,9 +197,12 @@ public class LogBlock : Block
 public class LeavesBlock : Block
 {
     private readonly int _sapling; private readonly bool _apples;
+    /// <summary>Tekstura liści w trybie szybkiej grafiki (nieprzezroczysta).</summary>
+    public int OpaqueTex;
     public LeavesBlock(byte id, string k, string n, string tex, TintType tint, int sapling, bool apples) : base(id, k, n)
     {
         T(tex); Tint = tint; _sapling = sapling; _apples = apples;
+        OpaqueTex = TextureGen.Has(tex + "_opaque") ? TextureGen.Layer(tex + "_opaque") : Tex[0];
         Opaque = false; Layer = RenderLayer.Cutout; LightOpacity = 1; Hardness = 0.2f; BlastResistance = 0.2f;
         Sound = SoundType.Grass; RandomTicks = true; Tab(Blocks.TabDecoration); Flammable = true;
     }
@@ -452,7 +455,7 @@ public class ChestBlock : Block
     }
     public override int GetPlacementMeta(World w, int x, int y, int z, int face, double hx, double hy, double hz, Player p, int itemMeta)
         => (Dir.HorizFromYaw(p.Yaw) + 2) & 3;
-    public override bool OnActivated(World w, int x, int y, int z, Player p) { p.OpenBlockGui(GuiKind.Chest, x, y, z); return true; }
+    public override bool OnActivated(World w, int x, int y, int z, Player p) { w.PlaySound("random.chestopen", x + 0.5, y + 0.5, z + 0.5, 0.5f, w.Rand.NextFloat() * 0.1f + 0.9f); p.OpenBlockGui(GuiKind.Chest, x, y, z); return true; }
     public override void OnAdded(World w, int x, int y, int z)
     {
         if (w.GetTileEntity(x, y, z) is not ChestTileEntity) w.SetTileEntity(x, y, z, new ChestTileEntity());
@@ -870,11 +873,16 @@ public class TntBlock : Block
 public class DoorBlock : Block
 {
     private readonly int _lower, _upper;
-    public DoorBlock(byte id, string k, string n) : base(id, k, n)
+    /// <summary>Przedmiot drzwi (drop i wybieranie środkowym).</summary>
+    public readonly int ItemId;
+    /// <summary>Żelazne: nie otwierają się ręką (MC Material.iron).</summary>
+    public readonly bool Iron;
+    public DoorBlock(byte id, string k, string n, string tex = "door_wood", int itemId = Items.I.Door, bool iron = false) : base(id, k, n)
     {
-        _lower = TextureGen.Layer("door_wood_lower"); _upper = TextureGen.Layer("door_wood_upper");
+        _lower = TextureGen.Layer(tex + "_lower"); _upper = TextureGen.Layer(tex + "_upper"); ItemId = itemId; Iron = iron;
         Tex = ModelBox.All(_lower); Opaque = false; FullCube = false; Render = RenderType.Model; Layer = RenderLayer.Cutout; LightOpacity = 0;
-        Hardness = 3f; BlastResistance = 3f; Tool = ToolType.Axe; Sound = SoundType.Wood;
+        if (iron) { Hardness = 5f; BlastResistance = 5f; Tool = ToolType.Pickaxe; HarvestLevel = 0; Sound = SoundType.Metal; }
+        else { Hardness = 3f; BlastResistance = 3f; Tool = ToolType.Axe; Sound = SoundType.Wood; }
     }
     // dolna: bity 0-1 kierunek (0=+Z..), bit 2 = otwarte ; górna: bit 3 = górna, bit 0 = zawias prawy, bit 1 = zasilone
     public static int FullMeta(IBlockAccess w, int x, int y, int z)
@@ -916,16 +924,17 @@ public class DoorBlock : Block
         }
         boxes.Add(mb);
     }
-    public override int DropId(int meta, Rng r) => (meta & 8) != 0 ? 0 : Items.I.Door;
-    public override ItemStack PickStack(int meta) => new(Items.I.Door, 1);
+    public override int DropId(int meta, Rng r) => (meta & 8) != 0 ? 0 : ItemId;
+    public override ItemStack PickStack(int meta) => new(ItemId, 1);
     public override bool OnActivated(World w, int x, int y, int z, Player p)
     {
+        if (Iron) return true;
         int m = w.GetMeta(x, y, z);
         int ly = (m & 8) != 0 ? y - 1 : y;
         int lm = w.GetMeta(x, ly, z) ^ 4;
         w.SetMeta(x, ly, z, lm);
         w.MarkDirty(x, ly + 1, z);
-        w.PlaySound((lm & 4) != 0 ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5);
+        w.PlaySound((lm & 4) != 0 ? "random.door_open" : "random.door_close", x + 0.5, y + 0.5, z + 0.5);
         return true;
     }
     public override void OnNeighborChanged(World w, int x, int y, int z, int nid)
@@ -933,10 +942,10 @@ public class DoorBlock : Block
         int m = w.GetMeta(x, y, z);
         if ((m & 8) != 0)
         {
-            if (w.GetBlock(x, y - 1, z) != B.OakDoor) w.SetBlock(x, y, z, B.Air);
+            if (w.GetBlock(x, y - 1, z) != Id) w.SetBlock(x, y, z, B.Air);
             return;
         }
-        if (w.GetBlock(x, y + 1, z) != B.OakDoor) { w.BreakBlock(x, y, z, true); return; }
+        if (w.GetBlock(x, y + 1, z) != Id) { w.BreakBlock(x, y, z, true); return; }
         if (!Block.Get(w.GetBlock(x, y - 1, z)).Opaque) { w.BreakBlock(x, y, z, true); return; }
         bool powered = Redstone.IsBlockPowered(w, x, y, z) || Redstone.IsBlockPowered(w, x, y + 1, z);
         int um = w.GetMeta(x, y + 1, z);
@@ -949,13 +958,13 @@ public class DoorBlock : Block
             {
                 w.SetMeta(x, y, z, m ^ 4);
                 w.MarkDirty(x, y + 1, z);
-                w.PlaySound(powered ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5);
+                w.PlaySound(powered ? "random.door_open" : "random.door_close", x + 0.5, y + 0.5, z + 0.5);
             }
         }
     }
     public override void OnRemoved(World w, int x, int y, int z, int oldMeta)
     {
-        if ((oldMeta & 8) != 0) { if (w.GetBlock(x, y - 1, z) == B.OakDoor) w.SetBlock(x, y - 1, z, B.Air); }
-        else if (w.GetBlock(x, y + 1, z) == B.OakDoor) w.SetBlock(x, y + 1, z, B.Air);
+        if ((oldMeta & 8) != 0) { if (w.GetBlock(x, y - 1, z) == Id) w.SetBlock(x, y - 1, z, B.Air); }
+        else if (w.GetBlock(x, y + 1, z) == Id) w.SetBlock(x, y + 1, z, B.Air);
     }
 }

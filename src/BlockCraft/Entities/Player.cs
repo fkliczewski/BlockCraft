@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public enum GuiKind { Inventory, Crafting, Furnace, Chest }
+public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest }
 
 public interface IPlayerHandler
 {
@@ -52,7 +52,8 @@ public partial class Player : LivingEntity
     public bool Spectator => GameMode == 3;
     public override int ArmorValue => Inventory.ArmorValue;
     protected override bool IsFlyingNow => Flying;
-    public override string HurtSound => "player_hurt";
+    public override string HurtSound => "game.player.hurt";
+    public override string DeathSound => "game.player.die";
 
     public void SetGameMode(int gm)
     {
@@ -108,13 +109,14 @@ public partial class Player : LivingEntity
         CameraYawBob += (speed - CameraYawBob) * 0.4;
         CameraPitchBob += (pitchB - CameraPitchBob) * 0.8f;
         DistWalked += horiz * 0.6;
-        if (Sprinting && (FoodLevel <= 6 && !Creative || MoveForward <= 0 || CollidedH || Sneaking)) Sprinting = false;
+        if (Sprinting && (HasEffect(Effect.Blindness) || FoodLevel <= 6 && !Creative || MoveForward <= 0 || CollidedH || Sneaking)) Sprinting = false;
         if (Flying && OnGround && !Spectator && !AllowFlying) Flying = false;
         if (OpenContainer is FurnaceContainer fc && World.GetTileEntity(fc.Furnace.X, fc.Furnace.Y, fc.Furnace.Z) != fc.Furnace) CloseContainer();
     }
 
     protected override void LivingUpdate()
     {
+        if (NetPuppet) return; // zdalny gracz na hoście: ruch liczy klient
         if (Flying)
         {
             if (Sneaking) MotionY -= FlySpeed * 3;
@@ -157,14 +159,14 @@ public partial class Player : LivingEntity
         else base.Travel(strafe, forward);
     }
 
-    public override float GetSpeed() => 0.1f * (Sprinting ? 1.3f : 1f);
+    public override float GetSpeed() => 0.1f * (Sprinting ? 1.3f : 1f) * EffectLogic.Movement(this);
 
     protected override void OnFall(float distance)
     {
         if (AllowFlying || Flying) return;
         if (distance > 3)
         {
-            int dmg = (int)Math.Ceiling(distance - 3);
+            int dmg = (int)Math.Ceiling(distance - 3 - (EffectLevel(Effect.JumpBoost) + 1));
             if (dmg > 0)
             {
                 World.PlaySound(dmg > 4 ? "fall_big" : "fall_small", X, Y, Z);
@@ -216,15 +218,8 @@ public partial class Player : LivingEntity
 
     public bool CanEat(bool always) => always || Creative || FoodLevel < 20;
 
-    public void Eat(Item food)
-    {
-        FoodLevel = Math.Min(20, FoodLevel + food.Hunger);
-        Saturation = Math.Min(FoodLevel, Saturation + food.Hunger * food.SaturationMod * 2f);
-        if (food.Id == I.RawChicken && World.Rand.NextFloat() < 0.3f) HungerEffect = 600;
-        if (food.Id == I.RottenFlesh && World.Rand.NextFloat() < 0.8f) HungerEffect = 600;
-        if (food.Id == I.GoldenApple) RegenEffect = 100;
-        if (food.Id == I.SpiderEye) HungerEffect = 100;
-    }
+    public void Eat(Item food) => Eat(new ItemStack(food.Id));
+
 
     // ---------- używanie przedmiotów ----------
     public void StartUsing(ItemStack s)
@@ -264,13 +259,14 @@ public partial class Player : LivingEntity
         var it = s.Item;
         if (it.IsFood)
         {
-            Eat(it);
+            Eat(s);
             World.PlaySound("burp", X, Y, Z, 0.5f, 0.9f + World.Rand.NextFloat() * 0.1f);
             if (!Creative) { s.Count--; if (it.Id == I.MushroomStew) Inventory.Selected = new ItemStack(I.Bowl); else if (s.Count <= 0) Inventory.Selected = null; }
         }
+        else if (it.Id == I.Potion) PlayerAlchemy.Drink(this, s);
         else if (it.Id == I.MilkBucket)
         {
-            HungerEffect = 0; RegenEffect = 0;
+            HungerEffect = 0; RegenEffect = 0; ClearEffects();
             if (!Creative) Inventory.Selected = new ItemStack(I.Bucket);
         }
         Inventory.Dirty = true;
@@ -339,6 +335,7 @@ public partial class Player : LivingEntity
 
     public void CloseContainer()
     {
+        if (OpenContainer is ChestContainer) World.PlaySound("random.chestclosed", X, Y, Z, 0.5f, World.Rand.NextFloat() * 0.1f + 0.9f);
         if (OpenContainer != null) { OpenContainer.OnClose(this); OpenContainer = null; }
         else InventoryContainer.OnClose(this);
     }
@@ -419,6 +416,12 @@ public partial class Player : LivingEntity
 
     public void Respawn()
     {
+        if (!World.Provider.CanRespawn && World.Dimensions != null)
+        {
+            var home = World.Dimensions.Get(DimensionId.Overworld);
+            World.Dimensions.Transfer(this, DimensionId.Overworld, home.SpawnX + .5, home.SpawnY, home.SpawnZ + .5);
+        }
+        ClearEffects(); Absorption = 0;
         Dead = false; DeathTime = 0; Health = MaxHealth; FoodLevel = 20; Saturation = 5; Exhaustion = 0; Air = 300; FireTicks = 0;
         HungerEffect = 0; RegenEffect = 0; HurtTime = 0; FallDistance = 0;
         MotionX = MotionY = MotionZ = 0;
@@ -440,10 +443,11 @@ public partial class Player : LivingEntity
     /// <summary>Atak wręcz na encję.</summary>
     public void AttackEntity(Entity target)
     {
+        if (target is not LivingEntity && target.AttackedByPlayer(this)) return;
         if (target is not LivingEntity le || le.Dead) return;
         var held = Inventory.Selected;
-        float dmg = held?.Item?.AttackDamage ?? 1f;
-        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && MotionY < 0 && !Sprinting;
+        float dmg = EffectLogic.Melee(this, held?.Item?.AttackDamage ?? 1f);
+        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && MotionY < 0 && !Sprinting && !HasEffect(Effect.Blindness);
         if (crit) dmg *= 1.5f;
         int kb = Sprinting ? 1 : 0;
         if (le.Attack(DamageSource.PlayerAttack(this), dmg))
@@ -464,11 +468,13 @@ public partial class Player : LivingEntity
     {
         var d = new PlayerData
         {
+            Dimension = (int)World.Dimension,
             Name = Name, X = X, Y = Y, Z = Z, Yaw = Yaw, Pitch = Pitch, Health = Health, Food = FoodLevel, Saturation = Saturation, Exhaustion = Exhaustion,
             GameMode = GameMode, Flying = Flying, XpLevel = XpLevel, XpProgress = XpProgress, XpTotal = XpTotal, Selected = Inventory.SelectedSlot, Air = Air,
             HasSpawn = HasSpawn, SpawnX = SpawnX, SpawnY = SpawnY, SpawnZ = SpawnZ, Dead = Dead
         };
         for (int i = 0; i < 40; i++) { var s = Inventory.Get(i); if (s != null) d.Inventory.Add(SlotData.From(i, s)); }
+        SaveMechanics(d);
         return d;
     }
 
@@ -481,6 +487,7 @@ public partial class Player : LivingEntity
         HasSpawn = d.HasSpawn; SpawnX = d.SpawnX; SpawnY = d.SpawnY; SpawnZ = d.SpawnZ;
         Inventory.Clear();
         foreach (var s in d.Inventory) if (Item.ById[s.Id] != null && s.Slot >= 0 && s.Slot < 40) Inventory.Set(s.Slot, s.ToStack());
+        LoadMechanics(d);
         if (d.Dead || Health <= 0) { Health = 0; }
     }
 }

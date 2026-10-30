@@ -1,4 +1,5 @@
 using BlockCraft.Core;
+using BlockCraft.Entities;
 using BlockCraft.Render;
 using BlockCraft.World;
 
@@ -89,6 +90,12 @@ public class Item
     public Func<ItemStack, (int layer, uint color)> OverlayFn;
     /// <summary>Własna nazwa zależna od stacka (np. mikstury, zaklęta książka).</summary>
     public Func<ItemStack, string> NameFn;
+    /// <summary>Własne użycie PPM na bloku: (gracz, stack, x, y, z, ściana, hx, hy, hz). True = obsłużone, domyślna logika się nie wykona.</summary>
+    public Func<Player, ItemStack, int, int, int, int, double, double, double, bool> UseOnBlock;
+    /// <summary>Własne użycie PPM w powietrze (też gdy UseOnBlock nie obsłużył). True = obsłużone.</summary>
+    public Func<Player, ItemStack, bool> UseInAir;
+    /// <summary>Wołane po zjedzeniu (efekty jedzenia modułów, np. trujący ziemniak).</summary>
+    public Action<Player> OnEaten;
 
     public Item(int id, string key, string name)
     {
@@ -99,8 +106,8 @@ public class Item
     public bool IsBlock => BlockId >= 0;
     public bool IsFood => Hunger > 0;
     public bool IsTool => Tool != ToolType.None;
-    public UseAction Action => IsFood ? UseAction.Eat : Id == I.MilkBucket ? UseAction.Drink : Id == I.Bow ? UseAction.Bow : UseAction.None;
-    public int UseDuration => IsFood || Id == I.MilkBucket ? 32 : Id == I.Bow ? 72000 : 0;
+    public UseAction Action => IsFood ? UseAction.Eat : Id is I.MilkBucket or I.Potion ? UseAction.Drink : Id == I.Bow ? UseAction.Bow : UseAction.None;
+    public int UseDuration => IsFood || Id is I.MilkBucket or I.Potion ? 32 : Id == I.Bow ? 72000 : 0;
 
     public int GetSprite(ItemStack s)
     {

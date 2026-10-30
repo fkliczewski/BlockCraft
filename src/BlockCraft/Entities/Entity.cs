@@ -59,6 +59,8 @@ public abstract class Entity
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
     public float FallDistance;
+    /// <summary>W pajęczynie (MC isInWeb): następny ruch spowolniony.</summary>
+    public bool InWeb;
     public int Age;
     public int FireTicks;
     public float StepHeight = 0.5f;
@@ -188,6 +190,7 @@ public abstract class Entity
     public void MoveWithCollision(double dx, double dy, double dz)
     {
         if (NoClip) { X += dx; Y += dy; Z += dz; return; }
+        if (InWeb) { InWeb = false; dx *= 0.25; dy *= 0.05000000074505806; dz *= 0.25; MotionX = 0; MotionY = 0; MotionZ = 0; }
         double odx = dx, ody = dy, odz = dz;
         var box = BoundingBox;
 
@@ -240,13 +243,18 @@ public abstract class Entity
         CollidedH = odx != dx || odz != dz;
         CollidedV = ody != dy;
         OnGround = CollidedV && ody < 0;
+        UpdateStepSound(dx, dz);
         if (odx != dx) MotionX = 0;
         if (odz != dz) MotionZ = 0;
-        if (ody != dy) MotionY = 0;
+        // blok pod stopami jak w MC (floor(posY - 0.2)): lądowanie, upadek, chodzenie (szlam, ruda redstone)
+        int fx = MathUtil.FloorToInt(X), fy = MathUtil.FloorToInt(Y - 0.2), fz = MathUtil.FloorToInt(Z);
+        var feet = Block.Get(World.GetBlock(fx, fy, fz));
+        if (ody != dy) { double my = MotionY; MotionY = 0; if (ody < 0) feet.OnEntityLanded(World, this, my); }
 
         if (OnGround)
         {
-            if (FallDistance > 0) { OnFall(FallDistance); FallDistance = 0; }
+            if (FallDistance > 0) { OnFall(FallDistance * feet.FallDamageMultiplier(World, this)); FallDistance = 0; }
+            if (!World.IsRemote && this is LivingEntity { Sneaking: false }) feet.OnEntityWalk(World, fx, fy, fz, this);
         }
         else if (dy < 0) FallDistance -= (float)dy;
 
@@ -266,7 +274,38 @@ public abstract class Entity
                             var cb = new AABB(x + 1 / 16.0, y, z + 1 / 16.0, x + 15 / 16.0, y + 1, z + 15 / 16.0);
                             if (cb.Intersects(bb)) Block.ById[id].OnEntityCollide(World, x, y, z, this);
                         }
+                        else if (id != 0) Block.ById[id].OnEntityCollide(World, x, y, z, this); // MC doBlockCollisions (płyty, linka, tory)
                     }
+    }
+
+    // ---- dźwięk kroków (MC 1.8: distanceWalkedModified / nextStepDistance) ----
+    private float _distWalked, _nextStep = 1f;
+    /// <summary>Zdarzenie kroku moba (np. mob.cow.step); null = dźwięk bloku pod nogami.</summary>
+    public virtual string StepSoundName => null;
+    protected virtual bool SilentSteps => this is LivingEntity le && le.Sneaking;
+
+    private void UpdateStepSound(double dx, double dz)
+    {
+        if (!(this is LivingEntity) || NoClip) return;
+        if (SilentSteps) return;
+        _distWalked += (float)Math.Sqrt(dx * dx + dz * dz) * 0.6f;
+        if (_distWalked <= _nextStep) return;
+        _nextStep = (int)_distWalked + 1;
+        int bx = MathUtil.FloorToInt(X), by = MathUtil.FloorToInt(Y - 0.2), bz = MathUtil.FloorToInt(Z);
+        if (InWater)
+        {
+            float f = (float)Math.Sqrt(MotionX * MotionX * 0.2 + MotionY * MotionY + MotionZ * MotionZ * 0.2) * 0.35f;
+            if (f > 1f) f = 1f;
+            World.PlaySound(this is Player ? "game.player.swim" : "game.neutral.swim", X, Y, Z, f, 1f + (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.4f);
+            return;
+        }
+        if (!OnGround) return;
+        int id = World.GetBlock(bx, by, bz);
+        if (id == 0) return;
+        var b = Block.Get(id);
+        if (b.IsLiquid) return;
+        string name = StepSoundName ?? BlockCraft.Audio.SoundEvents.Step(b.Sound);
+        World.PlaySound(name, X, Y, Z, 0.15f, 1f);
     }
 
     protected virtual void OnFall(float distance) { }
@@ -288,6 +327,8 @@ public abstract class Entity
     /// <summary>Uderzenie pioruna (MC: onStruckByLightning) - domyślnie 5 obrażeń od ognia i podpalenie; creeper, świnia, wieśniak nadpisują.</summary>
     public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); FireTicks = Math.Max(FireTicks, 160); }
     public virtual bool Interact(Player p) => false;
+    /// <summary>Gracz uderza encję, która nie jest żywa (np. odbicie kuli ognia). True = obsłużone.</summary>
+    public virtual bool AttackedByPlayer(Player p) => false;
 
     public virtual void Save(BinaryWriter bw)
     {

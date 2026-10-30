@@ -5,14 +5,6 @@ namespace BlockCraft.World;
 
 public enum WorldType { Default = 0, Superflat = 1 }
 
-public static class Biome
-{
-    public const byte Forest = 0, Desert = 1, Plains = 2;
-    public static string Name(int b) => b switch { Desert => "Pustynia", Plains => "Równiny", _ => "Las" };
-    public static uint GrassColor(int b) => b switch { Desert => 0xBFB755, Plains => 0x91BD59, _ => 0x79C05A };
-    public static uint FoliageColor(int b) => b switch { Desert => 0xAEA42A, Plains => 0x77AB2F, _ => 0x59AE30 };
-}
-
 public interface ITreeWriter
 {
     int Get(int x, int y, int z);
