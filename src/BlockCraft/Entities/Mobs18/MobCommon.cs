@@ -44,6 +44,14 @@ public abstract partial class Mob
     }
     private bool TickMobControl()
     {
+        if(Rider!=null && !Rider.Dead) {
+            Nav.Stop(); Yaw=Rider.Yaw; Pitch=Rider.Pitch*.5f;
+            bool control=Saddled && (this is Horse h && h.Tamed || this is Pig && Rider.Inventory.Selected?.Id==I.CarrotOnAStick);
+            if(control) { AiMoveSpeed=(float)MoveSpeed; MoveForward=Rider.MoveForward; MoveStrafe=Rider.MoveStrafe*.5f; IsJumping=Rider.IsJumping && this is Horse; return true; }
+            if(this is Horse untamed && !untamed.Tamed) {
+                if(Age%50==0) { if(World.Rand.Next(100)<untamed.Temper) untamed.Tame(Rider); else { untamed.Temper=Math.Min(100,untamed.Temper+5); Dismount(); } }
+            }
+        }
         if(Vehicle!=null) {
             if(Vehicle.Dead||Vehicle.Removed) Vehicle=null;
             else { Nav.Stop(); SetPosition(Vehicle.X,Vehicle.Y+Vehicle.Height*.75,Vehicle.Z); MotionX=MotionY=MotionZ=0; return true; }
@@ -56,6 +64,25 @@ public abstract partial class Mob
         }
         return false;
     }
+    public override void Tick()
+    {
+        base.Tick();
+        if(Vehicle!=null&&!Vehicle.Removed) { SetPosition(Vehicle.X,Vehicle.Y+Vehicle.Height*.75,Vehicle.Z); MotionX=MotionY=MotionZ=0; FallDistance=0; }
+        if(Rider!=null) {
+            if(Dead||Removed||Rider.Dead||Rider.Sneaking) Dismount();
+            else { Rider.SetPosition(X,Y+Height*.75,Z); Rider.MotionX=Rider.MotionY=Rider.MotionZ=0; Rider.FallDistance=0; }
+        }
+    }
+    public bool Mount(Player p)
+    { if(Rider!=null) return false; p.RidingMob?.Dismount(); Rider=p; p.RidingMob=this; PersistenceRequired=true; return true; }
+    public void Dismount()
+    { if(Rider==null) return; var p=Rider; Rider=null; p.RidingMob=null; p.SetPosition(X+Width+.5,Y+.1,Z); }
+    public bool InteractLead(Player p)
+    {
+        if(LeashHolder==p) { LeashHolder=null; if(!p.Creative) Drop(I.Lead,1); return true; }
+        if(p.Inventory.Selected?.Id!=I.Lead || this is Monster || LeashHolder!=null) return false;
+        LeashHolder=p; PersistenceRequired=true; ConsumeHeld(p); return true;
+    }
     public override void OnDeath(DamageSource src)
     {
         if(Dead) return;
@@ -64,6 +91,18 @@ public abstract partial class Mob
         if(LeashHolder!=null) { Drop(I.Lead,1); LeashHolder=null; }
         if(Saddled) Drop(I.Saddle,1);
         base.OnDeath(src);
+    }
+}
+
+public sealed partial class Player
+{
+    public Mob RidingMob;
+    private bool TravelMounted(float strafe,float forward)
+    {
+        if(RidingMob==null) return false;
+        if(RidingMob.Dead||RidingMob.Removed||Sneaking) { RidingMob.Dismount(); return false; }
+        MotionX=MotionY=MotionZ=0; FallDistance=0;
+        SetPosition(RidingMob.X,RidingMob.Y+RidingMob.Height*.75,RidingMob.Z); return true;
     }
 }
 

@@ -143,6 +143,7 @@ public partial class Player : LivingEntity
 
     public override void Travel(float strafe, float forward)
     {
+        if (TravelMounted(strafe, forward)) return;
         if (Flying)
         {
             double my = MotionY;

@@ -200,6 +200,7 @@ public abstract class Animal : Mob
 
     public override bool Interact(Player p)
     {
+        if (InteractLead(p)) return true;
         var held = p.Inventory.Selected;
         if (IsBreedingItem(held))
         {
