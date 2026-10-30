@@ -8,7 +8,7 @@ namespace BlockCraft.World;
 public enum RenderType { None, Cube, Cross, Crops, Liquid, Torch, Model, Wire, Cactus }
 public enum RenderLayer { Solid, Cutout, Translucent }
 public enum ToolType { None, Pickaxe, Axe, Shovel, Sword, Shears, Hoe }
-public enum TintType { None, Grass, Foliage, Birch, RedstoneWire }
+public enum TintType { None, Grass, Foliage, Birch, RedstoneWire, Spruce, Water, Custom }
 public enum SoundType { Stone, Wood, Gravel, Grass, Sand, Glass, Wool, Metal, Ladder }
 
 /// <summary>Box modelu (współrzędne 0..1) z teksturami per ściana.</summary>
@@ -58,6 +58,8 @@ public class Block
     public bool NeedsSupport;         // np. rośliny, pochodnie
     public bool IsPowerSource;
     public bool HasTileEntity;
+    /// <summary>OnEntityCollide wołane, gdy encja jest w bloku (pajęczyna, portale, płyty naciskowe...).</summary>
+    public bool EntityInside;
     public bool Flammable;
     public int DropOverride = -1, DropOverrideCount = 1;
     /// <summary>Warianty meta pokazywane w kreatywnym i jako osobne ikony (null = tylko 0).</summary>
@@ -96,6 +98,10 @@ public class Block
 
     // --- zachowanie ---
     public virtual int GetTexture(int face, int meta) => Tex[face];
+    /// <summary>Tint zależny od meta (np. podwójne rośliny: tylko trawa i paproć). Custom = kolor z CustomTint.</summary>
+    public virtual TintType TintAt(int meta) => Tint;
+    /// <summary>Kolor RGB dla TintType.Custom (np. łodygi dyni zależne od wieku).</summary>
+    public virtual uint CustomTint(int meta) => 0xFFFFFF;
     public virtual bool IsOpaqueCube(int meta) => Opaque;
 
     /// <summary>Boxy kolizji w lokalnych współrzędnych bloku (0..1).</summary>
@@ -174,8 +180,9 @@ public class Block
         var it = tool?.Item;
         if (it == null) return 1f;
         if (it.Tool == Tool && Tool != ToolType.None) return it.ToolSpeed;
-        if (it.Tool == ToolType.Sword && (Id == B.OakLeaves || Id == B.BirchLeaves)) return 1.5f;
-        if (it.Tool == ToolType.Shears && (Id == B.OakLeaves || Id == B.BirchLeaves)) return 15f;
+        if (it.Tool == ToolType.Sword && Id == B.Cobweb) return 15f;
+        if (it.Tool == ToolType.Sword && (this is LeavesBlock || Id is B.Vine or B.Pumpkin or B.Melon or B.JackOLantern || Render is RenderType.Cross or RenderType.Crops)) return 1.5f;
+        if (it.Tool == ToolType.Shears && (this is LeavesBlock || Id == B.Cobweb)) return 15f;
         if (it.Tool == ToolType.Shears && Id == B.Wool) return 5f;
         return 1f;
     }

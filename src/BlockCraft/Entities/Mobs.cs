@@ -276,7 +276,7 @@ public sealed class Sheep : Animal
     {
         Width = 0.9f; Height = 1.3f; MaxHealth = 8; Health = 8; MoveSpeed = 0.23;
         int r = w.Rand.Next(100);
-        Color = r < 5 ? 3 : r < 10 ? 2 : r < 15 ? 1 : r < 18 ? 4 : w.Rand.Next(500) == 0 ? 5 : 0;
+        Color = r < 5 ? 15 : r < 10 ? 7 : r < 15 ? 8 : r < 18 ? 12 : w.Rand.Next(500) == 0 ? 6 : 0; // EntitySheep.getRandomSheepColor (kolory EnumDyeColor)
     }
     public override string TypeKey => "sheep";
     public override string DisplayName => "Owca";

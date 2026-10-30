@@ -197,9 +197,12 @@ public class LogBlock : Block
 public class LeavesBlock : Block
 {
     private readonly int _sapling; private readonly bool _apples;
+    /// <summary>Tekstura liści w trybie szybkiej grafiki (nieprzezroczysta).</summary>
+    public int OpaqueTex;
     public LeavesBlock(byte id, string k, string n, string tex, TintType tint, int sapling, bool apples) : base(id, k, n)
     {
         T(tex); Tint = tint; _sapling = sapling; _apples = apples;
+        OpaqueTex = TextureGen.Has(tex + "_opaque") ? TextureGen.Layer(tex + "_opaque") : Tex[0];
         Opaque = false; Layer = RenderLayer.Cutout; LightOpacity = 1; Hardness = 0.2f; BlastResistance = 0.2f;
         Sound = SoundType.Grass; RandomTicks = true; Tab(Blocks.TabDecoration); Flammable = true;
     }

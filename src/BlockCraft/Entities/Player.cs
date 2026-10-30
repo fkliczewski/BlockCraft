@@ -224,6 +224,7 @@ public partial class Player : LivingEntity
         if (food.Id == I.RottenFlesh && World.Rand.NextFloat() < 0.8f) HungerEffect = 600;
         if (food.Id == I.GoldenApple) RegenEffect = 100;
         if (food.Id == I.SpiderEye) HungerEffect = 100;
+        food.OnEaten?.Invoke(this);
     }
 
     // ---------- używanie przedmiotów ----------

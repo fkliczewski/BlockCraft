@@ -59,6 +59,8 @@ public abstract class Entity
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
     public float FallDistance;
+    /// <summary>W pajęczynie (MC isInWeb): następny ruch spowolniony.</summary>
+    public bool InWeb;
     public int Age;
     public int FireTicks;
     public float StepHeight = 0.5f;
@@ -188,6 +190,7 @@ public abstract class Entity
     public void MoveWithCollision(double dx, double dy, double dz)
     {
         if (NoClip) { X += dx; Y += dy; Z += dz; return; }
+        if (InWeb) { InWeb = false; dx *= 0.25; dy *= 0.05000000074505806; dz *= 0.25; MotionX = 0; MotionY = 0; MotionZ = 0; }
         double odx = dx, ody = dy, odz = dz;
         var box = BoundingBox;
 

@@ -598,8 +598,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
                         RenderPart(Skin, _shHead, aroot); RenderPart(Skin, _shBody, aroot); foreach (var l in _shLegs) RenderPart(Skin, l, aroot);
                         if (!sh.Sheared)
                         {
-                            uint[] wc = { 0xE9ECEC, 0x8E8E86, 0x3E4447, 0x141519, 0x724728, 0xED8DAC };
-                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[Math.Clamp(sh.Color, 0, 5)]);
+                            uint[] wc = Items.Dyes.Rgb;
+                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[sh.Color & 15]);
                             if (sh.Color == 0) Skin.Color = Vector4.One;
                             _fHead.RY = _shHead.RY; _fHead.RX = _shHead.RX; _fHead.PY = _shHead.PY; _fBody.RX = MathF.PI / 2;
                             for (int i = 0; i < 4; i++) _fLegs[i].RX = _shLegs[i].RX;
