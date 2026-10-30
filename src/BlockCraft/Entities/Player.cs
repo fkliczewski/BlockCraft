@@ -339,6 +339,7 @@ public partial class Player : LivingEntity
 
     public void CloseContainer()
     {
+        if (OpenContainer is ChestContainer) World.PlaySound("random.chestclosed", X, Y, Z, 0.5f, World.Rand.NextFloat() * 0.1f + 0.9f);
         if (OpenContainer != null) { OpenContainer.OnClose(this); OpenContainer = null; }
         else InventoryContainer.OnClose(this);
     }

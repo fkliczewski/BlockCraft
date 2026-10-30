@@ -11,7 +11,7 @@ public sealed class SoundOptionsScreen : Screen
 
     static readonly (string key, string label)[] Cats =
     {
-        ("music", "Muzyka"), ("record", "Szafy grające/Bloki nutowe"), ("weather", "Pogoda"), ("block", "Bloki"),
+        ("music", "Muzyka"), ("record", "Płyty i nuty"), ("weather", "Pogoda"), ("block", "Bloki"),
         ("hostile", "Wrogie stworzenia"), ("neutral", "Przyjazne stworzenia"), ("player", "Gracze"), ("ambient", "Otoczenie"),
     };
 
