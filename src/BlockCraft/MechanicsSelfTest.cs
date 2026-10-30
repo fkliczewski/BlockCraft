@@ -29,6 +29,16 @@ public static partial class SelfTest
         p.ClearEffects(); p.AddEffect(Effect.Resistance, 100, 4); p.Health = 20; p.HurtResistantTime = 0;
         p.Attack(DamageSource.Generic, 10); Check(p.Health == 20, "Odporność V blokuje obrażenia");
         p.HurtResistantTime = 0; p.Attack(DamageSource.Void, 4); Check(p.Health == 16, "Odporność nie chroni przed pustką");
+        Check(Potions.Brew(0, new ItemStack(I.NetherWartItem)) == 16, "Brodawka zmienia wodę w niezręczną miksturę");
+        Check(Potions.Brew(16, new ItemStack(I.Sugar)) == 8194, "Cukier warzy szybkość");
+        Check(Potions.Brew(8194, new ItemStack(I.Redstone)) == 8258, "Redstone przedłuża miksturę szybkości");
+        Check(Potions.Brew(8194, new ItemStack(I.GlowstoneDust)) == 8226, "Glowstone wzmacnia miksturę szybkości");
+        Check(Potions.Brew(8194, new ItemStack(I.Gunpowder)) == 24578, "Proch zmienia miksturę w rozpryskową");
+        var brewWorld = MakeWorld(22, WorldType.Superflat, 0);
+        var stand = new BrewingStandTile { X = 8, Y = 80, Z = 8 };
+        stand.Items[0] = new ItemStack(I.Potion, 1, 16); stand.Items[3] = new ItemStack(I.NetherWartItem);
+        for (int i = 0; i < 400; i++) stand.Tick(brewWorld);
+        Check(stand.Items[0].Damage == 16 && stand.Items[3] == null, "Statyw warzy w 400 ticków bez paliwa");
         p.ClearEffects(); p.AddEffect(Effect.MiningFatigue, 100, 2);
         Check(Math.Abs(EffectLogic.Mining(p) - .0027f) < .000001, "Zmęczenie III: współczynnik 0.0027");
     }

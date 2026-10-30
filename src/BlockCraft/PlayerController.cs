@@ -142,6 +142,7 @@ public sealed partial class PlayerController
     private bool UseInAir(ItemStack held)
     {
         var p = P; var it = held.Item;
+        if (PlayerAlchemy.Use(p, held)) return true;
         if (it.IsFood) { if (p.CanEat(it.Id == I.GoldenApple)) p.StartUsing(held); return true; }
         if (it.Id == I.MilkBucket) { p.StartUsing(held); return true; }
         if (it.Id == I.Bow) { if (p.Creative || p.Inventory.CountOf(I.Arrow) > 0) p.StartUsing(held); return true; }

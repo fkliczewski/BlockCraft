@@ -40,6 +40,7 @@ public static class GuiDraw
     {
         var it = s.Item; if (it == null) return "?";
         string t = s.Name;
+        if (s.Id == I.Potion) foreach (var effect in Potions.Effects(s)) t += "\n" + EffectLogic.Name(effect.Id) + " " + EnchantHelper.Roman(effect.Amplifier + 1) + (EffectLogic.Instant(effect.Id) ? "" : " (" + EffectLogic.Time(effect) + ")");
         if (it.ArmorSlot >= 0) t += "\n§9+" + it.ArmorPoints + " Pancerz";
         if (it.IsTool && it.AttackDamage > 1) t += "\n§9+" + it.AttackDamage + " Obrażenia od ataku";
         if (it.IsFood) t += "\n§7Głód: +" + it.Hunger;

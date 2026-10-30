@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public enum GuiKind { Inventory, Crafting, Furnace, Chest }
+public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing }
 
 public interface IPlayerHandler
 {
@@ -259,6 +259,7 @@ public partial class Player : LivingEntity
             World.PlaySound("burp", X, Y, Z, 0.5f, 0.9f + World.Rand.NextFloat() * 0.1f);
             if (!Creative) { s.Count--; if (it.Id == I.MushroomStew) Inventory.Selected = new ItemStack(I.Bowl); else if (s.Count <= 0) Inventory.Selected = null; }
         }
+        else if (it.Id == I.Potion) PlayerAlchemy.Drink(this, s);
         else if (it.Id == I.MilkBucket)
         {
             HungerEffect = 0; RegenEffect = 0; ClearEffects();
