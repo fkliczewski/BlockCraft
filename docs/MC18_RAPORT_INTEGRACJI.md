@@ -66,9 +66,9 @@ NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy int
 
 ## Pierwsze niezakończone zadania
 
-1. MO: pełne modele i skórki dodatkowych mobów (część klas nie ma renderera),
-   naturalny spawn według biomu, wieśniak i handel (RegisterVillagers18 nadal
-   niezaimplementowane), ekwipunek konia, smycze i kompletna zgodność AI.
+1. MO: podłączyć GUI konia i handlu do multiplayera, uzupełnić oferty zależne
+   od przedmiotów ME i sprawdzić zgodność AI. Modele, spawn według biomu,
+   wieśniacy, handel i ekwipunek konia już scalone - aktualizacja Tory poniżej.
 2. NE: ukończyć podłączenie przywoływania Withera do prawdziwych czaszek ME;
    sprawdzić zgodność generatorów i układu fortec z oryginałem. Smok, kryształy,
    Wither i napisy są już scalone - patrz aktualizacja Hiro poniżej.
@@ -132,3 +132,29 @@ Odizolowano go w osobnym świecie bez naturalnego spawnu; reguły rozmnażania
 w grze nie zostały zmienione. Log pierwszej nieudanej próby pozostawiono
 w `.modus/hiro-published-selftest.log`, wyniki po poprawce w
 `.modus/hiro-published-fixed.log` i `.modus/hiro-repeat-*.log`.
+
+## Aktualizacja po raporcie Tory, 16:48
+
+Przeczytano `.modus/raporty/20261030-164854-Tora.md`. Scalono `mc18/mobs2`
+do 4f9ac95 przez fast-forward. Usunięto tymczasowy Horse.cs na rzecz
+Horses18.cs. Dodano pełniejszą obsługę koni i wariantów, zbroi, skrzyń,
+dziedziczenia, skoku ładowanego i GUI; wieśniaków z karierami i handlem;
+oswajanie zwierząt, golemy budowane z bloków, smycze oraz modele i skórki.
+MobSpawner ma cztery kategorie i listy biomów; skórki są w tablicy 128x128
+z przeskalowaniem dotychczasowych warstw 64x64.
+
+Własna weryfikacja po scaleniu: Release OK, **379 OK / 0 FAIL** w selftest
+(`.modus/tora-integrated-selftest.log`), autotest `--autotest --mo` zakończony
+`MO-TEST KONIEC: OK` oraz `AUTOTEST DONE`. Obejrzano mo_06_konie,
+mo_17_gui_kon i mo_19_gui_handel. Zrzuty zachowane w
+`.modus/tora-integrated-autotest`; odświeżono wydanie `BlockCraft_Gra`.
+Pięć udanych powtórek z raportu Tory jest wynikiem jego testów, a nie pięcioma
+dodatkowymi przebiegami wykonanymi podczas integracji.
+
+Ograniczenia: brakujące przedmioty ME powodują pomijanie zależnych od nich
+ofert; spawn strażników przy monumentach wymaga integracji ze strukturami OW.
+Przegląd kodu ujawnił też, że Player.OpenEntityContainer otwiera ekran wyłącznie
+przy Handler typu Game. GUI konia i handlu nie jest jeszcze podłączone do
+RemoteClient, a wybór oferty wymaga komunikatu klient-host. Nie deklarować
+pełnej obsługi tych mechanik dla gościa sieciowego. Zgodność całości 1:1 nadal
+wymaga dalszych testów.
