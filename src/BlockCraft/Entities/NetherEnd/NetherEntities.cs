@@ -7,6 +7,7 @@ public static partial class Registries
     static partial void EntitiesNetherEnd()
     {
         WorldHooks.OnEntityInPortal = DimensionPortals.ContactPortal;
+        NetherFortress.Init();
         Mob("zombie_pigman", w => new ZombiePigman(w));
         Mob("ghast", w => new Ghast(w));
         Mob("blaze", w => new Blaze(w));

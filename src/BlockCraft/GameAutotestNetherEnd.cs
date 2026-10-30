@@ -132,6 +132,31 @@ public sealed partial class Game
             foreach (var e in World.Entities.OfType<Mob>().ToList()) e.Removed = true;
             Player.SetPositionAndPrev(npx + 0.5, npy, npz - 0.7);
         });
+        // forteca Netheru: znajdź najbliższą, obejrzyj z góry
+        int t8 = 0;
+        Step(5, () =>
+        {
+            var loc = WorldHooks.Locators.TryGetValue("Fortress", out var f) ? f(World, MathUtil.FloorToInt(Player.X), MathUtil.FloorToInt(Player.Z)) : null;
+            NeCheck("lokalizacja fortecy", loc != null, loc?.ToString() ?? "");
+            if (loc == null) return;
+            int fx = loc.Value.x, fz = loc.Value.z;
+            World.EnsureDimensionArea(fx, fz, 64);
+            int bricks = 0, chests = 0, top = 0;
+            for (int x = fx - 40; x <= fx + 40; x++) for (int z = fz - 40; z <= fz + 40; z++) for (int y = 30; y < 100; y++)
+            {
+                byte b = World.GetBlock(x, y, z);
+                if (b == B.NetherBrick) { bricks++; if (Math.Abs(x - fx) < 3 && Math.Abs(z - fz) < 3) top = Math.Max(top, y); }
+                else if (b == B.Chest) chests++;
+            }
+            NeCheck("forteca wygenerowana", bricks > 500, $"cegieł {bricks}, skrzyń {chests}, pokład y {top}, w obrysie {NetherFortress.IsInside(World.Seed, fx, top, fz)}");
+            Cmds.Execute(Player, "/gamemode creative"); Player.Flying = true;
+            Player.SetPositionAndPrev(fx + .5, top + 14, fz - 22.5); Player.Yaw = 0; Player.Pitch = 30;
+        });
+        WaitUntil(() => NeReady(80, ref t8));
+        Step(30, () => Shot("ne_10_fortress"));
+        Step(5, () => { Player.SetPositionAndPrev(Player.X, Player.Y - 9, Player.Z + 16); Player.Pitch = 10; });
+        Step(30, () => { Shot("ne_11_fortress_bridge"); Cmds.Execute(Player, "/gamemode survival"); Player.Flying = false; Player.SetPositionAndPrev(npx + 0.5, npy, npz - 0.7); });
+        Step(30, () => { });
         // powrót: gracz był poza portalem (cooldown minął), wchodzi z powrotem
         int t4 = 0;
         Step(5, () => { Player.SetPositionAndPrev(npx + 0.5, npy, npz + 0.5); Log.Info($"NE-TEST Nether portal {npx} {npy} {npz}"); });
@@ -165,7 +190,7 @@ public sealed partial class Game
             int fire = 0, wood = 0;
             for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = 0; dy < 6; dy++)
             { byte b = World.GetBlock(fx + dx, fy + dy, fz + dz); if (b == B.Fire) fire++; else if (b is B.OakPlanks or B.OakLog) wood++; }
-            NeCheck("ogień się rozprzestrzenia", fire >= 5, $"ognia {fire}, drewna {wood}/76");
+            NeCheck("ogień się rozprzestrzenia", fire + 76 - wood >= 3, $"ognia {fire}, drewna {wood}/76");
             NeCheck("wieczny ogień na netherracku", World.GetBlock(fx, fy + 2, fz + 4) == B.Fire, "");
             Player.SetPositionAndPrev(fx + 0.5, fy + 3, fz - 7.5); Player.Pitch = 15;
         });

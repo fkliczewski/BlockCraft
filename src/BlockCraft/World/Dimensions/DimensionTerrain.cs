@@ -14,7 +14,7 @@ public sealed class DimensionTerrain
     {
         var c=new Chunk(cx,cz); var r=new Rng(_seed ^ (long)cx*341873128712L ^ (long)cz*132897987541L);
         Array.Fill(c.Biomes,(byte)(_id==DimensionId.Nether ? 8 : 9));
-        if (_id==DimensionId.Nether) Nether(c,r); else End(c,r);
+        if (_id==DimensionId.Nether) { Nether(c,r); NetherFortress.Generate(_seed,c); } else End(c,r);
         c.RecountSections(); c.RecalcHeightMap(); c.Modified=true;
         return c;
     }
