@@ -94,6 +94,8 @@ public class Item
     public Func<Player, ItemStack, int, int, int, int, double, double, double, bool> UseOnBlock;
     /// <summary>Własne użycie PPM w powietrze (też gdy UseOnBlock nie obsłużył). True = obsłużone.</summary>
     public Func<Player, ItemStack, bool> UseInAir;
+    /// <summary>Wołane po zjedzeniu (efekty jedzenia modułów, np. trujący ziemniak).</summary>
+    public Action<Player> OnEaten;
 
     public Item(int id, string key, string name)
     {
