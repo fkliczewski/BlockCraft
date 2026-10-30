@@ -16,6 +16,7 @@ public sealed class SlotData
 
 public sealed class PlayerData
 {
+    public int Dimension { get; set; }
     public string Name { get; set; } = "Steve";
     public double X { get; set; }
     public double Y { get; set; }

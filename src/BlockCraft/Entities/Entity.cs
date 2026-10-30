@@ -324,6 +324,8 @@ public abstract class Entity
     /// <summary>Uderzenie pioruna (MC: onStruckByLightning) - domyślnie 5 obrażeń od ognia i podpalenie; creeper, świnia, wieśniak nadpisują.</summary>
     public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); FireTicks = Math.Max(FireTicks, 160); }
     public virtual bool Interact(Player p) => false;
+    /// <summary>Gracz uderza encję, która nie jest żywa (np. odbicie kuli ognia). True = obsłużone.</summary>
+    public virtual bool AttackedByPlayer(Player p) => false;
 
     public virtual void Save(BinaryWriter bw)
     {

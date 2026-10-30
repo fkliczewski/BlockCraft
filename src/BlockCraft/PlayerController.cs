@@ -142,6 +142,7 @@ public sealed partial class PlayerController
     private bool UseInAir(ItemStack held)
     {
         var p = P; var it = held.Item;
+        if (it.UseInAir != null && it.UseInAir(p, held)) return true;
         if (it.IsFood) { if (p.CanEat(it.Id == I.GoldenApple)) p.StartUsing(held); return true; }
         if (it.Id == I.MilkBucket) { p.StartUsing(held); return true; }
         if (it.Id == I.Bow) { if (p.Creative || p.Inventory.CountOf(I.Arrow) > 0) p.StartUsing(held); return true; }
@@ -209,6 +210,7 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {
@@ -227,7 +229,10 @@ public sealed partial class PlayerController
         if (it.Id == I.FlintAndSteel)
         {
             if (id == B.Tnt) { TntBlock.Ignite(W, x, y, z, 80); p.DamageHeld(1); return true; }
-            return false;
+            int fx = x + Dir.X[face], fy = y + Dir.Y[face], fz = z + Dir.Z[face];
+            if (W.GetBlock(fx, fy, fz) != B.Air) return false;
+            W.PlaySound("fire.ignite", fx + 0.5, fy + 0.5, fz + 0.5, 1f, W.Rand.NextFloat() * 0.4f + 0.8f);
+            W.SetBlock(fx, fy, fz, B.Fire, 0); p.DamageHeld(1); return true;
         }
         if (it.IsFood || it.Id == I.MilkBucket || it.Id == I.Bow || it.Id == I.EnderPearl || it.Id == I.Egg || it.ArmorSlot >= 0) return UseInAir(held);
         if (!it.IsBlock) return false;

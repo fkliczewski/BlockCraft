@@ -22,7 +22,7 @@ public sealed class LightEngine
     }
 
     // ---------- lokalna inicjalizacja chunka (wątek roboczy) ----------
-    public static void InitChunkLocal(Chunk c)
+    public static void InitChunkLocal(Chunk c, bool hasNoSky = false)
     {
         InitTables();
         var light = c.Light; var blocks = c.Blocks;
@@ -32,7 +32,7 @@ public sealed class LightEngine
         for (int z = 0; z < 16; z++)
             for (int x = 0; x < 16; x++)
             {
-                int level = 15;
+                int level = hasNoSky ? 0 : 15;
                 for (int y = Chunk.Height - 1; y >= 0; y--)
                 {
                     int i = Chunk.Index(x, y, z);
@@ -220,6 +220,7 @@ public sealed class LightEngine
 
     private void UpdateChannel(int x, int y, int z, bool sky, Block newB)
     {
+        if (sky && _w.Provider.HasNoSky) return;
         int old = GetL(x, y, z, sky, out var c);
         if (old < 0) return;
         int emit = sky ? 0 : newB.LightEmit;

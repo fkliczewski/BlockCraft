@@ -329,6 +329,8 @@ public sealed class ThrownEntity : Entity
             World.SpawnParticles(ParticleKind.Portal, X, Y, Z, 32);
             if (Thrower is Player p && !p.Dead)
             {
+                // MC 1.8: 5% szans na endermita w miejscu gracza (moduł NE rejestruje "endermite")
+                if (World.Rand.NextFloat() < 0.05f && World.Rules.DoMobSpawning && EntitySerializer.Create("endermite", World) is { } mite) { mite.SetPositionAndPrev(p.X, p.Y, p.Z); mite.Yaw = p.Yaw; World.SpawnEntity(mite); }
                 p.SetPositionAndPrev(X, Y, Z); p.FallDistance = 0;
                 p.NetTeleportHook?.Invoke();
                 if (!p.Creative) p.Attack(DamageSource.Fall, 5f);

@@ -24,6 +24,7 @@ public sealed partial class Game
         Directory.CreateDirectory(_shotDir);
         foreach (var f in Directory.GetFiles(_shotDir, "*.png")) File.Delete(f);
         if (Environment.GetEnvironmentVariable("BC_AUTOTEST") == "rs") { AutotestRedstone(true); return; }
+        if (_args.Contains("--ne")) { SetupAutotestNetherEnd(); return; }
         int t0 = 0;
         WaitUntil(() => HasMenuWorld && Renderer.PendingMeshes < 20 || ++t0 > 600);
         Step(30, () => Shot("01_title"));

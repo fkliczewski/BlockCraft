@@ -66,9 +66,11 @@ public sealed partial class World : IBlockAccess
     public WorldStorage Storage;
     public MobSpawner Spawner;
 
-    public World(long seed, WorldType type, bool remote)
+    public World(long seed, WorldType type, bool remote, DimensionId dimension = DimensionId.Overworld)
     {
         Seed = seed; Type = type; IsRemote = remote;
+        Provider = new DimensionProvider(dimension);
+        if (dimension != DimensionId.Overworld) _dimensionTerrain = new DimensionTerrain(seed, dimension);
         Generator = new WorldGenerator(seed, type);
         Light = new LightEngine(this);
         Spawner = new MobSpawner(this);
@@ -101,6 +103,7 @@ public sealed partial class World : IBlockAccess
     }
     public int GetSkyLight(int x, int y, int z)
     {
+        if (Provider.HasNoSky) return 0;
         if (y >= Chunk.Height) return 15;
         if (y < 0) return 0;
         var c = GetChunk(x >> 4, z >> 4); if (c == null) return 15;
@@ -117,7 +120,7 @@ public sealed partial class World : IBlockAccess
     /// <summary>Światło z uwzględnieniem pory dnia (jak MC getLightFromNeighbors).</summary>
     public int GetLight(int x, int y, int z) => Math.Max(GetSkyLight(x, y, z) - SkyLightSubtracted, GetBlockLight(x, y, z));
     public int GetHeight(int x, int z) { var c = GetChunk(x >> 4, z >> 4); return c?.GetHeight(x & 15, z & 15) ?? 0; }
-    public bool CanSeeSky(int x, int y, int z) => y >= GetHeight(x, z);
+    public bool CanSeeSky(int x, int y, int z) => !Provider.HasNoSky && y >= GetHeight(x, z);
     public byte GetBiome(int x, int z) { var c = GetChunk(x >> 4, z >> 4); return c?.Biomes[((z & 15) << 4) | (x & 15)] ?? Generator.BiomeAt(x, z); }
 
     // ---------- modyfikacja ----------
@@ -336,6 +339,7 @@ public sealed partial class World : IBlockAccess
     // ---------- czas ----------
     public float CelestialAngle(float partial)
     {
+        if (Dimension != DimensionId.Overworld) return Dimension == DimensionId.End ? 0 : .5f;
         int j = (int)(DayTime % 24000L);
         float f = (j + partial) / 24000f - 0.25f;
         if (f < 0) f += 1; if (f > 1) f -= 1;
@@ -455,7 +459,7 @@ public sealed partial class World : IBlockAccess
     public void Tick()
     {
         TotalTime++;
-        if (Rules.DoDaylightCycle) DayTime++;
+        if (Rules.DoDaylightCycle && Provider.HasDaylightCycle) DayTime++;
         FlushAdds();
         if (!IsRemote)
         {

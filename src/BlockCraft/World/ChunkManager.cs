@@ -76,8 +76,8 @@ public sealed class ChunkManager : IDisposable
                 Chunk c = null;
                 if (_savingChunks.TryGetValue(key, out var sc)) { c = sc; c.Unloaded = false; }
                 if (c == null && _w.Storage != null) c = _w.Storage.LoadChunk(cx, cz);
-                if (c == null) c = _w.Generator.Generate(cx, cz);
-                LightEngine.InitChunkLocal(c);
+                if (c == null) c = _w.GenerateChunk(cx, cz);
+                LightEngine.InitChunkLocal(c, _w.Provider.HasNoSky);
                 _ready.Enqueue(c);
             }
             catch (Exception ex) { Log.Error("Chunk gen error: " + ex); lock (_lock) _pending.Remove(key); }

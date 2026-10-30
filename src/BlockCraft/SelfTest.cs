@@ -55,6 +55,7 @@ public static partial class SelfTest
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
+        try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ({sw.ElapsedMilliseconds} ms) ===");
         foreach (var f in Failures) Console.WriteLine(" - " + f);
         return _fail == 0 ? 0 : 2;

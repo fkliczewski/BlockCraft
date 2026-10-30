@@ -209,6 +209,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             w.SpawnX = sp.x; w.SpawnY = sp.y; w.SpawnZ = sp.z;
         }
         else { w.SpawnX = level.SpawnX; w.SpawnY = level.SpawnY; w.SpawnZ = level.SpawnZ; }
+        StartDimensions(w);
+        if (level.Player?.Dimension is -1 or 1) w = Dimensions.Get((DimensionId)level.Player.Dimension);
         var p = new Player(w) { Name = Settings.PlayerName, Handler = this, IsLocal = true, IsLocalOp = level.AllowCheats };
         if (level.Player != null) p.FromData(level.Player);
         else
@@ -253,8 +255,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (World == null || _storage == null || !_sessionStarted) return;
         try
         {
-            _level.DayTime = World.DayTime; _level.Time = World.TotalTime;
-            _level.SpawnX = World.SpawnX; _level.SpawnY = World.SpawnY; _level.SpawnZ = World.SpawnZ;
+            var home = Dimensions?.Get(DimensionId.Overworld) ?? World;
+            _level.DayTime = home.DayTime; _level.Time = home.TotalTime;
+            _level.SpawnX = home.SpawnX; _level.SpawnY = home.SpawnY; _level.SpawnZ = home.SpawnZ;
             _level.Difficulty = (int)World.Difficulty;
             _level.GameMode = Player.GameMode;
             _level.Player = Player.ToData();
@@ -264,7 +267,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 ["mobGriefing"] = World.Rules.MobGriefing, ["naturalRegeneration"] = World.Rules.NaturalRegeneration
             };
             _storage.SaveLevel(_level);
-            World.ChunkManager.SaveAll();
+            Dimensions.SaveAll();
         }
         catch (Exception ex) { Log.Error("Zapis świata: " + ex); }
     }
@@ -272,7 +275,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     public void QuitToTitle()
     {
         SaveWorld();
-        World?.ChunkManager?.Dispose();
+        Dimensions?.Dispose(); Dimensions = null;
         Renderer.SetWorld(null);
         World = null; Player = null; Ctrl = null; _storage = null;
         StartMenuWorld();
@@ -413,7 +416,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        try { Sound.Shutdown(); SaveWorld(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        try { Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
         base.OnClosing(e);
     }
 
@@ -494,7 +497,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (paused) { Renderer.Update(new Vector3d(p.X, p.Y, p.Z)); return; }
 
         ControlTick();
-        w.Tick();
+        Dimensions.Tick();
+        DimensionMusicTick();
+        w = World;
         if (!p.Dead && p.Removed) { }
         w.ChunkManager.Update(new[] { (MathUtil.FloorToInt(p.X) >> 4, MathUtil.FloorToInt(p.Z) >> 4) }, 5);
         Renderer.TickAnimations();
