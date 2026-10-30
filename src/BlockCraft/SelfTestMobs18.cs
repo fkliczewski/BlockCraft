@@ -41,7 +41,7 @@ public static partial class SelfTest
         Console.WriteLine("[Moby MO]");
         var w = MakeWorld(7, WorldType.Superflat, 3);
         w.Rules.DoMobSpawning = false; w.DayTime = 6000;
-        TestHorses18(w); TestTrade18(w); TestWolf18(w); TestGolems18(w); TestLeash18(w); TestPig18(w); TestSheep18(w); TestMobSaves18(w);
+        TestHorses18(w); TestTrade18(w); TestWolf18(w); TestGolems18(w); TestLeash18(w); TestPig18(w); TestSheep18(w); TestMobSaves18(w); TestSpawns18();
     }
 
     private static void TestHorses18(World.World w)
@@ -250,6 +250,25 @@ public static partial class SelfTest
         Sheep lamb = null;
         for (int i = 0; i < 900 && lamb == null; i++) { w.Tick(); lamb = w.Entities.OfType<Sheep>().FirstOrDefault(e => e.IsBaby); }
         Check(lamb != null && lamb.Color == Dyes.Orange, "Jagnię czerwonej i żółtej owcy jest pomarańczowe", lamb?.Color.ToString() ?? $"brak, miłość {a.InLove}/{b.InLove}, odległość {a.Distance(b):F1}");
+    }
+
+    private static void TestSpawns18()
+    {
+        bool Has(int b, SpawnKind k, string key) => BiomeSpawns.For(b, k).Any(e => e.Key == key);
+        Check(Has(Biome.Plains, SpawnKind.Creature, "horse") && !Has(Biome.Forest, SpawnKind.Creature, "horse") && Has(Biome.Savanna, SpawnKind.Creature, "horse"), "Konie na równinach i sawannie");
+        Check(Has(Biome.Forest, SpawnKind.Creature, "wolf") && Has(Biome.Taiga, SpawnKind.Creature, "wolf") && Has(Biome.ColdTaiga, SpawnKind.Creature, "wolf") && !Has(Biome.BirchForest, SpawnKind.Creature, "wolf"), "Wilki w lesie i tajdze");
+        Check(Has(Biome.Jungle, SpawnKind.Monster, "ocelot") && Has(Biome.JungleM, SpawnKind.Monster, "ocelot"), "Ocelot z listy potworów dżungli");
+        Check(BiomeSpawns.For(Biome.MushroomIsland, SpawnKind.Creature).All(e => e.Key == "mooshroom") && BiomeSpawns.For(Biome.MushroomIsland, SpawnKind.Monster).Length == 0, "Grzybowa wyspa: tylko grzybowe krowy, bez potworów");
+        Check(BiomeSpawns.For(Biome.Desert, SpawnKind.Creature).All(e => e.Key == "rabbit") && BiomeSpawns.For(Biome.Ocean, SpawnKind.Creature).Length == 0 && Has(Biome.Ocean, SpawnKind.Water, "squid"), "Pustynia: króliki, ocean: kałamarnice");
+        Check(Has(Biome.Swampland, SpawnKind.Monster, "witch") && BiomeSpawns.For(Biome.Swampland, SpawnKind.Monster).Count(e => e.Key == "slime") == 2 && BiomeSpawns.For(Biome.Hell, SpawnKind.Monster).Length == 0, "Bagno: dodatkowy szlam, Nether osobno");
+        var w = MakeWorld(5, WorldType.Superflat, 4);
+        w.DayTime = 6000;
+        SpawnPlayer(w, 0.5, 4, 0.5);
+        for (int i = 1; i <= 30; i++) { w.TotalTime = i * 400; w.Spawner.Tick(); w.Tick(); }
+        var animals = w.Entities.OfType<Animal>().ToList();
+        var plains = BiomeSpawns.For(w.GetBiome(0, 0), SpawnKind.Creature).Select(e => e.Key).ToHashSet();
+        Check(animals.Count > 0 && animals.All(a => plains.Contains(a.TypeKey)), "Spawner: zwierzęta z listy biomu", $"{animals.Count}: {string.Join(",", animals.Select(a => a.TypeKey).Distinct())}");
+        Check(animals.All(a => w.GetBlock(MathUtil.FloorToInt(a.X), MathUtil.FloorToInt(a.Y) - 1, MathUtil.FloorToInt(a.Z)) == B.Grass), "Zwierzęta tylko na trawie");
     }
 
     private static void TestMobSaves18(World.World w)
