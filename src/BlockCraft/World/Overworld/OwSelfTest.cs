@@ -79,5 +79,6 @@ public static partial class SelfTest
         Check(ok, "Kolory owiec jak w 1.8");
         TestOwGenLayers();
         TestOwTerrain();
+        TestOwCavesAndPopulation();
     }
 }

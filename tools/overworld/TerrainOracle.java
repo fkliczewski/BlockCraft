@@ -7,8 +7,10 @@ public class TerrainOracle {
   protected amv k() { return null; }
   protected int q() { return 0; }
   public aec v() { return cm; }
+  public ady b(cj pos) { return cm.a(pos); }
   public ato P() { return info; }
  }
+ static int state(ans p,int x,int y,int z) { int s=afh.f(p.a(x,y,z)); return s==10?11:s; }
  public static void main(String[] args) throws Exception {
   kb.c();
   Field uf=sun.misc.Unsafe.class.getDeclaredField("theUnsafe"); uf.setAccessible(true);
@@ -26,12 +28,16 @@ public class TerrainOracle {
     ans primer=new ans(); gen.a(x,z,primer);
     ady[] biomes=world.cm.b(null,x*16,z*16,16,16);
     gen.a(x,z,primer,biomes);
+        if(args.length>1) for(String field:new String[]{"u","z"}) {
+     Field gf=aoa.class.getDeclaredField(field);gf.setAccessible(true);
+     ((any)gf.get(gen)).a(gen,world,x,z,primer);
+    }
     long hash=0xcbf29ce484222325L;
-    for(int y=0;y<256;y++) for(int zz=0;zz<16;zz++) for(int xx=0;xx<16;xx++) hash=(hash^afh.f(primer.a(xx,y,zz)))*0x100000001b3L;
+    for(int y=0;y<256;y++) for(int zz=0;zz<16;zz++) for(int xx=0;xx<16;xx++) hash=(hash^state(primer,xx,y,zz))*0x100000001b3L;
     System.out.printf("%d %s %d %d %016x%n",seed,name,x,z,hash);
     if(args.length>0) {
      java.io.DataOutputStream out=new java.io.DataOutputStream(new java.io.FileOutputStream(args[0]+"/terrain-"+seed+"-"+name+"-"+x+"-"+z+".bin"));
-     for(int y=0;y<256;y++) for(int zz=0;zz<16;zz++) for(int xx=0;xx<16;xx++) out.writeShort(afh.f(primer.a(xx,y,zz)));
+     for(int y=0;y<256;y++) for(int zz=0;zz<16;zz++) for(int xx=0;xx<16;xx++) out.writeShort(state(primer,xx,y,zz));
      out.close();
     }
    }

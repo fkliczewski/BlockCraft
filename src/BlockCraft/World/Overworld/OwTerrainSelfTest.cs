@@ -7,7 +7,7 @@ public static partial class SelfTest
     // Numery stanów MC służą wyłącznie do niezależnego porównania z oficjalnym serwerem, nie do zapisu gry.
     private static int McTerrainState(byte id, int meta) => (id switch
     {
-        B.Air => 0, B.Stone => 1, B.Grass => 2, B.Dirt => 3, B.Bedrock => 7, B.Water => 9,
+        B.Air => 0, B.Stone => 1, B.Grass => 2, B.Dirt => 3, B.Bedrock => 7, B.Water => 9, B.Lava => 11,
         B.Sand => 12, B.Gravel => 13, B.Sandstone => 24, B.SnowLayer => 78, B.Ice => 79, B.Snow => 80,
         B.Mycelium => 110, B.LilyPad => 111, B.StainedClay => 159, B.HardenedClay => 172, B.RedSandstone => 179,
         _ => throw new InvalidOperationException("Nieznany stan surowego terenu: " + id)
