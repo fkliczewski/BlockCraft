@@ -67,6 +67,8 @@ public sealed class CreditsScreen : Gui.Screen
     };
     private float _scroll, _prevScroll;
     public override bool ShowWorld => false;
+    /// <summary>Przewija napisy tak, by pierwsza linia była u góry ekranu (zrzut w autoteście).</summary>
+    public void SkipIntro() { _scroll = _prevScroll = H; }
     protected override void Init() { Audio.Music.SetContext(Audio.MusicType.Credits); }
     public override void OnClose() { Audio.Music.SetContext(G.Player?.Creative == true ? Audio.MusicType.Creative : Audio.MusicType.Game); }
     public override void Tick()

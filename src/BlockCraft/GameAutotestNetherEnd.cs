@@ -400,6 +400,10 @@ public sealed partial class Game
         {
             NeCheck("powrót z Endu do Overworldu", World.Dimension == DimensionId.Overworld, "");
             NeCheck("napisy końcowe", CurrentScreen is CreditsScreen, CurrentScreen?.GetType().Name ?? "brak ekranu");
+            (CurrentScreen as CreditsScreen)?.SkipIntro();
+        });
+        Step(5, () =>
+        {
             Shot("ne_17_credits");
             SetScreen(null);
         });
