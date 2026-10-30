@@ -8,6 +8,8 @@ public sealed class ProtoChunk
     public readonly byte[] Blocks = new byte[Chunk.Volume];
     public readonly byte[] Meta = new byte[Chunk.Volume];
     public readonly byte[] Biomes = new byte[256];
+    public readonly Dictionary<int, OwTilePlan> Tiles = new();
+    public readonly List<OwEntityPlan> Entities = new();
     public byte Get(int x, int y, int z) => Blocks[Chunk.Index(x, y, z)];
     public void Set(int x, int y, int z, byte id, int meta = 0) { int i = Chunk.Index(x, y, z); Blocks[i] = id; Meta[i] = (byte)meta; }
 }

@@ -11,6 +11,7 @@ public sealed partial class OwGenerator
     public readonly OwTerrain Terrain;
     public OwBiomeProvider Biomes => Terrain.Biomes;
     private readonly ConcurrentDictionary<long, Lazy<ProtoChunk>> _base = new();
+    private readonly ConcurrentDictionary<long, Lazy<ProtoChunk>> _natural = new();
     private readonly ConcurrentDictionary<long, Lazy<OwGenRegion>> _population = new();
 
     public OwGenerator(long seed, WorldType type)
@@ -19,13 +20,25 @@ public sealed partial class OwGenerator
         Terrain = new OwTerrain(seed, type == WorldType.Amplified, type == WorldType.LargeBiomes);
     }
 
-    public ProtoChunk Base(int cx, int cz)
+    public ProtoChunk Natural(int cx, int cz)
     {
         long key = MathUtil.ChunkKey(cx, cz);
-        var p = _base.GetOrAdd(key, _ => new Lazy<ProtoChunk>(() =>
+        var p = _natural.GetOrAdd(key, _ => new Lazy<ProtoChunk>(() =>
         {
             var raw = Terrain.Generate(cx, cz);
             OwCaves.Generate(Seed, cx, cz, raw);
+            return raw;
+        })).Value;
+        if (_natural.Count > 512) _natural.TryRemove(_natural.Keys.First(), out _);
+        return p;
+    }
+
+    public ProtoChunk Base(int cx, int cz)
+    {
+        var p = _base.GetOrAdd(MathUtil.ChunkKey(cx, cz), _ => new Lazy<ProtoChunk>(() =>
+        {
+            var n = Natural(cx, cz); var raw = new ProtoChunk();
+            Array.Copy(n.Blocks, raw.Blocks, Chunk.Volume); Array.Copy(n.Meta, raw.Meta, Chunk.Volume); Array.Copy(n.Biomes, raw.Biomes, 256);
             GenerateStructures(cx, cz, raw);
             return raw;
         })).Value;
@@ -84,6 +97,7 @@ public sealed partial class OwGenerator
         Array.Copy(raw.Blocks, c.Blocks, Chunk.Volume);
         Array.Copy(raw.Meta, c.Meta, Chunk.Volume);
         Array.Copy(raw.Biomes, c.Biomes, 256);
+        foreach (var (index, plan) in raw.Tiles) plan.Apply(c, index);
         // Duże żyły kamieni mogą przekroczyć drugi dodatni chunk od źródła.
         for (int sx = cx - 2; sx <= cx + 1; sx++)
             for (int sz = cz - 2; sz <= cz + 1; sz++) Population(sx, sz).Apply(c);
@@ -115,13 +129,16 @@ public sealed partial class OwGenerator
 public sealed class OwGenRegion : IGenAccess
 {
     public readonly OwGenerator Generator;
+    public readonly List<OwEntityPlan> Entities = new();
     private readonly Dictionary<long, ProtoChunk> _read = new();
     private readonly Dictionary<long, Dictionary<int, (byte id, byte meta)>> _writes = new();
-    public OwGenRegion(OwGenerator generator) { Generator = generator; }
+    private readonly Dictionary<long, Dictionary<int, OwTilePlan>> _tiles = new();
+    private readonly bool _natural;
+    public OwGenRegion(OwGenerator generator, bool natural = false) { Generator = generator; _natural = natural; }
     private ProtoChunk Read(int x, int z)
     {
         long key = MathUtil.ChunkKey(x >> 4, z >> 4);
-        if (!_read.TryGetValue(key, out var p)) _read[key] = p = Generator.Base(x >> 4, z >> 4);
+        if (!_read.TryGetValue(key, out var p)) _read[key] = p = _natural ? Generator.Natural(x >> 4, z >> 4) : Generator.Base(x >> 4, z >> 4);
         return p;
     }
     public int Get(int x, int y, int z)
@@ -162,9 +179,23 @@ public sealed class OwGenRegion : IGenAccess
         return 0;
     }
     public void ReleaseReadCache() => _read.Clear();
+    public void Tile(int x, int y, int z, OwTilePlan plan)
+    {
+        long key = MathUtil.ChunkKey(x >> 4, z >> 4);
+        if (!_tiles.TryGetValue(key, out var edits)) _tiles[key] = edits = new();
+        edits[Chunk.Index(x & 15, y, z & 15)] = plan;
+    }
+    public void Apply(ProtoChunk p, int cx, int cz)
+    {
+        long key = MathUtil.ChunkKey(cx, cz);
+        if (_writes.TryGetValue(key, out var edits)) foreach (var (index, state) in edits) { p.Blocks[index] = state.id; p.Meta[index] = state.meta; }
+        if (_tiles.TryGetValue(key, out var tiles)) foreach (var (index, plan) in tiles) p.Tiles[index] = plan;
+        foreach (var e in Entities) if (((int)Math.Floor(e.X) >> 4) == cx && ((int)Math.Floor(e.Z) >> 4) == cz) p.Entities.Add(e);
+    }
     public void Apply(Chunk c)
     {
-        if (!_writes.TryGetValue(MathUtil.ChunkKey(c.Cx, c.Cz), out var edits)) return;
-        foreach (var (index, state) in edits) { c.Blocks[index] = state.id; c.Meta[index] = state.meta; }
+        long key = MathUtil.ChunkKey(c.Cx, c.Cz);
+        if (_writes.TryGetValue(key, out var edits)) foreach (var (index, state) in edits) { c.Blocks[index] = state.id; c.Meta[index] = state.meta; c.TileEntities.Remove(index); }
+        if (_tiles.TryGetValue(key, out var tiles)) foreach (var (index, plan) in tiles) plan.Apply(c, index);
     }
 }

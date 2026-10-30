@@ -80,5 +80,6 @@ public static partial class SelfTest
         TestOwGenLayers();
         TestOwTerrain();
         TestOwCavesAndPopulation();
+        TestOwStructures();
     }
 }
