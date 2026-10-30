@@ -38,6 +38,7 @@ public sealed class PlayerData
     public int SpawnY { get; set; }
     public int SpawnZ { get; set; }
     public bool Dead { get; set; }
+    public string RidingVehicleId { get; set; }
     public List<SlotData> Inventory { get; set; } = new();
 }
 

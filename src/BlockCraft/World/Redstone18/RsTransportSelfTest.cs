@@ -171,6 +171,40 @@ public static partial class SelfTest
             "Zniszczony wagonik upuszcza wagonik, skrzynię i zawartość");
         foreach (var c in w.Entities.OfType<MinecartEntity>().ToArray()) if (!c.Removed) c.Kill();
 
+        var collisionA = new MinecartEntity(w) { MotionX = 0.3, Yaw = 0 };
+        var collisionB = new MinecartEntity(w); collisionB.SetPosition(0.8, 0, 0);
+        collisionA.Collide(collisionB);
+        Check(collisionB.MotionX > 0.1 && collisionA.MotionX < 0.3, "Zderzenie wagoników przekazuje pęd");
+        var transverse = new MinecartEntity(w) { MotionX = 0.3, Yaw = 0 };
+        var beside = new MinecartEntity(w); beside.SetPosition(0, 0, 0.8); transverse.Collide(beside);
+        Check(transverse.MotionX == 0.3 && beside.MotionX == 0 && beside.MotionZ == 0, "Wagoniki na równoległych torach nie zderzają się bokami");
+        var locomotive = new FurnaceMinecartEntity(w) { MotionX = 0.2 }; var wagon = new MinecartEntity(w); wagon.SetPosition(0.8, 0, 0);
+        locomotive.Collide(wagon);
+        Check(wagon.MotionX > 0.2 && locomotive.MotionX > 0.18, "Wagonik z piecem pcha zwykły wagonik");
+        var occupant = new Cow(w); var occupied = new MinecartEntity(w); occupant.Mount(occupied);
+        Check(!rider.Mount(occupied) && occupied.Passenger == occupant && rider.RidingEntity == null, "Zajęty wagonik nie nadpisuje pasażera"); occupant.Mount(null);
+        Check(!new TntMinecartEntity(w).Interact(rider) && rider.RidingEntity == null, "Wagonik TNT nie przyjmuje pasażera");
+
+        w.Rules.Set("doEntityDrops", "false", out _);
+        var noDrops = Cart(MinecartKind.Rideable, 78.5, -84.5); noDrops.Attack(DamageSource.Generic, 5); w.Tick();
+        Check(noDrops.Removed && !w.GetEntitiesInBox(new AABB(77, 3, -86, 80, 6, -83)).OfType<ItemEntity>().Any(), "doEntityDrops=false wyłącza drop wagonika");
+        w.Rules.DoEntityDrops = true;
+        var savedFurnace = new FurnaceMinecartEntity(w) { Fuel = 1234, PushX = 0.75, PushZ = -0.25 };
+        var savedTnt = new TntMinecartEntity(w) { Fuse = 37 };
+        var savedHopper = new HopperMinecartEntity(w) { Enabled = false, TransferCooldown = 3 };
+        savedHopper.Set(1, new ItemStack(I.Diamond, 9));
+        var passengerDataSource = new Player(w); passengerDataSource.Mount(savedFurnace);
+        var loadedWorld = new World.World(42, WorldType.Superflat, false); loadedWorld.Rules.DoMobSpawning = false;
+        EntitySerializer.LoadEntities(loadedWorld, EntitySerializer.SaveEntities(new List<Entity> { savedFurnace, savedTnt, savedHopper })); loadedWorld.Tick();
+        var restoredFurnace = loadedWorld.Entities.OfType<FurnaceMinecartEntity>().Single();
+        var restoredTnt = loadedWorld.Entities.OfType<TntMinecartEntity>().Single();
+        var restoredHopper = loadedWorld.Entities.OfType<HopperMinecartEntity>().Single();
+        Check(restoredFurnace.Fuel == 1234 && restoredFurnace.PushX == 0.75 && restoredFurnace.PushZ == -0.25 && restoredTnt.Fuse == 37 && !restoredHopper.Enabled && restoredHopper.TransferCooldown == 3 && restoredHopper.Get(1)?.Count == 9,
+            "Rejestr i zapis encji odtwarzają paliwo, lont, blokadę i ładunek");
+        var restoredPassenger = new Player(loadedWorld); restoredPassenger.FromData(passengerDataSource.ToData()); loadedWorld.AddEntityNow(restoredPassenger);
+        restoredPassenger.Tick();
+        Check(restoredPassenger.RidingEntity == restoredFurnace && restoredFurnace.Passenger == restoredPassenger, "Po wczytaniu gracz ponownie dosiada zapisanego wagonika");
+
         w.SetBlock(85, y, -80, B.ActivatorRail); w.SetBlock(85, y - 1, -80, B.RedstoneBlock);
         var tnt = (TntMinecartEntity)Cart(MinecartKind.Tnt, 85.5, -79.5); tnt.Tick();
         Check(tnt.Fuse == 79, "Tor aktywacyjny zapala TNT (80 ticków)");

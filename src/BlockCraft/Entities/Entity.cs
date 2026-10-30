@@ -67,12 +67,15 @@ public abstract class Entity
     public double NetX, NetY, NetZ; public float NetYaw, NetPitch; public int NetSteps;
     public int RiddenTicks;
     public Entity RidingEntity, Passenger;
+    public string SaveId = Guid.NewGuid().ToString("N");
+    public string PendingVehicleId;
 
     public virtual bool Attack(DamageSource source, float amount) => false;
     public bool Mount(Entity vehicle)
     {
         if (vehicle == this || vehicle != null && (vehicle.Removed || vehicle.Passenger != null)) return false;
         for (var parent = vehicle; parent != null; parent = parent.RidingEntity) if (parent == this) return false;
+        PendingVehicleId = null;
         var old = RidingEntity;
         if (old != null) old.Passenger = null;
         RidingEntity = vehicle;
@@ -127,6 +130,15 @@ public abstract class Entity
     {
         Age++;
         if (IsRemoteControlled) { NetInterpolate(); return; }
+        if (!Dead && PendingVehicleId != null)
+        {
+            if (this is Player { Sneaking: true }) PendingVehicleId = null;
+            else
+            {
+                var vehicle = World.Entities.FirstOrDefault(e => !e.Removed && e.SaveId == PendingVehicleId);
+                if (vehicle != null) Mount(vehicle);
+            }
+        }
         UpdateFluidState();
         if (FireTicks > 0)
         {
@@ -310,7 +322,7 @@ public abstract class Entity
 
     protected virtual void OnFall(float distance) { }
 
-    public void Kill() { Passenger?.Mount(null); if (RidingEntity != null) Mount(null); Dead = true; Removed = true; }
+    public void Kill() { PendingVehicleId = null; Passenger?.Mount(null); if (RidingEntity != null) Mount(null); Dead = true; Removed = true; }
 
     public double DistanceSq(Entity o) { double dx = X - o.X, dy = Y - o.Y, dz = Z - o.Z; return dx * dx + dy * dy + dz * dz; }
     public double DistanceSq(double x, double y, double z) { double dx = X - x, dy = Y - y, dz = Z - z; return dx * dx + dy * dy + dz * dz; }
@@ -385,6 +397,10 @@ public static class EntitySerializer
             bw.Write((int)ems.Length);
             bw.Write(ems.ToArray());
         }
+        // Opcjonalny ogon zachowuje zgodność starych rekordów encji i zapisuje relacje także między chunkami.
+        bw.Write(0x52534452); // RDSR
+        bw.Write(ents.Count);
+        foreach (var e in ents) { bw.Write(e.SaveId); bw.Write(e.RidingEntity?.SaveId ?? e.PendingVehicleId ?? ""); }
         return ms.ToArray();
     }
 
@@ -394,6 +410,7 @@ public static class EntitySerializer
         {
             using var br = new BinaryReader(new MemoryStream(data));
             int n = br.ReadInt32();
+            var loaded = new Entity[n];
             for (int i = 0; i < n; i++)
             {
                 string key = br.ReadString();
@@ -401,8 +418,19 @@ public static class EntitySerializer
                 var bytes = br.ReadBytes(len);
                 var e = Create(key, w);
                 if (e == null) continue;
-                try { e.Load(new BinaryReader(new MemoryStream(bytes))); w.SpawnEntity(e); }
+                try { e.Load(new BinaryReader(new MemoryStream(bytes))); loaded[i] = e; w.SpawnEntity(e); }
                 catch (Exception ex) { Log.Error("Entity load " + key + ": " + ex.Message); }
+            }
+            if (br.BaseStream.Length - br.BaseStream.Position >= 8 && br.ReadInt32() == 0x52534452)
+            {
+                int links = br.ReadInt32();
+                for (int i = 0; i < links; i++)
+                {
+                    string id = br.ReadString(), vehicle = br.ReadString();
+                    if (i >= n || loaded[i] == null) continue;
+                    loaded[i].SaveId = id;
+                    loaded[i].PendingVehicleId = vehicle.Length == 0 ? null : vehicle;
+                }
             }
         }
         catch (Exception ex) { Log.Error("Entities load: " + ex.Message); }
