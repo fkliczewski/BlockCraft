@@ -116,6 +116,7 @@ public partial class Player : LivingEntity
 
     protected override void LivingUpdate()
     {
+        if (NetPuppet) return; // zdalny gracz na hoście: ruch liczy klient
         if (Flying)
         {
             if (Sneaking) MotionY -= FlySpeed * 3;
