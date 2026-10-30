@@ -408,6 +408,7 @@ public static partial class SelfTest
     {
         Console.WriteLine("[Moby]");
         var w = MakeWorld(1, WorldType.Superflat, 3);
+        w.Rules.DoMobSpawning = false; // nocne potwory z naturalnego spawnu odciągały zombie od gracza
         var p = SpawnPlayer(w, 0.5, 4, 0.5);
         var z = new Zombie(w); z.SetPositionAndPrev(8.5, 4, 0.5); w.AddEntityNow(z);
         w.DayTime = 18000;

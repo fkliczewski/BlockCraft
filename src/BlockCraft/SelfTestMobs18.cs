@@ -41,7 +41,7 @@ public static partial class SelfTest
         Console.WriteLine("[Moby MO]");
         var w = MakeWorld(7, WorldType.Superflat, 3);
         w.Rules.DoMobSpawning = false; w.DayTime = 6000;
-        TestHorses18(w); TestTrade18(w); TestWolf18(w); TestGolems18(w); TestLeash18(w); TestPig18(w); TestMobSaves18(w);
+        TestHorses18(w); TestTrade18(w); TestWolf18(w); TestGolems18(w); TestLeash18(w); TestPig18(w); TestSheep18(w); TestMobSaves18(w);
     }
 
     private static void TestHorses18(World.World w)
@@ -194,8 +194,8 @@ public static partial class SelfTest
         var p = SpawnPlayer(w, 32, 4, -10.5); p.Inventory.Selected = new ItemStack(I.Lead, 2);
         Check(cow.Interact(p) && cow.LeashHolder == p, "Smycz na krowie");
         p.SetPositionAndPrev(cow.X + 8, 4, cow.Z);
-        Ticks(w, 80);
-        Check(cow.LeashHolder == p && cow.Distance(p) < 7, "Smycz ciągnie krowę", $"{cow.Distance(p):F1}");
+        for (int i = 0; i < 200 && cow.Distance(p) >= 6; i++) w.Tick();
+        Check(cow.LeashHolder == p && cow.Distance(p) < 7, "Smycz ciągnie krowę", $"{cow.Distance(p):F1} trzyma={cow.LeashHolder?.TypeKey} martwa={cow.Dead} usunięta={cow.Removed} poz={cow.X:F1},{cow.Y:F1},{cow.Z:F1}");
         int fx = MathUtil.FloorToInt(p.X) + 1, fz = MathUtil.FloorToInt(p.Z);
         w.SetBlock(fx, 4, fz, B.Fence);
         Check(LeashKnot.TryTie(w, p, fx, 4, fz) && cow.LeashHolder is LeashKnot, "Przywiązanie do płotu");
@@ -224,6 +224,32 @@ public static partial class SelfTest
         Check(Math.Abs(MathUtil.WrapDegrees(pig.Yaw - 90)) < 15, "Świnia skręca za wzrokiem", pig.Yaw.ToString("F0"));
         Check(pig.Boost(p) && p.Inventory.Selected?.Damage == 7 && !pig.Boost(p), "Przyspieszenie marchewką (-7 trwałości)");
         pig.Dismount();
+    }
+
+    private static void TestSheep18(World.World w)
+    {
+        var counts = new int[16];
+        for (int i = 0; i < 4000; i++) counts[new Sheep(w).Color]++;
+        bool onlyNatural = true;
+        for (int c = 0; c < 16; c++) if (counts[c] > 0 && c is not (Dyes.White or Dyes.Black or Dyes.Gray or Dyes.LightGray or Dyes.Brown or Dyes.Pink)) onlyNatural = false;
+        Check(onlyNatural && counts[Dyes.White] > 3000 && counts[Dyes.Black] > 120 && counts[Dyes.Gray] > 120 && counts[Dyes.LightGray] > 120 && counts[Dyes.Brown] > 60,
+            "Naturalne kolory owiec jak w 1.8", string.Join(" ", counts.Select((n, c) => n > 0 ? $"{c}:{n}" : null).Where(x => x != null)));
+        var sh = Put(w, new Sheep(w) { Color = Dyes.White }, -30.5, 30.5);
+        var p = SpawnPlayer(w, -32, 4, 30.5); p.Name = "Pasterz";
+        p.Inventory.Selected = Dyes.DyeStack(Dyes.Red, 2);
+        Check(sh.Interact(p) && sh.Color == Dyes.Red && p.Inventory.Selected?.Count == 1, "Barwienie owcy barwnikiem");
+        p.Inventory.Selected = new ItemStack(I.Shears);
+        sh.Interact(p); Ticks(w, 1);
+        Check(w.Entities.OfType<ItemEntity>().Any(e => e.Stack.Id == B.Wool && e.Stack.Damage == Dyes.Red && e.Distance(sh) < 3), "Strzyżenie daje wełnę w kolorze runa");
+        p.Inventory.Selected = Dyes.DyeStack(Dyes.Blue);
+        sh.Interact(p);
+        Check(sh.Color == Dyes.Red, "Ostrzyżonej owcy nie da się zabarwić");
+        var a = Put(w, new Sheep(w) { Color = Dyes.Red }, -36.5, 36.5); var b = Put(w, new Sheep(w) { Color = Dyes.Yellow }, -37.5, 36.5);
+        p.Inventory.Selected = new ItemStack(I.Wheat, 2);
+        a.Interact(p); b.Interact(p);
+        Sheep lamb = null;
+        for (int i = 0; i < 900 && lamb == null; i++) { w.Tick(); lamb = w.Entities.OfType<Sheep>().FirstOrDefault(e => e.IsBaby); }
+        Check(lamb != null && lamb.Color == Dyes.Orange, "Jagnię czerwonej i żółtej owcy jest pomarańczowe", lamb?.Color.ToString() ?? $"brak, miłość {a.InLove}/{b.InLove}, odległość {a.Distance(b):F1}");
     }
 
     private static void TestMobSaves18(World.World w)

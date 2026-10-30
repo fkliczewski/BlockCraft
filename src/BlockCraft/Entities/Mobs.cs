@@ -291,8 +291,15 @@ public sealed class Sheep : Animal
     public override Animal CreateChild()
     {
         var s = new Sheep(World);
-        s.Color = World.Rand.NextBool() ? Color : (Mate as Sheep)?.Color ?? Color;
+        s.Color = MixColor(Color, (Mate as Sheep)?.Color ?? Color);
         return s;
+    }
+    /// <summary>EntitySheep.getDyeColorMixFromParents: barwniki rodziców w siatce 2x2, bez receptury losowo kolor jednego z nich.</summary>
+    private int MixColor(int a, int b)
+    {
+        var mixed = Recipes.Find(new[] { Dyes.DyeStack(a), Dyes.DyeStack(b), null, null }, 2, 2);
+        int c = Dyes.ColorOf(mixed);
+        return c >= 0 ? c : World.Rand.NextBool() ? a : b;
     }
     protected override void Think()
     {
@@ -340,6 +347,12 @@ public sealed class Sheep : Animal
             }
             p.DamageHeld(1);
             World.PlaySound("mob.sheep.shear", X, Y, Z);
+            return true;
+        }
+        // ItemDye.itemInteractionForEntity: barwnik zmienia kolor runa (ostrzyżonej owcy nie)
+        if (Dyes.ColorOf(held) is int dye && dye >= 0)
+        {
+            if (!Sheared && Color != dye) { Color = dye; ConsumeHeld(p); }
             return true;
         }
         return base.Interact(p);
