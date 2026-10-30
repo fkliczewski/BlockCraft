@@ -80,5 +80,8 @@ public partial class Game
         Step(8, () => { Log.Info($"AUTOTEST RS pasazer={(Player.RidingEntity == _rsRideCart ? "OK" : "FAIL")}"); });
         Step(3, () => Shot("rs_14_jazda"));
         Step(3, () => { Player.Sneaking = true; Player.Tick(); Player.Sneaking = false; Log.Info($"AUTOTEST RS wysiadanie={(Player.RidingEntity == null ? "OK" : "FAIL")}"); });
+        Step(3, () => SetScreen(new Gui.CreativeScreen(Player, Blocks.TabTransport)));
+        Step(3, () => Shot("rs_15_transport"));
+        Step(3, () => SetScreen(null));
     }
 }

@@ -46,6 +46,7 @@ public static partial class SelfTest
         w.SetBlock(sx - 1, y, sz, B.Air);
         Check(w.GetMeta(sx, y, sz) == 6, "Zwrotnica wraca po odłączeniu sygnału");
         TestMinecarts18(w);
+        TestRsRecipes();
     }
 
     private static void TestMinecarts18(World.World w)
@@ -178,5 +179,34 @@ public static partial class SelfTest
         Check(tnt.Removed && w.GetBlock(85, y, -80) == B.ActivatorRail && w.GetBlock(85, y - 1, -80) == B.RedstoneBlock,
             "Wagonik TNT wybucha i chroni tory z podłożem");
         rider.Kill();
+    }
+
+    private static void TestRsRecipes()
+    {
+        void Craft(string name, int expected, int count, params int[] ids)
+        {
+            var grid = ids.Select(id => id == 0 ? null : new ItemStack(id)).ToArray();
+            var result = Recipes.Find(grid, 3, 3);
+            Check(result?.Id == expected && result?.Count == count, name, result?.ToString() ?? "brak");
+        }
+        Craft("Receptura: 16 torów", B.Rail, 16, I.IronIngot, 0, I.IronIngot, I.IronIngot, I.Stick, I.IronIngot, I.IronIngot, 0, I.IronIngot);
+        Craft("Receptura: 6 zasilanych torów", B.PoweredRail, 6, I.GoldIngot, 0, I.GoldIngot, I.GoldIngot, I.Stick, I.GoldIngot, I.GoldIngot, I.Redstone, I.GoldIngot);
+        Craft("Receptura: 6 torów detektorowych", B.DetectorRail, 6, I.IronIngot, 0, I.IronIngot, I.IronIngot, B.StonePressurePlate, I.IronIngot, I.IronIngot, I.Redstone, I.IronIngot);
+        Craft("Receptura: 6 torów aktywacyjnych", B.ActivatorRail, 6, I.IronIngot, I.Stick, I.IronIngot, I.IronIngot, B.RedstoneTorch, I.IronIngot, I.IronIngot, I.Stick, I.IronIngot);
+        Craft("Receptura: wagonik", I.Minecart, 1, 0, 0, 0, I.IronIngot, 0, I.IronIngot, I.IronIngot, I.IronIngot, I.IronIngot);
+        foreach (var (block, item) in new[] { (B.Chest, I.ChestMinecart), (B.Furnace, I.FurnaceMinecart), (B.Tnt, I.TntMinecart), (B.Hopper, I.HopperMinecart) })
+            Craft("Receptura: " + Item.ById[item].Name, item, 1, 0, block, 0, 0, 0, 0, 0, 0, I.Minecart);
+        Craft("Receptura: 3 żelazne drzwi", I.IronDoorItem, 3, I.IronIngot, I.IronIngot, 0, I.IronIngot, I.IronIngot, 0, I.IronIngot, I.IronIngot, 0);
+        Craft("Receptura: komparator", I.ComparatorItem, 1, 0, B.RedstoneTorch, 0, B.RedstoneTorch, I.Quartz, B.RedstoneTorch, B.Stone, B.Stone, B.Stone);
+        Craft("Receptura: lej", B.Hopper, 1, I.IronIngot, 0, I.IronIngot, I.IronIngot, B.Chest, I.IronIngot, 0, I.IronIngot, 0);
+        Craft("Receptura: czujnik z mieszanymi płytami drewna", B.DaylightSensor, 1, B.Glass, B.Glass, B.Glass, I.Quartz, I.Quartz, I.Quartz, B.OakSlab, B.BirchSlab, B.DarkOakSlab);
+        Craft("Receptura: klapa z mieszanych desek", B.Trapdoor, 2, B.OakPlanks, B.BirchPlanks, B.SprucePlanks, B.JunglePlanks, B.AcaciaPlanks, B.DarkOakPlanks, 0, 0, 0);
+        Craft("Receptura: lepki tłok ze szlamem", B.StickyPiston, 1, 0, I.Slimeball, 0, 0, B.Piston, 0, 0, 0, 0);
+        Check(Recipes.Find(new ItemStack[] { new(B.Piston), new(I.String), null, null }, 2, 2) == null, "Nić nie zastępuje kulki szlamu w lepkim tłoku");
+        Craft("Receptura: lampa z jasnogłazem", B.RedstoneLamp, 1, 0, I.Redstone, 0, I.Redstone, B.Glowstone, I.Redstone, 0, I.Redstone, 0);
+        Craft("Receptura: odzyskanie 9 kulek szlamu", I.Slimeball, 9, 0, 0, 0, 0, B.SlimeBlock, 0, 0, 0, 0);
+        var transport = ItemRegistry.CreativeItems(Blocks.TabTransport);
+        Check(transport.Count == 9 && transport.Select(s => s.Id).Contains(I.HopperMinecart) && transport.All(s => s.Id is >= B.Rail and <= B.ActivatorRail || s.Item.MaxStack == 1),
+            "Transport zawiera 4 tory i 5 niełączących się w stos wagoników", transport.Count.ToString());
     }
 }
