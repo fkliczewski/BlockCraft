@@ -159,6 +159,7 @@ public class ContainerScreen : Screen
     {
         DrawDim();
         DrawBackground(mx, my);
+        if (C is PlayerContainer) EffectPanel.Draw(G, P, Left, Top);
         int hover = SlotAt(mx, my);
         foreach (var s in C.Slots)
             if (s.Stack != null) G.DrawItem(s.Stack, Left + s.X, Top + s.Y);

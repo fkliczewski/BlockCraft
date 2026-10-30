@@ -5,7 +5,7 @@ using BlockCraft.Items;
 
 namespace BlockCraft.World;
 
-public enum ParticleKind { BlockBreak, Smoke, Explosion, Flame, Splash, Bubble, Heart, Portal, Crit, RedDust, LargeSmoke, Angry, Note, Poof }
+public enum ParticleKind { BlockBreak, Smoke, Explosion, Flame, Splash, Bubble, Heart, Portal, Crit, RedDust, LargeSmoke, Angry, Note, Poof, Spell }
 
 public interface IWorldListener
 {

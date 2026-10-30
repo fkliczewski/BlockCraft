@@ -512,7 +512,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _prevFovMod = _fovMod;
         float fovT = 1f;
         if (p.Flying) fovT *= 1.1f;
-        if (p.Sprinting) fovT *= 1.15f;
+        fovT *= (p.GetSpeed() / .1f + 1) / 2;
         if (p.ItemInUse?.Id == I.Bow) { float bc = p.BowCharge; fovT *= 1f - bc * bc * 0.15f; }
         _fovMod += (fovT - _fovMod) * 0.5f;
         // autozapis co 5 minut

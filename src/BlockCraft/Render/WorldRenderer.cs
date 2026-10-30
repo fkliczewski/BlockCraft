@@ -814,6 +814,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             case ParticleKind.Crit:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.6f), Rnd(0.4f), TextureGen.Layer("particle_crit"), 0.15f, 10 + r.Next(5), 0.02f, new Vector4(0.9f, 0.9f, 0.6f, 1), false, true);
                 break;
+            case ParticleKind.Spell:
+                for (int i = 0; i < count; i++) AddParticle(p + Rnd(.3f), new Vector3(0, .02f, 0), TextureGen.Layer("particle_smoke_0"), .12f, 24, 0, new Vector4((data >> 16 & 255) / 255f, (data >> 8 & 255) / 255f, (data & 255) / 255f, .8f), false, false, 0, 0, 1, 1, true);
+                break;
             case ParticleKind.Poof:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);
                 break;
