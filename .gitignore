@@ -10,3 +10,6 @@ BlockCraft_Gra/
 .claude/skills/mtiles-database/
 
 node_modules/
+
+# Modus Operandi (stan lokalny)
+.modus/
