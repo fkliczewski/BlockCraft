@@ -269,6 +269,199 @@ public sealed partial class Game
         Step(20, () => { Player.Yaw = 270; Player.Pitch = 0; Shot("ne_07_end"); });
         Step(5, () => { Player.Yaw = 90; Player.Pitch = -10; });
         Step(20, () => Shot("ne_08_end2"));
-        Step(5, () => { Log.Info($"NE-TEST KONIEC, błędów: {_neFails}"); Log.Info("AUTOTEST DONE"); Close(); });
+        SetupAutotestEndBoss();
+    }
+
+    private void NeShot(string name)
+    {
+        Log.Info($"NE-TEST zrzut {name}: gracz {Player.X:F1} {Player.Y:F1} {Player.Z:F1} lot {Player.Flying} yaw {Player.Yaw:F0} pitch {Player.Pitch:F0}");
+        Shot(name);
+    }
+
+    /// <summary>Gracz w kreatywnym lata w danym punkcie (lot wyłącza się po dotknięciu ziemi).</summary>
+    private void NeFly(double x, double y, double z)
+    {
+        Player.SetPositionAndPrev(x, y, z); Player.MotionX = Player.MotionY = Player.MotionZ = 0; Player.OnGround = false; Player.Flying = true;
+    }
+
+    /// <summary>Kamera gracza na punkt (x, y, z).</summary>
+    private void NeLookAt(double x, double y, double z)
+    {
+        double dx = x - Player.X, dy = y - (Player.Y + Player.EyeHeight), dz = z - Player.Z;
+        Player.Yaw = Player.PrevYaw = (float)(Math.Atan2(-dx, dz) * MathUtil.Rad2Deg);
+        Player.Pitch = Player.PrevPitch = (float)(-Math.Atan2(dy, Math.Sqrt(dx * dx + dz * dz)) * MathUtil.Rad2Deg);
+    }
+
+    /// <summary>Część Endu: filary z kryształami, smok i jego części, leczenie promieniem, śmierć, portal wyjściowy, napisy; potem Wither.</summary>
+    private void SetupAutotestEndBoss()
+    {
+        EnderDragon dragon = null;
+        Step(5, () =>
+        {
+            Cmds.Execute(Player, "/gamemode creative"); Player.Flying = true;
+            World.EnsureDimensionArea(0, 0, 112);
+            Player.SetPositionAndPrev(60, 95, 60); NeLookAt(0, 70, 0);
+        });
+        int t8 = 0;
+        WaitUntil(() => NeReady(80, ref t8));
+        Step(10, () =>
+        {
+            var crystals = World.Entities.OfType<EnderCrystal>().ToList();
+            int pillars = 0, bedrockTops = 0;
+            foreach (var c in crystals)
+            {
+                int x = MathUtil.FloorToInt(c.X), y = MathUtil.FloorToInt(c.Y), z = MathUtil.FloorToInt(c.Z);
+                if (World.GetBlock(x, y - 1, z) == B.Bedrock) bedrockTops++;
+                if (World.GetBlock(x, y - 2, z) == B.Obsidian) pillars++;
+            }
+            int stone = 0;
+            for (int x = -96; x <= 96; x += 4) for (int z = -96; z <= 96; z += 4) for (int y = 10; y < 80; y++) if (World.GetBlock(x, y, z) == B.EndStone) { stone++; break; }
+            NeCheck("wyspa Endu z kamienia", stone > 800, $"kolumn z kamieniem {stone}/2401");
+            NeCheck("filary z kryształami", crystals.Count >= 5 && pillars == crystals.Count && bedrockTops == crystals.Count, $"kryształów {crystals.Count}, na obsydianie {pillars}, na bedrocku {bedrockTops}");
+            int fires = crystals.Count(c => World.GetBlock(MathUtil.FloorToInt(c.X), MathUtil.FloorToInt(c.Y), MathUtil.FloorToInt(c.Z)) == B.Fire);
+            NeCheck("ogień pod kryształami", fires == crystals.Count, $"{fires}/{crystals.Count}");
+            dragon = World.Entities.OfType<EnderDragon>().FirstOrDefault();
+            NeCheck("smok w Endzie", dragon != null, dragon == null ? "" : $"poz {dragon.X:F0} {dragon.Y:F0} {dragon.Z:F0}, hp {dragon.Health}");
+            NeCheck("części ciała smoka", dragon?.Parts?.Length == 7 && dragon.Parts.All(p => World.Entities.Contains(p)), $"części {dragon?.Parts?.Length}");
+            NeCheck("pasek bossa", BossStatus.Visible && BossStatus.BossName == "Smok Endu", $"{BossStatus.BossName} {BossStatus.HealthScale:F2}");
+            var c0 = crystals.OrderBy(c => c.DistanceSq(Player)).FirstOrDefault();
+            if (c0 != null) { NeFly(c0.X + 3, c0.Y + 3, c0.Z + 3); NeLookAt(c0.X, c0.Y + 1, c0.Z); Log.Info($"NE-TEST kryształ do zrzutu {c0.X:F1} {c0.Y:F1} {c0.Z:F1}"); }
+            // do zrzutów smok wisi nieruchomo (NoAI) nad środkiem wyspy
+            if (dragon != null) { dragon.NoAI = true; dragon.SetPositionAndPrev(0, 85, 0); dragon.Yaw = dragon.PrevYaw = 30; dragon.MotionX = dragon.MotionY = dragon.MotionZ = 0; dragon.RingIndex = -1; }
+        });
+        Step(20, () => NeShot("ne_12_end_pillar"));
+        Step(5, () =>
+        {
+            if (dragon == null) return;
+            NeFly(dragon.X + 22, dragon.Y + 6, dragon.Z + 8); NeLookAt(dragon.X, dragon.Y + 2, dragon.Z);
+        });
+        Step(3, () => { if (dragon != null) NeLookAt(dragon.X, dragon.Y + 2, dragon.Z); NeShot("ne_13_dragon"); });
+        // leczenie: kryształ tuż przy smoku
+        EnderCrystal healer = null; float hp0 = 0;
+        Step(5, () =>
+        {
+            if (dragon == null) return;
+            dragon.Health = 150; hp0 = dragon.Health;
+            healer = new EnderCrystal(World); healer.SetPositionAndPrev(dragon.X - 10, dragon.Y - 6, dragon.Z + 12); World.SpawnEntity(healer);
+        });
+        int t9 = 0;
+        WaitUntil(() => dragon == null || dragon.HealingCrystal == healer && dragon.Health > hp0 || ++t9 > 200);
+        Step(1, () =>
+        {
+            if (dragon == null) return;
+            NeCheck("kryształ leczy smoka", dragon.HealingCrystal == healer && dragon.Health > hp0, $"hp {hp0} -> {dragon.Health}, leczący {(dragon.HealingCrystal == healer ? "nowy" : dragon.HealingCrystal == null ? "brak" : "inny")}");
+            NeFly(healer.X + 5, healer.Y + 3, healer.Z + 5); NeLookAt(healer.X, healer.Y + 1.5, healer.Z);
+            Log.Info($"NE-TEST smok {dragon.X:F1} {dragon.Y:F1} {dragon.Z:F1}, kryształ {healer.X:F1} {healer.Y:F1} {healer.Z:F1}");
+        });
+        Step(10, () => NeShot("ne_14_crystal_beam"));
+        Step(2, () =>
+        {
+            if (dragon == null) return;
+            hp0 = dragon.Health;
+            Player.AttackEntity(healer);
+            NeCheck("uderzenie niszczy kryształ", healer.Removed, "");
+        });
+        int t10 = 0;
+        WaitUntil(() => dragon == null || dragon.HealingCrystal != healer || ++t10 > 40);
+        Step(2, () =>
+        {
+            if (dragon == null) return;
+            NeCheck("zniszczenie leczącego kryształu rani smoka", dragon.Health < hp0, $"hp {hp0} -> {dragon.Health}");
+            // obrażenia w skrzydło są dzielone (/4+1), w głowę pełne
+            float h = dragon.Health; dragon.HurtResistantTime = 0;
+            Player.AttackEntity(dragon.Wing1);
+            NeCheck("trafienie w część ciała", dragon.Health < h && h - dragon.Health <= 2.5f, $"hp {h} -> {dragon.Health}");
+            dragon.HurtResistantTime = 0;
+            dragon.Head.Attack(DamageSource.PlayerAttack(Player), 1000);
+            NeCheck("smok ginie od trafienia w głowę", dragon.Health <= 0, $"hp {dragon.Health}");
+        });
+        WaitUntil(() => dragon == null || dragon.DeathTicks >= 150);
+        Step(1, () => { if (dragon != null) { NeFly(dragon.X + 34, dragon.Y + 2, dragon.Z + 12); NeLookAt(dragon.X, dragon.Y + 2, dragon.Z); } });
+        Step(3, () => { if (dragon != null) NeLookAt(dragon.X, dragon.Y + 2, dragon.Z); NeShot("ne_15_dragon_death"); });
+        int t11 = 0, ex = 0, ez = 0;
+        WaitUntil(() => dragon == null || dragon.Removed || ++t11 > 400);
+        Step(5, () =>
+        {
+            if (dragon == null) return;
+            ex = MathUtil.FloorToInt(dragon.X); ez = MathUtil.FloorToInt(dragon.Z);
+            int portal = 0;
+            for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++) if (World.GetBlock(ex + dx, 64, ez + dz) == B.EndPortal) portal++;
+            int orbs = World.Entities.OfType<XpOrbEntity>().Count();
+            NeCheck("portal wyjściowy po smoku", portal == 20, $"bloków portalu {portal}/20 (środek to kolumna z bedrocku) w {ex} 64 {ez}");
+            NeCheck("jajo smoka na kolumnie", World.GetBlock(ex, 68, ez) == B.DragonEgg && World.GetBlock(ex, 67, ez) == B.Bedrock, Block.Get(World.GetBlock(ex, 68, ez)).Key);
+            NeCheck("XP ze smoka", orbs > 0, $"kul {orbs}");
+            NeFly(ex + 9, 72, ez + 9); NeLookAt(ex, 65, ez);
+        });
+        Step(20, () => NeShot("ne_16_exit_portal"));
+        int t12 = 0;
+        Step(5, () => { Cmds.Execute(Player, "/gamemode survival"); Player.Flying = false; Player.SetPositionAndPrev(ex + 1.5, 64.2, ez + .5); });
+        WaitUntil(() => World.Dimension == DimensionId.Overworld || ++t12 > 200);
+        Step(30, () =>
+        {
+            NeCheck("powrót z Endu do Overworldu", World.Dimension == DimensionId.Overworld, "");
+            NeCheck("napisy końcowe", CurrentScreen is CreditsScreen, CurrentScreen?.GetType().Name ?? "brak ekranu");
+            Shot("ne_17_credits");
+            SetScreen(null);
+        });
+        // Wither: wzór z piasku dusz; w teście czaszki zastępuje znacznik (blok czaszki dodaje moduł ME)
+        Wither wither = null; int wx = 0, wy = 0, wz = 0;
+        Step(10, () =>
+        {
+            Cmds.Execute(Player, "/gamemode creative"); Player.Flying = true;
+            World.Difficulty = Difficulty.Normal;
+            wx = MathUtil.FloorToInt(Player.X) + 8; wz = MathUtil.FloorToInt(Player.Z); wy = MathUtil.FloorToInt(Player.Y);
+            for (int dx = -6; dx <= 6; dx++) for (int dz = -6; dz <= 6; dz++) for (int dy = -1; dy < 8; dy++) World.SetBlock(wx + dx, wy + dy, wz + dz, dy < 0 ? B.Stone : B.Air, 0);
+            World.SetBlock(wx, wy, wz, B.SoulSand);
+            for (int i = -1; i <= 1; i++) { World.SetBlock(wx, wy + 1, wz + i, B.SoulSand); World.SetBlock(wx, wy + 2, wz + i, B.Glowstone); }
+            var old = Wither.IsWitherSkullAt;
+            Wither.IsWitherSkullAt = (w, x, y, z) => w.GetBlock(x, y, z) == B.Glowstone;
+            wither = Wither.TrySummon(World, wx, wy + 2, wz + 1);
+            Wither.IsWitherSkullAt = old;
+            NeCheck("przywołanie Withera ze wzoru T", wither != null && World.GetBlock(wx, wy + 1, wz) == B.Air, wither == null ? "" : $"hp {wither.Health}, nietykalny {wither.InvulTime}");
+            NeFly(wx - 7, wy + 2, wz + 0.5); NeLookAt(wx + .5, wy + 2, wz + .5);
+            var cr = new EnderCrystal(World); cr.SetPositionAndPrev(wx - 3.5, wy, wz - 2.5); World.SpawnEntity(cr);
+        });
+        Step(30, () => { NeLookAt(wx + .5, wy + 2, wz + .5); NeShot("ne_18_wither_spawn"); });
+        int t13 = 0;
+        WaitUntil(() => wither == null || wither.InvulTime <= 0 || ++t13 > 4000);
+        Step(5, () =>
+        {
+            if (wither == null) return;
+            NeCheck("Wither po wybuchu startowym", wither.InvulTime == 0 && !wither.Dead && wither.Health > 200, $"hp {wither.Health}, pod nim {Block.Get(World.GetBlock(wx, wy - 1, wz)).Key}");
+            var cow = new Cow(World); cow.SetPositionAndPrev(wx + 6.5, wy + 1, wz + 6.5); World.SpawnEntity(cow);
+        });
+        int t14 = 0;
+        WaitUntil(() => wither == null || World.Entities.OfType<WitherSkullEntity>().Any() || ++t14 > 3000);
+        Step(1, () =>
+        {
+            NeCheck("Wither strzela czaszkami", World.Entities.OfType<WitherSkullEntity>().Any(), $"cel {wither?.Target?.TypeKey}, głowy {string.Join(",", wither?.HeadTargets ?? Array.Empty<int>())}");
+            if (wither != null) { NeFly(wither.X - 8, wither.Y + 2, wither.Z); NeLookAt(wither.X, wither.Y + 2, wither.Z); }
+        });
+        Step(3, () => { if (wither != null) NeLookAt(wither.X, wither.Y + 2, wither.Z); NeShot("ne_19_wither_fight"); });
+        Step(5, () =>
+        {
+            if (wither == null) return;
+            wither.Health = 140;
+            var arrow = new ArrowEntity(World); arrow.SetPositionAndPrev(wither.X - 3, wither.Y + 1.5, wither.Z); arrow.MotionX = 2; World.SpawnEntity(arrow);
+        });
+        Step(5, () =>
+        {
+            if (wither == null) return;
+            NeCheck("tarcza Withera odbija strzały", wither.Armored && wither.Health >= 140, $"hp {wither.Health}");
+            NeFly(wither.X - 7, wither.Y + 2, wither.Z); NeLookAt(wither.X, wither.Y + 2, wither.Z);
+        });
+        Step(5, () => { if (wither != null) NeLookAt(wither.X, wither.Y + 2, wither.Z); NeShot("ne_20_wither_armor"); });
+        Step(5, () =>
+        {
+            if (wither == null) return;
+            wither.HurtResistantTime = 0;
+            wither.Attack(DamageSource.PlayerAttack(Player), 1000);
+        });
+        Step(30, () =>
+        {
+            bool star = World.Entities.OfType<ItemEntity>().Any(e => e.Stack.Id == I.NetherStar) || Player.Inventory.Main.Any(s => s?.Id == I.NetherStar);
+            NeCheck("Wither upuszcza gwiazdę Netheru", wither != null && wither.Dead && star, $"gwiazda {star}");
+            Log.Info($"NE-TEST KONIEC, błędów: {_neFails}"); Log.Info("AUTOTEST DONE"); Close();
+        });
     }
 }

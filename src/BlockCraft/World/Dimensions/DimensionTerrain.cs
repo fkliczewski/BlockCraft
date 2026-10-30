@@ -1,4 +1,5 @@
 using BlockCraft.Core;
+using BlockCraft.Entities;
 
 namespace BlockCraft.World;
 
@@ -59,28 +60,88 @@ public sealed class DimensionTerrain
             { for(int k=0;k<r.Next(2,6);k++)c.SetBlockRaw(x,y-k,z,B.Glowstone,0);break; }
         }
     }
-    private void End(Chunk c,Rng r)
+    // ---------- End (ChunkProviderEnd + BiomeEndDecorator z MC 1.8) ----------
+    /// <summary>Gęstość w punkcie siatki (co 8 bloków poziomo, co 4 w pionie): wyspa o promieniu ok. 100 bloków,
+    /// zanik do -3000 nad 14. warstwą i do -30 pod 8. (initializeNoiseField z ChunkProviderEnd).</summary>
+    private double EndGrid(int gx, int gy, int gz)
     {
-        for(int x=0;x<16;x++) for(int z=0;z<16;z++)
+        double dist = Math.Sqrt((double)gx * gx + (double)gz * gz) * 8;
+        double d = _density.Sample(gx * .25, gy * .125, gz * .25) * 96 - 8 + Math.Clamp(100 - dist, -100, 80);
+        if (gy > 14) { double t = Math.Clamp((gy - 14) / 64.0, 0, 1); d = d * (1 - t) - 3000 * t; }
+        if (gy < 8) { double t = (8 - gy) / 7.0; d = d * (1 - t) - 30 * t; }
+        return d;
+    }
+
+    /// <summary>Gęstość kolumny (x, z) dla y 0..127 - ta sama interpolacja co przy generowaniu chunków.</summary>
+    private double[] EndColumn(int wx, int wz)
+    {
+        int gx = wx >> 3, gz = wz >> 3; double fx = (wx & 7) / 8.0, fz = (wz & 7) / 8.0;
+        var g = new double[33];
+        for (int gy = 0; gy < 33; gy++)
+            g[gy] = (EndGrid(gx, gy, gz) * (1 - fx) + EndGrid(gx + 1, gy, gz) * fx) * (1 - fz) + (EndGrid(gx, gy, gz + 1) * (1 - fx) + EndGrid(gx + 1, gy, gz + 1) * fx) * fz;
+        var col = new double[128];
+        for (int y = 0; y < 128; y++) col[y] = g[y >> 2] + (g[(y >> 2) + 1] - g[y >> 2]) * (y & 3) / 4.0;
+        return col;
+    }
+
+    private void End(Chunk c, Rng r)
+    {
+        // daleko od wyspy gęstość nie może być dodatnia
+        double near = Math.Sqrt(Math.Pow(Math.Max(0, Math.Abs(c.Cx * 16 + 8) - 8), 2) + Math.Pow(Math.Max(0, Math.Abs(c.Cz * 16 + 8) - 8), 2));
+        if (near < 230)
         {
-            int wx=c.Cx*16+x,wz=c.Cz*16+z; double distance=Math.Sqrt((double)wx*wx+(double)wz*wz);
-            double shape=1-distance/100+_surface.Sample(wx/32.0,wz/32.0)*.22;
-            if(shape<=0)continue;
-            int top=64+(int)(_detail.Sample(wx/48.0,wz/48.0)*9),bottom=top-(int)(shape*35);
-            for(int y=bottom;y<=top;y++)c.SetBlockRaw(x,y,z,B.EndStone,0);
-        }
-        // Filary są deterministyczne także na granicach chunków.
-        var spikes=new Rng(_seed^0x454E44);
-        for(int i=0;i<10;i++)
-        {
-            double angle=i*Math.PI/5; int px=(int)(Math.Cos(angle)*42),pz=(int)(Math.Sin(angle)*42),radius=2+spikes.Next(3),top=76+spikes.Next(28);
-            for(int x=0;x<16;x++) for(int z=0;z<16;z++)
+            var g = new double[3, 33, 3];
+            for (int i = 0; i < 3; i++) for (int k = 0; k < 3; k++) for (int j = 0; j < 33; j++) g[i, j, k] = EndGrid(c.Cx * 2 + i, j, c.Cz * 2 + k);
+            for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++)
             {
-                int dx=c.Cx*16+x-px,dz=c.Cz*16+z-pz;
-                if(dx*dx+dz*dz>radius*radius+1)continue;
-                for(int y=45;y<top;y++)c.SetBlockRaw(x,y,z,B.Obsidian,0);
-                if(dx==0&&dz==0)c.SetBlockRaw(x,top,z,B.Bedrock,0);
+                int gx = x >> 3, gz = z >> 3; double fx = (x & 7) / 8.0, fz = (z & 7) / 8.0;
+                for (int y = 0; y < 128; y++)
+                {
+                    int gy = y >> 2; double fy = (y & 3) / 4.0, d = 0;
+                    for (int dx = 0; dx < 2; dx++) for (int dy = 0; dy < 2; dy++) for (int dz = 0; dz < 2; dz++)
+                        d += g[gx + dx, gy + dy, gz + dz] * (dx == 0 ? 1 - fx : fx) * (dy == 0 ? 1 - fy : fy) * (dz == 0 ? 1 - fz : fz);
+                    if (d > 0) c.SetBlockRaw(x, y, z, B.EndStone, 0);
+                }
             }
         }
+        var ents = new List<Entity>();
+        // WorldGenSpikes: w co piątym chunku (z przesunięciem +8) filar obsydianu wys. 6-37, promień 1-4, bedrock i kryształ na szczycie
+        for (int scx = c.Cx - 1; scx <= c.Cx; scx++) for (int scz = c.Cz - 1; scz <= c.Cz; scz++)
+        {
+            var sr = new Rng(_seed ^ (long)scx * 341873128712L ^ (long)scz * 132897987541L ^ 0x5350494BL);
+            if (sr.Next(5) != 0) continue;
+            int sx = scx * 16 + sr.Next(16) + 8, sz = scz * 16 + sr.Next(16) + 8, height = sr.Next(32) + 6, radius = sr.Next(4) + 1;
+            if ((double)sx * sx + (double)sz * sz > 240 * 240) continue;
+            if (sx + radius < c.Cx * 16 || sx - radius > c.Cx * 16 + 15 || sz + radius < c.Cz * 16 || sz - radius > c.Cz * 16 + 15) continue;
+            var col = EndColumn(sx, sz); int baseY = -1;
+            for (int y = 127; y >= 0; y--) if (col[y] > 0) { baseY = y + 1; break; }
+            if (baseY <= 0) continue;
+            bool ok = true;
+            for (int dx = -radius; dx <= radius && ok; dx++) for (int dz = -radius; dz <= radius && ok; dz++)
+                if (dx * dx + dz * dz <= radius * radius + 1 && EndColumn(sx + dx, sz + dz)[baseY - 1] <= 0) ok = false;
+            if (!ok) continue;
+            for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++)
+            {
+                int lx = sx + dx - c.Cx * 16, lz = sz + dz - c.Cz * 16;
+                if (dx * dx + dz * dz > radius * radius + 1 || lx < 0 || lx > 15 || lz < 0 || lz > 15) continue;
+                for (int y = baseY; y < baseY + height && y < Chunk.Height; y++) c.SetBlockRaw(lx, y, lz, B.Obsidian, 0);
+            }
+            int cxl = sx - c.Cx * 16, czl = sz - c.Cz * 16;
+            if (cxl is >= 0 and < 16 && czl is >= 0 and < 16)
+            {
+                c.SetBlockRaw(cxl, baseY + height, czl, B.Bedrock, 0);
+                var crystal = new EnderCrystal(null) { Yaw = sr.NextFloat() * 360 };
+                crystal.SetPositionAndPrev(sx + .5, baseY + height + 1, sz + .5);
+                ents.Add(crystal);
+            }
+        }
+        // BiomeEndDecorator: smok pojawia się raz, przy generowaniu chunku (0, 0)
+        if (c.Cx == 0 && c.Cz == 0)
+        {
+            var dragon = new EnderDragon(null) { Yaw = r.NextFloat() * 360 };
+            dragon.SetPositionAndPrev(0, 128, 0);
+            ents.Add(dragon);
+        }
+        if (ents.Count > 0) c.PendingEntityData = EntitySerializer.SaveEntities(ents);
     }
 }
