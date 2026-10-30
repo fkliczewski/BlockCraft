@@ -150,7 +150,7 @@ public sealed class CreateWorldScreen : Screen
         _seed = Add(new TextField(W / 2 - 100, 92, 200, 20) { Text = oldSeed, Placeholder = "(losowe)", MaxLength = 32 });
         Add(new Button(W / 2 - 155, 124, 150, 20, () => "Tryb gry: " + (_mode switch { 0 => "Przetrwanie", 1 => "Kreatywny", _ => "Hardkor" }),
             () => { _mode = (_mode + 1) % 3; _cheats = _mode == 1; }));
-        Add(new Button(W / 2 + 5, 124, 150, 20, () => "Typ świata: " + (_type == 0 ? "Domyślny" : "Superpłaski"), () => _type = 1 - _type));
+        Add(new Button(W / 2 + 5, 124, 150, 20, () => "Typ świata: " + (_type switch { 0 => "Domyślny", 1 => "Superpłaski", 2 => "Duże biomy", _ => "Amplified" }), () => _type = (_type + 1) % 4));
         Add(new Button(W / 2 - 155, 148, 150, 20, () => "Komendy: " + (_cheats ? "TAK" : "NIE"), () => _cheats = !_cheats) );
         Add(new Button(W / 2 - 155, H - 28, 150, 20, "Stwórz nowy świat", Create));
         Add(new Button(W / 2 + 5, H - 28, 150, 20, "Anuluj", () => G.SetScreen(_parent)));

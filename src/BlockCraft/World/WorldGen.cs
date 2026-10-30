@@ -3,7 +3,7 @@ using BlockCraft.Core;
 
 namespace BlockCraft.World;
 
-public enum WorldType { Default = 0, Superflat = 1 }
+public enum WorldType { Default = 0, Superflat = 1, LargeBiomes = 2, Amplified = 3 }
 
 public interface ITreeWriter
 {
@@ -120,15 +120,18 @@ public static class TreeGen
 
 public sealed class WorldGenerator
 {
-    public const int SeaLevel = 62; // najwyższy blok wody
+    public const int SeaLevel = 63; // granica morza; najwyższa woda ma y = 62
     public readonly long Seed;
     public readonly WorldType Type;
+    private readonly OwTerrain _mcTerrain;
+    public OwBiomeProvider Biomes => _mcTerrain.Biomes;
     private readonly OctaveNoise _terrain3D, _hills, _continental, _temp, _forest, _detail, _surface, _beach;
     private readonly ConcurrentDictionary<long, (byte[] top, byte[] topBlock, byte[] biome)> _protoCache = new();
 
     public WorldGenerator(long seed, WorldType type)
     {
         Seed = seed; Type = type;
+        _mcTerrain = new OwTerrain(seed, type == WorldType.Amplified, type == WorldType.LargeBiomes);
         var r = new Rng(seed);
         _terrain3D = new OctaveNoise(r, 4);
         _hills = new OctaveNoise(r, 4);
@@ -142,12 +145,7 @@ public sealed class WorldGenerator
 
     public double Temperature(int x, int z) => _temp.Sample(x / 420.0, z / 420.0) * 1.6 + _detail.Sample(x / 40.0, 3.3, z / 40.0) * 0.04;
     public double DesertWeight(int x, int z) { double t = Temperature(x, z); return SmoothStep(0.12, 0.30, t); }
-    public byte BiomeAt(int x, int z)
-    {
-        if (Type == WorldType.Superflat) return Biome.Plains;
-        if (DesertWeight(x, z) > 0.5) return Biome.Desert;
-        return _forest.Sample(x / 160.0, 7.7, z / 160.0) < -0.12 ? Biome.Plains : Biome.Forest;
-    }
+    public byte BiomeAt(int x, int z) => Type == WorldType.Superflat ? Biome.Plains : Biomes.BiomeAt(x, z);
     private static double SmoothStep(double a, double b, double v) { double t = Math.Clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
     private void ColumnParams(int x, int z, out double height, out double noiseAmp)
@@ -186,38 +184,7 @@ public sealed class WorldGenerator
         return d;
     }
 
-    private void FillTerrain(int cx, int cz, byte[] blocks)
-    {
-        var d = ComputeDensity(cx, cz);
-        for (int gx = 0; gx < 4; gx++)
-            for (int gz = 0; gz < 4; gz++)
-                for (int gy = 0; gy < 16; gy++)
-                {
-                    double d000 = d[(gx * 5 + gz) * 17 + gy], d001 = d[(gx * 5 + gz + 1) * 17 + gy];
-                    double d100 = d[((gx + 1) * 5 + gz) * 17 + gy], d101 = d[((gx + 1) * 5 + gz + 1) * 17 + gy];
-                    double d010 = d[(gx * 5 + gz) * 17 + gy + 1], d011 = d[(gx * 5 + gz + 1) * 17 + gy + 1];
-                    double d110 = d[((gx + 1) * 5 + gz) * 17 + gy + 1], d111 = d[((gx + 1) * 5 + gz + 1) * 17 + gy + 1];
-                    for (int ly = 0; ly < 8; ly++)
-                    {
-                        double ty = ly / 8.0;
-                        double a00 = d000 + (d010 - d000) * ty, a01 = d001 + (d011 - d001) * ty;
-                        double a10 = d100 + (d110 - d100) * ty, a11 = d101 + (d111 - d101) * ty;
-                        int y = gy * 8 + ly;
-                        for (int lx = 0; lx < 4; lx++)
-                        {
-                            double tx = lx / 4.0;
-                            double b0 = a00 + (a10 - a00) * tx, b1 = a01 + (a11 - a01) * tx;
-                            for (int lz = 0; lz < 4; lz++)
-                            {
-                                double v = b0 + (b1 - b0) * (lz / 4.0);
-                                int x = gx * 4 + lx, z = gz * 4 + lz;
-                                byte id = v > 0 ? B.Stone : (y <= SeaLevel ? B.Water : B.Air);
-                                blocks[Chunk.Index(x, y, z)] = id;
-                            }
-                        }
-                    }
-                }
-    }
+    private void FillTerrain(int cx, int cz, byte[] blocks) => Array.Copy(_mcTerrain.Generate(cx, cz).Blocks, blocks, Chunk.Volume);
 
     private (byte[] top, byte[] topBlock, byte[] biome) Proto(int cx, int cz)
     {
@@ -232,7 +199,7 @@ public sealed class WorldGenerator
                 int y = Chunk.Height - 1;
                 while (y > 0 && blocks[Chunk.Index(x, y, z)] == B.Air) y--;
                 top[z * 16 + x] = (byte)y;
-                tb[z * 16 + x] = blocks[Chunk.Index(x, y, z)];
+                tb[z * 16 + x] = blocks[Chunk.Index(x, y, z)] == B.Grass ? B.Stone : blocks[Chunk.Index(x, y, z)];
                 bio[z * 16 + x] = BiomeAt(cx * 16 + x, cz * 16 + z);
             }
         p = (top, tb, bio);
@@ -245,61 +212,11 @@ public sealed class WorldGenerator
     {
         var c = new Chunk(cx, cz);
         if (Type == WorldType.Superflat) { GenerateFlat(c); return c; }
-        var blocks = c.Blocks;
-        FillTerrain(cx, cz, blocks);
+        var terrain = _mcTerrain.Generate(cx, cz);
+        Array.Copy(terrain.Blocks, c.Blocks, Chunk.Volume);
+        Array.Copy(terrain.Meta, c.Meta, Chunk.Volume);
+        Array.Copy(terrain.Biomes, c.Biomes, 256);
         var rng = new Rng(Seed ^ (cx * 341873128712L + cz * 132897987541L));
-        for (int z = 0; z < 16; z++)
-            for (int x = 0; x < 16; x++)
-                c.Biomes[z * 16 + x] = BiomeAt(cx * 16 + x, cz * 16 + z);
-
-        // powierzchnia
-        for (int z = 0; z < 16; z++)
-            for (int x = 0; x < 16; x++)
-            {
-                int wx = cx * 16 + x, wz = cz * 16 + z;
-                byte bio = c.Biomes[z * 16 + x];
-                double sn = _surface.Sample(wx / 16.0, 0.3, wz / 16.0);
-                int depthMax = (int)(3 + sn * 2 + rng.NextDouble());
-                bool beach = _beach.Sample(wx / 32.0, 1.7, wz / 32.0) > -0.1;
-                bool gravelBeach = _beach.Sample(wx / 32.0, 9.1, wz / 32.0) > 0.45;
-                int depth = -1;
-                byte top = bio == Biome.Desert ? B.Sand : B.Grass, filler = bio == Biome.Desert ? B.Sand : B.Dirt;
-                for (int y = Chunk.Height - 1; y >= 0; y--)
-                {
-                    int i = Chunk.Index(x, y, z);
-                    byte id = blocks[i];
-                    if (id == B.Air) { depth = -1; continue; }
-                    if (id == B.Water) { depth = -1; continue; }
-                    if (id != B.Stone) continue;
-                    if (depth == -1)
-                    {
-                        // pierwszy blok stały od góry
-                        byte t = top, f = filler;
-                        if (depthMax <= 0) { t = B.Air; f = B.Stone; }
-                        if (y >= SeaLevel - 3 && y <= SeaLevel + 1 && bio != Biome.Desert)
-                        {
-                            if (gravelBeach) { t = B.Gravel; f = B.Gravel; }
-                            else if (beach) { t = B.Sand; f = B.Sand; }
-                        }
-                        if (y < SeaLevel && t == B.Grass) { t = B.Dirt; }
-                        if (y < SeaLevel - 1 && bio != Biome.Desert && (sn > 0.25)) { t = B.Gravel; f = B.Dirt; }
-                        depth = depthMax;
-                        blocks[i] = y >= SeaLevel ? (t == B.Air ? B.Stone : t) : (t == B.Air ? B.Stone : t);
-                        if (blocks[i] == B.Grass && y + 1 < Chunk.Height && blocks[Chunk.Index(x, y + 1, z)] == B.Water) blocks[i] = B.Dirt;
-                        filler = f;
-                    }
-                    else if (depth > 0)
-                    {
-                        depth--;
-                        blocks[i] = filler;
-                        if (depth == 0 && filler == B.Sand) { depth = rng.Next(4) + 2; filler = B.Sandstone; }
-                    }
-                }
-                // skała macierzysta
-                blocks[Chunk.Index(x, 0, z)] = B.Bedrock;
-                for (int y = 1; y < 5; y++) if (rng.Next(5) >= y) blocks[Chunk.Index(x, y, z)] = B.Bedrock;
-            }
-
         CarveCaves(c);
         GenerateOres(c);
         Decorate(c, rng);

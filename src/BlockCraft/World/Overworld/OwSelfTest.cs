@@ -78,5 +78,6 @@ public static partial class SelfTest
         for (int i = 0; i < 200; i++) { var s = new Sheep(w); if (s.Color is not (0 or 6 or 7 or 8 or 12 or 15)) ok = false; }
         Check(ok, "Kolory owiec jak w 1.8");
         TestOwGenLayers();
+        TestOwTerrain();
     }
 }
