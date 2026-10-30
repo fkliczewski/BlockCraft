@@ -168,8 +168,10 @@ public sealed partial class NetServer
         string name = UniqueName(SanitizeName(nick), c.Conn.PeerKey);
         c.Name = name;
         c.ViewDistance = Math.Clamp(view, 2, Math.Max(2, ViewDistance));
-        var p = new Player(Main) { Name = name, Handler = c, NetPuppet = true, IsLocal = false };
         var data = Main.Storage?.LoadPlayer(name);
+        var target = data != null && Main.Dimensions != null ? Main.Dimensions.Get((DimensionId)data.Dimension) : Main;
+        if (target != Main) target.EnsureDimensionArea(MathUtil.FloorToInt(data.X), MathUtil.FloorToInt(data.Z), 32);
+        var p = new Player(target) { Name = name, Handler = c, NetPuppet = true, IsLocal = false };
         if (data != null) p.FromData(data);
         else
         {
@@ -178,8 +180,8 @@ public sealed partial class NetServer
         }
         p.IsLocalOp = Ops.Contains(c.Conn.PeerKey);
         c.P = p;
-        c.Ctrl = new PlayerController(Main, p);
-        Main.AddEntityNow(p);
+        c.Ctrl = new PlayerController(target, p);
+        target.AddEntityNow(p);
         c.LastX = p.X; c.LastY = p.Y; c.LastZ = p.Z;
         c.LoggedIn = true;
         c.SendLogin();

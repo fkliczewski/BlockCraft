@@ -12,6 +12,7 @@ public partial class Game
         Dimensions = new DimensionSet(overworld);
         Dimensions.EntityTransferred += (entity, old, next) =>
         {
+            if (entity is Player) next.ChunkManager ??= new ChunkManager(next) { Radius = Settings.RenderDistance };
             if (entity != Player) return;
             Player.OpenContainer = null;
             next.ChunkManager ??= new ChunkManager(next) { Radius = Settings.RenderDistance };
@@ -22,6 +23,19 @@ public partial class Game
             SetScreen(null);
             next.PlaySound("portal.travel",Player.X,Player.Y,Player.Z,.8f);
         };
+    }
+
+    private void UpdateDimensionChunks()
+    {
+        if (Dimensions == null) { World.ChunkManager?.Update(ChunkCenters(), 5); return; }
+        foreach (var w in Dimensions.Loaded.Values)
+        {
+            var centers = w.Players.Where(p => !p.Removed)
+                .Select(p => (Core.MathUtil.FloorToInt(p.X) >> 4, Core.MathUtil.FloorToInt(p.Z) >> 4)).ToArray();
+            if (centers.Length == 0) continue;
+            w.ChunkManager ??= new ChunkManager(w) { Radius = Settings.RenderDistance };
+            w.ChunkManager.Update(centers, 5);
+        }
     }
 
     /// <summary>MC 1.8 Minecraft.getAmbientMusicType: muzyka Netheru, Endu (z bossem: EndBoss), w Overworldzie gra albo kreatywny.</summary>

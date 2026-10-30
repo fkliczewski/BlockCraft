@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 1;
+    public const int Version = 2;
 }
 
 /// <summary>Pakiety klient -> host.</summary>

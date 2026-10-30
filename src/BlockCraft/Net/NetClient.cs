@@ -432,7 +432,7 @@ public sealed class NetClient
                     if (NetHooks.WorldState.TryGetValue(key, out var h)) { try { h.Read(w, d); } catch (Exception ex) { Log.Error("Sieć: stan " + key + ": " + ex.Message); } }
                     break;
                 }
-            case S2C.ChangeDimension: ChangeDimension(r.ReadSByte()); break;
+            case S2C.ChangeDimension: ChangeDimension(r.ReadSByte(), r.ReadInt32()); break;
         }
     }
 
@@ -541,10 +541,13 @@ public sealed class NetClient
         G.SetScreen(ContainerFactory.ScreenFor(P, c));
     }
 
-    private void ChangeDimension(int dim)
+    private void ChangeDimension(int dim, int entityId)
     {
         _dim = dim; _gen++;
         _decoding.Clear(); _deferred.Clear();
+        W.RemoveEntity(P);
+        P.Id = entityId;
+        P.Removed = false;
         G.NetChangeWorld(NetHooks.CreateRemoteWorld(dim));
     }
 }

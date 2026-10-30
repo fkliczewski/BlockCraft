@@ -1,5 +1,10 @@
 # Moduł G: multiplayer Tailcat.Link
 
+Aktualizacja po scaleniu: protokół 2, podłączone DimensionSet i kontenery
+redstone/alchemii. Test sieciowej zmiany wymiaru i ID gracza przechodzi.
+Pełny stan i ograniczenia: [raport integracji](MC18_RAPORT_INTEGRACJI.md).
+Wyniki poniżej opisują wcześniejszy test samej gałęzi `mc18/net`.
+
 Stan 2026-10-30, gałąź `mc18/net`. Gra używa Tailcat.Link 0.5.4 i własnego
 przekaźnika `derp.fimson.pl:443` (region 303). Nie wymaga przekierowania portów,
 Hamachi ani osobnego procesu serwera. `--server` pozostaje starszą atrapą;

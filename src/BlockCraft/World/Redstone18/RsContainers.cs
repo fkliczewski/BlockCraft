@@ -201,7 +201,7 @@ namespace BlockCraft.World
         public override void OnNeighborChanged(World w, int x, int y, int z, int nid) { if (!w.IsRemote) UpdateState(w, x, y, z); }
         public override bool OnActivated(World w, int x, int y, int z, Player p)
         {
-            if (w.GetTileEntity(x, y, z) is HopperTileEntity te) RsGui.Open(p, new RsContainer(p.Inventory, te, "Lej", RsContainer.Layout.Hopper));
+            p.OpenBlockGui(GuiKind.Hopper, x, y, z);
             return true;
         }
         public override void OnRemoved(World w, int x, int y, int z, int oldMeta)
@@ -495,7 +495,7 @@ namespace BlockCraft.World
         public override void OnScheduledTick(World w, int x, int y, int z, Rng r) { if (!w.IsRemote) Dispense(w, x, y, z); }
         public override bool OnActivated(World w, int x, int y, int z, Player p)
         {
-            if (w.GetTileEntity(x, y, z) is DispenserTileEntity te) RsGui.Open(p, new RsContainer(p.Inventory, te, Dropper ? "Podajnik" : "Dozownik", RsContainer.Layout.Grid3));
+            p.OpenBlockGui(GuiKind.Dispenser, x, y, z);
             return true;
         }
         public override void OnRemoved(World w, int x, int y, int z, int oldMeta)
@@ -649,10 +649,13 @@ namespace BlockCraft.World
         public override int GetTexture(int face, int meta) => face == Dir.HorizToFace(meta & 3) && face > 1 ? _front : base.GetTexture(face, meta);
         public override bool OnActivated(World w, int x, int y, int z, Player p)
         {
-            if (w.GetTileEntity(x, y, z) is ChestTileEntity te)
-                RsGui.Open(p, new RsContainer(p.Inventory, te, "Skrzynia-pułapka", RsContainer.Layout.Chest27, () => Viewers(w, x, y, z, te, 1), () => Viewers(w, x, y, z, te, -1)));
+            p.OpenBlockGui(GuiKind.TrappedChest, x, y, z);
             return true;
         }
+        public RsContainer CreateContainer(World w, Player p, int x, int y, int z)
+            => w.GetTileEntity(x,y,z) is ChestTileEntity te
+                ? new RsContainer(p.Inventory, te, "Skrzynia-pułapka", RsContainer.Layout.Chest27,
+                    w.IsRemote ? null : () => Viewers(w,x,y,z,te,1), w.IsRemote ? null : () => Viewers(w,x,y,z,te,-1)) : null;
         private void Viewers(World w, int x, int y, int z, ChestTileEntity te, int d)
         {
             te.Viewers = Math.Max(0, te.Viewers + d);

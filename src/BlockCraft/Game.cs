@@ -522,7 +522,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         NetAfterTick();
 
         if (!p.Dead && p.Removed) { }
-        w.ChunkManager?.Update(ChunkCenters(), 5);
+        UpdateDimensionChunks();
         Renderer.TickAnimations();
         Renderer.TickParticles();
         // ekwipowanie

@@ -33,10 +33,11 @@ public static partial class SelfTest
         Check(Potions.Brew(16, new ItemStack(I.Sugar)) == 8194, "Cukier warzy szybkość");
         Check(Potions.Brew(8194, new ItemStack(I.Redstone)) == 8258, "Redstone przedłuża miksturę szybkości");
         Check(Potions.Brew(8194, new ItemStack(I.GlowstoneDust)) == 8226, "Glowstone wzmacnia miksturę szybkości");
-        Check(Potions.Brew(8194, new ItemStack(I.Gunpowder)) == 24578, "Proch zmienia miksturę w rozpryskową");
+        Check(Potions.Brew(8194, new ItemStack(I.Gunpowder)) == 16386, "Proch zmienia miksturę w rozpryskową i usuwa bit 13");
         var brewWorld = MakeWorld(22, WorldType.Superflat, 0);
         var stand = new BrewingStandTile { X = 8, Y = 80, Z = 8 };
-        stand.Items[0] = new ItemStack(I.Potion, 1, 16); stand.Items[3] = new ItemStack(I.NetherWartItem);
+        stand.Items[0] = new ItemStack(I.Potion); stand.Items[3] = new ItemStack(I.NetherWartItem);
+        stand.Tick(brewWorld); // rozpoczęcie warzenia ustawia licznik na 400
         for (int i = 0; i < 400; i++) stand.Tick(brewWorld);
         Check(stand.Items[0].Damage == 16 && stand.Items[3] == null, "Statyw warzy w 400 ticków bez paliwa");
         p.ClearEffects(); p.AddEffect(Effect.MiningFatigue, 100, 2);

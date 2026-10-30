@@ -59,6 +59,7 @@ public static partial class SelfTest
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }
         try { TestNet(); } catch (Exception e) { Check(false, "Net", e.ToString()); }
+        try { TestIntegratedDimensions(); } catch (Exception e) { Check(false, "Integracja wymiarów", e.ToString()); }
         Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ({sw.ElapsedMilliseconds} ms) ===");
         foreach (var f in Failures) Console.WriteLine(" - " + f);
         return _fail == 0 ? 0 : 2;

@@ -99,6 +99,7 @@ public sealed class DimensionSet : IDisposable
         var old = entity.World; var next = Get(target);
         if (old == next) return;
         next.EnsureDimensionArea(MathUtil.FloorToInt(x),MathUtil.FloorToInt(z),32);
+        if (entity is Player player) player.CloseContainer();
         old.RemoveEntity(entity); entity.World = next; entity.Id = 0; entity.Removed = false;
         entity.MotionX = entity.MotionY = entity.MotionZ = 0; entity.FallDistance = 0;
         entity.SetPositionAndPrev(x,y,z); next.AddEntityNow(entity);

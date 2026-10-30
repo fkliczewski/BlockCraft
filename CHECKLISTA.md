@@ -1,3 +1,5 @@
+Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
+
 # BlockCraft – checklista implementacji (klon Minecrafta 1.8 w .NET)
 
 ## Narzędzia / technologie

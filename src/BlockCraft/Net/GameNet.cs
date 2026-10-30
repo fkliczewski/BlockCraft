@@ -54,7 +54,7 @@ public sealed partial class Game : INetClientHost
     public NetServer EnsureServer()
     {
         if (Server != null || World == null || Client != null) return Server;
-        Server = new NetServer(World)
+        Server = new NetServer(Dimensions?.Get(DimensionId.Overworld) ?? World)
         {
             HostPlayer = () => Player,
             ViewDistance = Math.Max(4, Settings.RenderDistance),
@@ -114,7 +114,7 @@ public sealed partial class Game : INetClientHost
     public void NetChangeWorld(World.World next)
     {
         var p = Player;
-        World.RemoveEntity(p);
+        if (World.EntityById.TryGetValue(p.Id, out var old) && old == p) World.RemoveEntity(p);
         next.Name = World.Name; next.TotalTime = World.TotalTime; next.DayTime = World.DayTime;
         p.World = next;
         p.OpenContainer = null;

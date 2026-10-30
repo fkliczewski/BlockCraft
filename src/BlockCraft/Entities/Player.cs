@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing }
+public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest }
 
 public interface IPlayerHandler
 {
@@ -416,6 +416,11 @@ public partial class Player : LivingEntity
 
     public void Respawn()
     {
+        if (!World.Provider.CanRespawn && World.Dimensions != null)
+        {
+            var home = World.Dimensions.Get(DimensionId.Overworld);
+            World.Dimensions.Transfer(this, DimensionId.Overworld, home.SpawnX + .5, home.SpawnY, home.SpawnZ + .5);
+        }
         ClearEffects(); Absorption = 0;
         Dead = false; DeathTime = 0; Health = MaxHealth; FoodLevel = 20; Saturation = 5; Exhaustion = 0; Air = 300; FireTicks = 0;
         HungerEffect = 0; RegenEffect = 0; HurtTime = 0; FallDistance = 0;

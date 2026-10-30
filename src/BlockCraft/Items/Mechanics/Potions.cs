@@ -22,12 +22,11 @@ public static class Potions
         for (int i = 0; i < formula.Length;)
         {
             char op = formula[i++];
-            if (op == '&') continue;
-            if (op is not ('+' or '-')) { while (i < formula.Length && char.IsDigit(formula[i])) i++; continue; }
+            if (op is not ('+' or '-' or '&' or '!')) continue;
             int bit = 0;
             while (i < formula.Length && char.IsDigit(formula[i])) bit = bit * 10 + formula[i++] - '0';
             int mask = 1 << bit;
-            value = op switch { '+' => value | mask, '-' => value & ~mask, _ => value ^ mask };
+            value = op switch { '+' => value | mask, '-' => value & ~mask, '&' => (value & mask) != 0 ? value : 0, _ => value ^ mask };
         }
         value &= 32767;
         // Statyw nie zużywa składnika, jeżeli nie zmienia efektu ani rodzaju butelki.

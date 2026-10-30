@@ -71,6 +71,7 @@ public static partial class SelfTest
     private static void TestNetLoopback()
     {
         var hw = MakeWorld(777, WorldType.Default, 3);
+        using var dimensions = new DimensionSet(hw);
         var hc = hw.GetChunk(0, 0);
         // płaska kamienna platforma na wysokości 70 (teren testu niezależny od generatora)
         int gy = 70;
@@ -87,7 +88,7 @@ public static partial class SelfTest
         {
             for (int k = 0; k < n; k++)
             {
-                server.Tick(); hw.Tick(); server.AfterTick();
+                server.Tick(); dimensions.Tick(); server.AfterTick();
                 Thread.Sleep(3);
                 if (!started && client.PollLogin())
                 {
@@ -198,6 +199,37 @@ public static partial class SelfTest
         client.SendRespawn();
         Step(3);
         Check(!host.Player.Dead && host.Player.Health == 20 && !puppet.Dead, "Sieć: odrodzenie");
+
+        foreach (var (block, kind, type) in new[] {
+            (B.BrewingStand, GuiKind.Brewing, typeof(BrewingContainer)),
+            (B.Hopper, GuiKind.Hopper, typeof(RsContainer)),
+            (B.Dispenser, GuiKind.Dispenser, typeof(RsContainer)),
+            (B.TrappedChest, GuiKind.TrappedChest, typeof(RsContainer)) })
+        {
+            hw.SetBlock(6, gy + 1, 8, block);
+            Step(5);
+            puppet.OpenBlockGui(kind, 6, gy + 1, 8);
+            Step(4);
+            Check(puppet.OpenContainer?.GetType() == type && host.Player.OpenContainer?.GetType() == type,
+                "Sieć: GUI modułu " + kind);
+            if (kind == GuiKind.TrappedChest)
+                Check(((ChestTileEntity)hw.GetTileEntity(6, gy + 1, 8)).Viewers == 1, "Sieć: skrzynia-pułapka liczy zdalnego widza");
+            host.Player.CloseContainer(); Step(4);
+        }
+
+        puppet.SetGameMode(1);
+        var nether = dimensions.Get(DimensionId.Nether);
+        // Zajmij ID w nowym wymiarze, aby przetestować zmianę ID gracza w protokole.
+        for (int n = 0; n < 3; n++) nether.AddEntityNow(new Cow(nether));
+        dimensions.Transfer(puppet, DimensionId.Nether, 8, 110, 8);
+        Step(25);
+        Check(host.World.Dimension == DimensionId.Nether && host.Player.Id == puppet.Id,
+            "Sieć: zmiana wymiaru i ID gracza");
+        Check(host.World.Chunks.Count > 0 && server.Clients[0].Ctrl.W == nether, "Sieć: teren i sterowanie w Netherze");
+        dimensions.Transfer(puppet, DimensionId.Overworld, 8, gy + 1, 8);
+        Step(10);
+        Check(host.World.Dimension == DimensionId.Overworld && host.Player.Id == puppet.Id,
+            "Sieć: powrót do Overworldu");
 
         client.Disconnect("koniec testu");
         Step(4);

@@ -280,8 +280,9 @@ public sealed class RemoteClient : IPlayerHandler
     private void ChangeWorld()
     {
         _world = W;
+        Ctrl = new PlayerController(W, P);
         SentChunks.Clear(); _tracked.Clear(); _blocks.Clear(); _worldState.Clear();
-        var w = Out.Begin(S2C.ChangeDimension); w.Write((sbyte)NetHooks.DimOf(W)); Out.End();
+        var w = Out.Begin(S2C.ChangeDimension); w.Write((sbyte)NetHooks.DimOf(W)); w.Write(P.Id); Out.End();
         SendTeleport();
     }
 

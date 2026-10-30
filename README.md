@@ -2,11 +2,13 @@
 
 # ⛏️ BlockCraft
 
-**Klon Minecrafta 1.8 napisany od zera w C# / .NET 8 i OpenGL 3.3**
+**Klon Minecrafta 1.8 napisany od zera w C# / .NET 10 i OpenGL 3.3**
+
+Stan rozbudowy MC 1.8: [raport integracji, wyniki testów i pozostałe braki](docs/MC18_RAPORT_INTEGRACJI.md).
 
 Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI są generowane proceduralnie w kodzie.
 
-![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-latest-239120?logo=csharp&logoColor=white)
 ![OpenGL](https://img.shields.io/badge/OpenGL-3.3_core-5586A4?logo=opengl&logoColor=white)
 ![OpenTK](https://img.shields.io/badge/OpenTK-4.8-0B3D91)
@@ -247,7 +249,7 @@ Dostępne w światach z włączonymi kodami:
 
 ## 🚀 Uruchomienie
 
-**Wymagania:** Windows, [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), karta graficzna z OpenGL 3.3.
+**Wymagania:** Windows, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), karta graficzna z OpenGL 3.3.
 
 ```bash
 git clone https://github.com/fkliczewski/BlockCraft.git

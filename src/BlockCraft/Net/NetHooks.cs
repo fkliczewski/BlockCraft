@@ -12,13 +12,13 @@ namespace BlockCraft.Net;
 public static class NetHooks
 {
     /// <summary>Numer wymiaru świata (0 Overworld, -1 Nether, 1 End).</summary>
-    public static Func<World.World, int> DimOf = _ => 0;
+    public static Func<World.World, int> DimOf = w => (int)w.Dimension;
 
     /// <summary>Wszystkie światy hosta, w których mogą być gracze (domyślnie tylko świat gracza hosta).</summary>
-    public static Func<World.World, IEnumerable<World.World>> WorldsOf = w => new[] { w };
+    public static Func<World.World, IEnumerable<World.World>> WorldsOf = w => w.Dimensions?.Loaded.Values ?? new[] { w };
 
     /// <summary>Świat zdalny na kliencie dla wymiaru.</summary>
-    public static Func<int, World.World> CreateRemoteWorld = dim => new World.World(0, WorldType.Default, true);
+    public static Func<int, World.World> CreateRemoteWorld = dim => new World.World(0, WorldType.Default, true, (DimensionId)dim);
 
     public static readonly Dictionary<string, (Func<World.World, byte[]> Write, Action<World.World, byte[]> Read)> WorldState = new();
 
