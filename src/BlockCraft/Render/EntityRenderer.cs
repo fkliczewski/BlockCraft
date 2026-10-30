@@ -462,6 +462,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
 
     public void RenderLiving(LivingEntity e, float pt, Vector3 pos, bool forGui = false)
     {
+        if (e.HasEffect(Effect.Invisibility) && !forGui) return;
         float bodyYaw = MathUtil.LerpAngle(e.PrevBodyYaw, e.BodyYaw, pt);
         float headYawAbs = MathUtil.LerpAngle(e.PrevYaw, e.Yaw, pt);
         float headYaw = MathUtil.WrapDegrees(headYawAbs - bodyYaw);

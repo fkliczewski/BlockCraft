@@ -297,6 +297,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         var p = Player;
         switch (kind)
         {
+            case GuiKind.Brewing:
+                if (World.GetTileEntity(x, y, z) is not BrewingStandTile stand) return;
+                var brewing = new BrewingContainer(p.Inventory, stand); p.OpenContainer = brewing; SetScreen(new BrewingScreen(p, brewing)); return;
             case GuiKind.Crafting: p.OpenContainer = new WorkbenchContainer(p.Inventory, x, y, z); break;
             case GuiKind.Furnace: if (World.GetTileEntity(x, y, z) is FurnaceTileEntity f) p.OpenContainer = new FurnaceContainer(p.Inventory, f); else return; break;
             case GuiKind.Chest: if (World.GetTileEntity(x, y, z) is ChestTileEntity c) p.OpenContainer = new ChestContainer(p.Inventory, c, "Skrzynia"); else return; break;
@@ -519,7 +522,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _prevFovMod = _fovMod;
         float fovT = 1f;
         if (p.Flying) fovT *= 1.1f;
-        if (p.Sprinting) fovT *= 1.15f;
+        fovT *= (p.GetSpeed() / .1f + 1) / 2;
         if (p.ItemInUse?.Id == I.Bow) { float bc = p.BowCharge; fovT *= 1f - bc * bc * 0.15f; }
         _fovMod += (fovT - _fovMod) * 0.5f;
         // autozapis co 5 minut

@@ -98,10 +98,12 @@ public sealed partial class Game
             if (id == B.Water && ey < by + FluidBlock.HeightOf(w.GetMeta(bx, by, bz))) { headFluid = 1; fov *= 60f / 70f; }
             if (id == B.Lava) headFluid = 2;
         }
+        if (p.HasEffect(Effect.Nausea)) { float wave = MathF.Sin((p.Age + pt) * .08f); view *= Matrix4.CreateRotationZ(wave * .035f) * Matrix4.CreateScale(1 + wave * .06f, 1, 1); }
         _proj = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Math.Clamp(fov, 10, 150)), fw / (float)Math.Max(1, fh), 0.05f, Math.Max(256f, Renderer.RenderDistance * 32f));
         Renderer.Update(cam);
         var look = -new Vector3(view.M13, view.M23, view.M33);
         Renderer.ComputeAtmosphere(cam, look, pt, headFluid);
+        ApplyEffectAtmosphere(p, pt);
         GL.ClearColor(Renderer.FogColor.X, Renderer.FogColor.Y, Renderer.FogColor.Z, 1);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         World.World.HitResult? sel = Ctrl.Hit.Hit && !p.Spectator && !HideGui ? Ctrl.Hit : null;
@@ -294,6 +296,7 @@ public sealed partial class Game
                 if (i * 2 + 1 < hp) sb.DrawPx(Gui.Icons, x, y, GuiTextures.HeartFull, 0, 9, 9);
                 else if (i * 2 + 1 == hp) sb.DrawPx(Gui.Icons, x, y, GuiTextures.HeartHalf, 0, 9, 9);
             }
+            DrawEffectHearts(p, hx, heartY);
             // zbroja
             int armor = p.ArmorValue;
             if (armor > 0)

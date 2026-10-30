@@ -54,6 +54,7 @@ public static partial class SelfTest
         try { TestMobs(); } catch (Exception e) { Check(false, "Mobs", e.ToString()); }
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
+        try { TestMechanicsEffects(); } catch (Exception e) { Check(false, "Efekty", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }

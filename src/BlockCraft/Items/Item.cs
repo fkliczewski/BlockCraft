@@ -106,8 +106,8 @@ public class Item
     public bool IsBlock => BlockId >= 0;
     public bool IsFood => Hunger > 0;
     public bool IsTool => Tool != ToolType.None;
-    public UseAction Action => IsFood ? UseAction.Eat : Id == I.MilkBucket ? UseAction.Drink : Id == I.Bow ? UseAction.Bow : UseAction.None;
-    public int UseDuration => IsFood || Id == I.MilkBucket ? 32 : Id == I.Bow ? 72000 : 0;
+    public UseAction Action => IsFood ? UseAction.Eat : Id is I.MilkBucket or I.Potion ? UseAction.Drink : Id == I.Bow ? UseAction.Bow : UseAction.None;
+    public int UseDuration => IsFood || Id is I.MilkBucket or I.Potion ? 32 : Id == I.Bow ? 72000 : 0;
 
     public int GetSprite(ItemStack s)
     {

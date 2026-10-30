@@ -40,6 +40,7 @@ public static class GuiDraw
     {
         var it = s.Item; if (it == null) return "?";
         string t = s.Name;
+        if (s.Id == I.Potion) foreach (var effect in Potions.Effects(s)) t += "\n" + EffectLogic.Name(effect.Id) + " " + EnchantHelper.Roman(effect.Amplifier + 1) + (EffectLogic.Instant(effect.Id) ? "" : " (" + EffectLogic.Time(effect) + ")");
         if (it.ArmorSlot >= 0) t += "\n§9+" + it.ArmorPoints + " Pancerz";
         if (it.IsTool && it.AttackDamage > 1) t += "\n§9+" + it.AttackDamage + " Obrażenia od ataku";
         if (it.IsFood) t += "\n§7Głód: +" + it.Hunger;
@@ -159,6 +160,7 @@ public class ContainerScreen : Screen
     {
         DrawDim();
         DrawBackground(mx, my);
+        if (C is PlayerContainer) EffectPanel.Draw(G, P, Left, Top);
         int hover = SlotAt(mx, my);
         foreach (var s in C.Slots)
             if (s.Stack != null) G.DrawItem(s.Stack, Left + s.X, Top + s.Y);
