@@ -106,11 +106,11 @@ public sealed partial class PlayerController
         var tool = P.Inventory.Selected;
         if (!P.Creative) b.OnDestroyedByPlayer(W, x, y, z, meta, P);
         // liście: ścinanie sąsiadów przyspiesza zanik
-        if (b.Id == B.OakLog || b.Id == B.BirchLog)
+        if (b is LogBlock)
             for (int dx = -4; dx <= 4; dx++) for (int dy = -4; dy <= 4; dy++) for (int dz = -4; dz <= 4; dz++)
                     {
                         int id = W.GetBlock(x + dx, y + dy, z + dz);
-                        if ((id == B.OakLeaves || id == B.BirchLeaves) && W.Rand.Next(3) == 0) W.ScheduleTick(x + dx, y + dy, z + dz, (byte)id, 20 + W.Rand.Next(200));
+                        if (Block.ById[id] is LeavesBlock && W.Rand.Next(3) == 0) W.ScheduleTick(x + dx, y + dy, z + dz, (byte)id, 20 + W.Rand.Next(200));
                     }
         W.BreakBlock(x, y, z, drop && !P.Creative, P, tool);
     }
@@ -142,6 +142,7 @@ public sealed partial class PlayerController
     private bool UseInAir(ItemStack held)
     {
         var p = P; var it = held.Item;
+        if (it.UseInAir != null && it.UseInAir(p, held)) return true;
         if (it.IsFood) { if (p.CanEat(it.Id == I.GoldenApple)) p.StartUsing(held); return true; }
         if (it.Id == I.MilkBucket) { p.StartUsing(held); return true; }
         if (it.Id == I.Bow) { if (p.Creative || p.Inventory.CountOf(I.Arrow) > 0) p.StartUsing(held); return true; }
@@ -209,6 +210,7 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {
