@@ -52,7 +52,8 @@ public partial class Player : LivingEntity
     public bool Spectator => GameMode == 3;
     public override int ArmorValue => Inventory.ArmorValue;
     protected override bool IsFlyingNow => Flying;
-    public override string HurtSound => "player_hurt";
+    public override string HurtSound => "game.player.hurt";
+    public override string DeathSound => "game.player.die";
 
     public void SetGameMode(int gm)
     {

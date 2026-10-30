@@ -21,6 +21,8 @@ public sealed class Settings
     public int Difficulty { get; set; } = 2;
     public string PlayerName { get; set; } = "Steve";
     public bool ShowFps { get; set; }
+    /// <summary>Głośności kategorii dźwięku (master, music, record, weather, block, hostile, neutral, player, ambient), 0..1.</summary>
+    public Dictionary<string, float> SoundVolumes { get; set; } = new();
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 
