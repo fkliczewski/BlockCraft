@@ -47,6 +47,7 @@ namespace BlockCraft.Render
                     s[y * 16 + x] = Mul(c, 0.9f + v * 0.2f);
                 }
             Add("slime", s);
+            TexRedstoneComponents();
         }
     }
 }

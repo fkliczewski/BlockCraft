@@ -16,6 +16,37 @@ namespace BlockCraft.World
             new PistonExtensionBlock(B.PistonExtension, "piston_extension", "Blok w ruchu");
             new ButtonBlock(B.WoodButton, "wooden_button", "Drewniany przycisk", true).Tab(TabRedstone);
             new SlimeBlockBlock(B.SlimeBlock, "slime", "Blok szlamu").Tab(TabRedstone);
+
+            new DoorBlock(B.IronDoor, "iron_door", "Żelazne drzwi", "door_iron", Items.I.IronDoorItem, true).NotCreative();
+            new TrapdoorBlock(B.Trapdoor, "trapdoor", "Klapa", false).Tab(TabRedstone);
+            new TrapdoorBlock(B.IronTrapdoor, "iron_trapdoor", "Żelazna klapa", true).Tab(TabRedstone);
+            new PressurePlateBlock(B.StonePressurePlate, "stone_pressure_plate", "Kamienna płyta naciskowa", "stone", PressurePlateBlock.Sense.Mobs).Tab(TabRedstone);
+            new PressurePlateBlock(B.WoodPressurePlate, "wooden_pressure_plate", "Drewniana płyta naciskowa", "planks_oak", PressurePlateBlock.Sense.Everything).Tab(TabRedstone);
+            new PressurePlateBlock(B.LightWeightedPlate, "light_weighted_pressure_plate", "Płyta naciskowa (lekka)", "gold_block", PressurePlateBlock.Sense.Light).Tab(TabRedstone);
+            new PressurePlateBlock(B.HeavyWeightedPlate, "heavy_weighted_pressure_plate", "Płyta naciskowa (ciężka)", "iron_block", PressurePlateBlock.Sense.Heavy).Tab(TabRedstone);
+            new TripwireHookBlock(B.TripwireHook, "tripwire_hook", "Hak na linkę").Tab(TabRedstone);
+            new TripwireBlock(B.Tripwire, "tripwire", "Linka");
+            new DaylightSensorBlock(B.DaylightSensor, "daylight_detector", "Czujnik światła dziennego", false).Tab(TabRedstone);
+            new DaylightSensorBlock(B.DaylightSensorInverted, "daylight_detector_inverted", "Czujnik światła dziennego", true).NotCreative();
+            new ComparatorBlock(B.Comparator, "unpowered_comparator", "Komparator", false).NotCreative();
+            new ComparatorBlock(B.ComparatorOn, "powered_comparator", "Komparator", true).NotCreative();
+            new RedstoneOreBlock(B.RedstoneOre, "redstone_ore", "Ruda czerwonego kamienia", false);
+            new RedstoneOreBlock(B.RedstoneOreLit, "lit_redstone_ore", "Ruda czerwonego kamienia", true);
+        }
+    }
+}
+
+namespace BlockCraft.Items
+{
+    public static partial class ItemRegistry
+    {
+        static partial void ItemsRedstone()
+        {
+            const int Red = 2;
+            var door = Simple(I.IronDoorItem, "iron_door", "Żelazne drzwi", Red, 64); door.BlockId = B.IronDoor;
+            var cmp = Simple(I.ComparatorItem, "comparator", "Komparator", Red); cmp.BlockId = B.Comparator;
+            // nić stawia linkę (MC ItemReed(Blocks.tripwire))
+            Item.ById[I.String].BlockId = B.Tripwire;
         }
     }
 }
@@ -26,7 +57,9 @@ namespace BlockCraft.Entities
     {
         static partial void EntitiesRedstone()
         {
+            Tile(10, () => new ComparatorTileEntity());
             Tile(11, () => new PistonTileEntity());
+            Tile(12, () => new DaylightSensorTileEntity());
             Render.EntityRenderer.Custom[typeof(PistonMovingVisual)] = Render.EntityRenderer.RenderMovingBlock;
         }
     }
