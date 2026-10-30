@@ -69,8 +69,9 @@ NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy int
 1. MO: pełne modele i skórki dodatkowych mobów (część klas nie ma renderera),
    naturalny spawn według biomu, wieśniak i handel (RegisterVillagers18 nadal
    niezaimplementowane), ekwipunek konia, smycze i kompletna zgodność AI.
-2. NE: smok, kryształy, Wither, wyjście z Endu i napisy; dokładna generacja
-   Netheru/Endu zamiast uproszczonych generatorów.
+2. NE: ukończyć podłączenie przywoływania Withera do prawdziwych czaszek ME;
+   sprawdzić zgodność generatorów i układu fortec z oryginałem. Smok, kryształy,
+   Wither i napisy są już scalone - patrz aktualizacja Hiro poniżej.
 3. RS: tory i wagoniki; dalsza weryfikacja kolejności aktualizacji i złożonych
    konstrukcji. Zestaw testów nie dowodzi zgodności każdego układu z MC 1.8.
 4. ME: zaklinanie i działanie zaklęć, kowadło, mapy, wędka, tabliczki, ramki,
@@ -102,3 +103,24 @@ W bieżącym przejęciu rzeczywiste błędy repo to brak Horse, konflikty scalan
 parser warzenia i błędy integracji GUI/wymiarów opisane wyżej. Zapisano je
 oddzielnie od problemów orkiestracji. Nie naprawiano aplikacji Modus Operandi
 ani jej ustawień zaufania - nie są częścią tego repozytorium.
+
+## Aktualizacja po raporcie Hiro, 12:59
+
+Przeczytano `.modus/raporty/20261030-125922-Hiro.md`. Scalono nowe commity
+1c82e2e i 5bb8463 z `mc18/netherend` do `feature/mc18` (merge 39e4763).
+Obejmują rozszerzoną generację Endu i filary, kryształy, smoka z częściami
+ciała, leczenie i śmierć, portal wyjściowy z jajem, Withera, pasek bossa
+i napisy końcowe. Nie deklarujemy na podstawie raportu pełnej zgodności 1:1.
+
+Sprawdzono na scalonym kodzie: Release OK, selftest 318/0 (w tym testy sieci),
+`--autotest --ne` zakończony `NE-TEST KONIEC, błędów: 0` i `AUTOTEST DONE`.
+Obejrzano ne_13_dragon i ne_20_wither_armor. W tym przebiegu nie testowano
+walki z bossami przez sieć. Szczególnie DragonPart wymaga integracji z protokołem
+(brak rejestracji dragon_part, lokalne ID części klienta nie są ID hosta).
+Przywołanie Withera w autoteście używa zamiennika czaszek - nie dowodzi
+działania przywoływania za pomocą przedmiotu czaszki w zwykłej grze.
+
+Naprawy integracyjne po tym scaleniu: uniknięto pokazania napisów końcowych
+przy odrodzeniu po śmierci w Endzie; przemianowano pomocniczą metodę Withera,
+która zasłaniała właściwość LivingEntity.IsUndead. Pełna lista braków z innych
+modułów pozostaje aktualna. Napisy używają własnego tekstu BlockCraft.

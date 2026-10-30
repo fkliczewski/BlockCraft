@@ -145,15 +145,15 @@ public sealed class Wither : Mob
     }
 
     private bool IsValidTarget(LivingEntity e) =>
-        !e.Dead && e != this && e is not (DragonPart or EnderCrystal) && !IsUndead(e) && e is not Player { Creative: true } and not Player { Spectator: true };
+        !e.Dead && e != this && e is not (DragonPart or EnderCrystal) && !IsUndeadEntity(e) && e is not Player { Creative: true } and not Player { Spectator: true };
 
     /// <summary>EntityLivingBase.getCreatureAttribute() == UNDEAD: Wither nie atakuje nieumarłych.</summary>
-    public static bool IsUndead(Entity e) => e is Zombie or Skeleton or ZombiePigman or WitherSkeleton or Wither;
+    public static bool IsUndeadEntity(Entity e) => e is Zombie or Skeleton or ZombiePigman or WitherSkeleton or Wither;
 
     private void AcquireWitherTarget()
     {
         if (Target != null && (!IsValidTarget(Target) || Target.DistanceSq(this) > FollowRange * FollowRange)) Target = null;
-        if (LastAttacker is LivingEntity la && IsValidTarget(la) && !IsUndead(la)) Target = la;
+        if (LastAttacker is LivingEntity la && IsValidTarget(la) && !IsUndeadEntity(la)) Target = la;
         if (Target == null && World.Rand.Next(10) == 0)
         {
             LivingEntity best = null; double bd = FollowRange * FollowRange;
@@ -215,7 +215,7 @@ public sealed class Wither : Mob
         if (src.Type == "drown" || src.Attacker is Wither) return false;
         if (InvulTime > 0 && src.Type != "outOfWorld") return false;
         if (Armored && src.Source is ArrowEntity) return false;
-        if (src.Attacker is LivingEntity a && a is not Player && IsUndead(a)) return false;
+        if (src.Attacker is LivingEntity a && a is not Player && IsUndeadEntity(a)) return false;
         if (_blockBreakCounter <= 0) _blockBreakCounter = 20;
         for (int i = 0; i < 2; i++) _idleHeadUpdates[i] += 3;
         return base.Attack(src, amount);

@@ -22,7 +22,7 @@ public partial class Game
             foreach (var c in next.Chunks.Values) c.MarkAllDirty();
             Renderer.SetWorld(next);
             // MC 1.8: wyjście przez portal Endu pokazuje napisy końcowe
-            SetScreen(old.Dimension == DimensionId.End && next.Dimension == DimensionId.Overworld ? new CreditsScreen() : null);
+            SetScreen(old.Dimension == DimensionId.End && next.Dimension == DimensionId.Overworld && !Player.Dead ? new CreditsScreen() : null);
             next.PlaySound("portal.travel",Player.X,Player.Y,Player.Z,.8f);
         };
     }
