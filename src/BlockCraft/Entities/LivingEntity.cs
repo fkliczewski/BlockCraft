@@ -133,7 +133,7 @@ public abstract partial class LivingEntity : Entity
         // tonięcie
         if (IsHeadInWater() && !CanBreatheUnderwater && !HasEffect(Effect.WaterBreathing) && !(this is Player { Invulnerable: true }))
         {
-            Air--;
+            Air = Items.EnchantEffects.DecreaseAir(this, Air);
             if (Air <= -20)
             {
                 Air = 0;
@@ -223,9 +223,10 @@ public abstract partial class LivingEntity : Entity
         if (InWater && !IsFlyingNow)
         {
             double py = Y;
-            MoveFlying(strafe, forward, 0.02f);
+            var (fr, acc) = Items.EnchantEffects.WaterMovement(this, 0.8f, 0.02f, GetSpeed());
+            MoveFlying(strafe, forward, acc);
             MoveWithCollision(MotionX, MotionY, MotionZ);
-            MotionX *= 0.8; MotionY *= 0.8; MotionZ *= 0.8;
+            MotionX *= fr; MotionY *= 0.8; MotionZ *= fr;
             MotionY -= 0.02;
             if (CollidedH && IsOffsetFree(MotionX, MotionY + 0.6 - Y + py, MotionZ)) MotionY = 0.3;
         }
@@ -328,6 +329,8 @@ public abstract partial class LivingEntity : Entity
         }
         if (src.Attacker is LivingEntity a) { LastAttacker = a; LastAttackerTime = 100; }
         if (src.Attacker is Player) RecentlyHitByPlayer = 100;
+        // Ciernie: trafienie wręcz (gracz, potwór) albo strzałą (applyThornEnchantments)
+        if (src.Type is "mob" or "player" or "arrow" && src.Attacker != null && src.Attacker != this) Items.EnchantEffects.ApplyThorns(this, src.Attacker);
         if (Health <= 0) OnDeath(src);
         return true;
     }
@@ -349,6 +352,7 @@ public abstract partial class LivingEntity : Entity
             OnArmorDamaged(amount);
         }
         if (src.Type is not ("outOfWorld" or "kill") && HasEffect(Effect.Resistance)) amount *= Math.Max(0, 1 - .2f * (EffectLevel(Effect.Resistance) + 1));
+        amount = Items.EnchantEffects.ApplyProtection(this, src, amount);
         float absorbed = Math.Min(Absorption, amount); Absorption -= absorbed;
         Health = Math.Max(0, Health - (amount - absorbed));
     }

@@ -50,8 +50,8 @@ public sealed partial class PlayerController
     {
         if (b.Hardness < 0) return 0;
         if (b.Hardness == 0) return 1;
-        float f = b.GetDigSpeed(tool) * EffectLogic.Mining(p);
-        if (p.IsHeadInWater()) f /= 5f;
+        float f = EnchantEffects.Efficiency(p, tool, b.GetDigSpeed(tool)) * EffectLogic.Mining(p);
+        if (p.IsHeadInWater() && !EnchantEffects.AquaAffinity(p)) f /= 5f;
         if (!p.OnGround && !p.Flying) f /= 5f;
         return b.CanHarvest(tool) ? f / b.Hardness / 30f : f / b.Hardness / 100f;
     }

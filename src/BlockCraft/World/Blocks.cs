@@ -160,6 +160,13 @@ public class GravityBlock : Block
         }
     }
     public override int DropId(int meta, Rng r) => Id == B.Gravel && r.Next(10) == 0 ? Items.I.Flint : Id;
+    /// <summary>BlockGravel.getItemDropped: Szczęście zwiększa szansę na krzemień (10 - 3*poziom, od poziomu 3 zawsze).</summary>
+    public override void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
+    {
+        if (Id != B.Gravel) { base.GetDrops(w, x, y, z, meta, r, tool, drops); return; }
+        int f = Math.Min(3, EnchantHelper.GetLevel(tool, Ench.Fortune));
+        drops.Add(new ItemStack(r.Next(10 - f * 3) == 0 ? Items.I.Flint : B.Gravel));
+    }
 }
 
 public class OreBlock : Block
@@ -168,8 +175,20 @@ public class OreBlock : Block
     public OreBlock(byte id, string k, string n, int drop, int min, int max) : base(id, k, n) { _drop = drop; _min = min; _max = max; }
     public override int DropId(int meta, Rng r) => _drop > 0 ? _drop : Id;
     public override int DropCount(Rng r) => _drop > 0 ? _min + r.Next(_max - _min + 1) : 1;
+    /// <summary>quantityDroppedWithBonus 1.8: czerwony kamień +rand(fortune+1), pozostałe rudy mnożnik max(0, rand(fortune+2)-1)+1.</summary>
+    public override void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
+    {
+        if (_drop <= 0) { base.GetDrops(w, x, y, z, meta, r, tool, drops); return; }
+        int fortune = EnchantHelper.GetLevel(tool, Ench.Fortune), n = DropCount(r);
+        if (_drop == Items.I.Redstone) n += r.Next(fortune + 1);
+        else if (fortune > 0) n *= Math.Max(0, r.Next(fortune + 2) - 1) + 1;
+        drops.Add(new ItemStack(_drop, n, DropMeta(meta)));
+    }
+    /// <summary>Doświadczenie tylko gdy ruda nie została wydobyta Jedwabnym dotykiem (getExpDrop).</summary>
+    protected static bool Silked(Player p) => EnchantHelper.GetLevel(p.Inventory.Selected, Ench.SilkTouch) > 0;
     public override void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p)
     {
+        if (Silked(p)) return;
         int xp = Id switch { B.CoalOre => w.Rand.Next(0, 3), B.DiamondOre => w.Rand.Next(3, 8), B.LapisOre => w.Rand.Next(2, 6), B.RedstoneOre => w.Rand.Next(1, 6), _ => 0 };
         if (xp > 0 && !p.Creative) w.SpawnXp(x + 0.5, y + 0.5, z + 0.5, xp);
     }
@@ -289,7 +308,7 @@ public class TallGrassBlock : PlantBlock
     public override void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
     {
         if (tool?.Item?.Tool == ToolType.Shears) { drops.Add(new ItemStack(Id, 1)); return; }
-        if (r.Next(8) == 0) drops.Add(new ItemStack(Items.I.Seeds, 1));
+        if (r.Next(8) == 0) drops.Add(new ItemStack(Items.I.Seeds, 1 + r.Next(EnchantHelper.GetLevel(tool, Ench.Fortune) * 2 + 1)));
     }
     public override void GetSelectionBoxes(IBlockAccess w, int x, int y, int z, int meta, List<AABB> list)
         => list.Add(new AABB(0.1, 0, 0.1, 0.9, 0.8, 0.9));

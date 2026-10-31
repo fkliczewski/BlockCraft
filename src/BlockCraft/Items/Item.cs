@@ -162,6 +162,8 @@ public sealed class ItemStack
     {
         var it = Item;
         if (it == null || it.MaxDamage <= 0) return false;
+        amount = EnchantEffects.Unbreaking(this, amount, Random.Shared);
+        if (amount <= 0) return false;
         Damage += amount;
         if (Damage >= it.MaxDamage) { Count--; Damage = 0; return true; }
         return false;

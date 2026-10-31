@@ -628,7 +628,7 @@ public sealed class RedstoneOreBlock : OreBlock
     }
     public override void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p)
     {
-        if (!p.Creative) w.SpawnXp(x + 0.5, y + 0.5, z + 0.5, 1 + w.Rand.Next(5));
+        if (!p.Creative && !Silked(p)) w.SpawnXp(x + 0.5, y + 0.5, z + 0.5, 1 + w.Rand.Next(5));
     }
     private static void Particles(World w, int x, int y, int z)
     {

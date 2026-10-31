@@ -288,13 +288,21 @@ public partial class Player : LivingEntity
     {
         float f = BowCharge;
         if (f < 0.1f) return;
-        bool hasArrow = Creative || Inventory.CountOf(I.Arrow) > 0;
+        var bow = Inventory.Selected;
+        bool infinite = Creative || EnchantHelper.GetLevel(bow, Ench.Infinity) > 0;
+        bool hasArrow = infinite || Inventory.CountOf(I.Arrow) > 0;
         if (!hasArrow) return;
-        var arrow = new ArrowEntity(World, this, f * 3f) { Critical = f >= 1f, PickupAllowed = !Creative };
+        var arrow = new ArrowEntity(World, this, f * 3f) { Critical = f >= 1f, PickupAllowed = !infinite };
+        // ItemBow.onPlayerStoppedUsing: Moc, Uderzenie, Płomień
+        int power = EnchantHelper.GetLevel(bow, Ench.Power), punch = EnchantHelper.GetLevel(bow, Ench.Punch);
+        if (power > 0) arrow.Damage += power * 0.5 + 0.5;
+        if (punch > 0) arrow.Knockback = punch;
+        if (EnchantHelper.GetLevel(bow, Ench.Flame) > 0) arrow.SetFire(100);
         if (NetShootHook != null) NetShootHook(f);
         else World.SpawnEntity(arrow);
         World.PlaySound("bow", X, Y, Z, 1f, 1f / (World.Rand.NextFloat() * 0.4f + 1.2f) + f * 0.5f);
-        if (!Creative) { Inventory.Consume(I.Arrow); DamageHeld(1); }
+        DamageHeld(1);
+        if (!infinite) Inventory.Consume(I.Arrow);
     }
     public Action<float> NetShootHook;
 
@@ -448,11 +456,25 @@ public partial class Player : LivingEntity
         if (target is not LivingEntity le || le.Dead) return;
         var held = Inventory.Selected;
         float dmg = EffectLogic.Melee(this, held?.Item?.AttackDamage ?? 1f);
-        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && MotionY < 0 && !Sprinting && !HasEffect(Effect.Blindness);
-        if (crit) dmg *= 1.5f;
-        int kb = Sprinting ? 1 : 0;
-        if (le.Attack(DamageSource.PlayerAttack(this), dmg))
+        // attackTargetEntityWithCurrentItem 1.8: premia zaklęcia po mnożniku krytyka, Odrzut i Zaklęty ogień z przedmiotu
+        float bonus = EnchantEffects.DamageBonus(held, EnchantEffects.CreatureOf(le));
+        int kb = EnchantHelper.GetLevel(held, Ench.Knockback) + (Sprinting ? 1 : 0);
+        if (dmg <= 0 && bonus <= 0) return;
+        // 1.8: krytyk bez warunku sprintu i prędkości pionowej (doszły w 1.9)
+        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && !HasEffect(Effect.Blindness) && RidingEntity == null;
+        if (crit && dmg > 0) dmg *= 1.5f;
+        dmg += bonus;
+        int fireAspect = EnchantHelper.GetLevel(held, Ench.FireAspect);
+        bool tempFire = false;
+        if (fireAspect > 0 && le.FireTicks <= 0) { tempFire = true; le.SetFire(1); }
+        bool hit = le.Attack(DamageSource.PlayerAttack(this), dmg);
+        if (!hit && tempFire) le.FireTicks = 0;
+        if (hit)
         {
+            if (bonus > 0) World.SpawnParticles(ParticleKind.Crit, le.X, le.Y + le.Height / 2, le.Z, 10);
+            EnchantEffects.ApplyArthropod(this, le);
+            if (fireAspect > 0) le.SetFire(fireAspect * 4);
+            else if (tempFire) le.FireTicks = 0;
             if (kb > 0)
             {
                 float yr = Yaw * MathUtil.Deg2Rad;

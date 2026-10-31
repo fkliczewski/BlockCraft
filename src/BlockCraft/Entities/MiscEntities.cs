@@ -173,6 +173,7 @@ public sealed class ArrowEntity : Entity
     public bool InGround; public int InGroundTicks; public int Shake;
     public double Damage = 2.0;
     public bool Critical, PickupAllowed = true;
+    public int Knockback; // Uderzenie (knockbackStrength)
     private int _gx, _gy, _gz; private byte _gid;
     public ArrowEntity(World.World w) : base(w) { Width = 0.5f; Height = 0.5f; StepHeight = 0; }
     public ArrowEntity(World.World w, LivingEntity shooter, float velocity) : this(w)
@@ -228,10 +229,12 @@ public sealed class ArrowEntity : Entity
             float speed = (float)len;
             int dmg = (int)Math.Ceiling(speed * Damage);
             if (Critical) dmg += World.Rand.Next(dmg / 2 + 2);
+            if (FireTicks > 0 && target is not Enderman) target.SetFire(5);
             if (target.Attack(DamageSource.Arrow(this, Shooter ?? this), dmg))
             {
+                // EntityArrow 1.8: dodatkowy odrzut tylko z Uderzenia, płonąca strzała podpala (poza endermanem)
                 double h = Math.Sqrt(MotionX * MotionX + MotionZ * MotionZ);
-                if (h > 0 && target is LivingEntity) { target.MotionX += MotionX * 0.6 / h * 0.6; target.MotionY += 0.1; target.MotionZ += MotionZ * 0.6 / h * 0.6; }
+                if (Knockback > 0 && h > 0 && target is LivingEntity) { target.MotionX += MotionX * Knockback * 0.6 / h; target.MotionY += 0.1; target.MotionZ += MotionZ * Knockback * 0.6 / h; }
                 World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
                 Kill();
             }
@@ -401,7 +404,8 @@ public static class Explosion
             float dmg = (float)((impact * impact + impact) / 2 * 8 * r2 + 1);
             if (e.CanBeAttacked) e.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
             else if (e is ItemEntity || e is XpOrbEntity) { e.Kill(); continue; }
-            e.MotionX += ex * impact; e.MotionY += ey * impact; e.MotionZ += ez * impact;
+            double push = Items.EnchantEffects.BlastKnockback(e, impact);
+            e.MotionX += ex * push; e.MotionY += ey * push; e.MotionZ += ez * push;
         }
         // niszczenie bloków
         var drops = new List<ItemStack>();

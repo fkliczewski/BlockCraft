@@ -27,6 +27,7 @@ public sealed class MonsterEggBlock : Block
     public static readonly int[] Hosts = { B.Stone,B.Cobblestone,B.StoneBricks,B.StoneBricks,B.StoneBricks,B.StoneBricks };
     public override int GetTexture(int face,int meta) => Block.Get(Hosts[Math.Clamp(meta,0,5)]).GetTexture(face,Math.Max(0,meta-2));
     public override int DropMeta(int meta)=>meta;
+    public override ItemStack SilkTouchStack(int meta) => null; // Jedwabny dotyk daje blok-gospodarza (GetDrops)
     public override void GetDrops(World w,int x,int y,int z,int meta,Rng r,ItemStack tool,List<ItemStack> drops)
     {
         if(EnchantHelper.GetLevel(tool,Ench.SilkTouch)>0) { drops.Add(new ItemStack(Hosts[Math.Clamp(meta,0,5)],1,Math.Max(0,meta-2))); return; }

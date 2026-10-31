@@ -237,13 +237,12 @@ public sealed class SeaLanternBlock : Block
     }
 }
 
-public sealed class EmeraldOreBlock : Block
+public sealed class EmeraldOreBlock : OreBlock
 {
-    public EmeraldOreBlock(byte id, string k, string n) : base(id, k, n) { }
-    public override int DropId(int meta, Rng r) => I.Emerald;
+    public EmeraldOreBlock(byte id, string k, string n) : base(id, k, n, I.Emerald, 1, 1) { }
     public override void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p)
     {
-        if (!p.Creative) w.SpawnXp(x + 0.5, y + 0.5, z + 0.5, w.Rand.Next(3, 8));
+        if (!p.Creative && !Silked(p)) w.SpawnXp(x + 0.5, y + 0.5, z + 0.5, w.Rand.Next(3, 8));
     }
 }
 

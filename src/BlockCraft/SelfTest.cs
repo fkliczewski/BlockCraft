@@ -59,6 +59,7 @@ public static partial class SelfTest
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
         try { TestMechanicsEffects(); } catch (Exception e) { Check(false, "Efekty", e.ToString()); }
         try { TestEnchanting(); } catch (Exception e) { Check(false, "Zaklinanie", e.ToString()); }
+        try { TestEnchantEffects(); } catch (Exception e) { Check(false, "Działanie zaklęć", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }

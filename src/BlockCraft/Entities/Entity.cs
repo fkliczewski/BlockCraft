@@ -12,6 +12,8 @@ public sealed class DamageSource
     public bool BypassArmor;
     public bool IsExplosion;
     public bool IsFire;
+    /// <summary>DamageSource.isProjectile z 1.8 (strzały, kule ognia, rzucane przedmioty).</summary>
+    public bool IsProjectile => Type is "arrow" or "fireball" or "thrown";
     public DamageSource(string type, Entity src = null, Entity attacker = null) { Type = type; Source = src; Attacker = attacker ?? src; }
 
     public static readonly DamageSource Fall = new("fall") { BypassArmor = true };
@@ -152,7 +154,7 @@ public abstract class Entity
                 FireTicks--;
             }
         }
-        if (InLava) { if (this is LivingEntity le2) { le2.Attack(DamageSource.Lava, 4f); } FireTicks = Math.Max(FireTicks, 300); FallDistance *= 0.5f; }
+        if (InLava) { if (this is LivingEntity le2) { le2.Attack(DamageSource.Lava, 4f); } SetFire(15); FallDistance *= 0.5f; }
         if (Y < -64) OnVoid();
     }
 
@@ -372,7 +374,14 @@ public abstract class Entity
 
     public virtual void OnCollideWithPlayer(Player p) { }
     /// <summary>Uderzenie pioruna (MC: onStruckByLightning) - domyślnie 5 obrażeń od ognia i podpalenie; creeper, świnia, wieśniak nadpisują.</summary>
-    public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); FireTicks = Math.Max(FireTicks, 160); }
+    public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); SetFire(8); }
+    /// <summary>Entity.setFire z 1.8: Ochrona przed ogniem skraca podpalenie istot.</summary>
+    public void SetFire(int seconds)
+    {
+        int t = seconds * 20;
+        if (this is LivingEntity le) t = Items.EnchantEffects.FireTime(le, t);
+        if (FireTicks < t) FireTicks = t;
+    }
     public virtual bool Interact(Player p) => false;
     /// <summary>Gracz uderza encję, która nie jest żywa (np. odbicie kuli ognia). True = obsłużone.</summary>
     public virtual bool AttackedByPlayer(Player p) => false;

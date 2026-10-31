@@ -98,7 +98,7 @@ public sealed class SmallFireballEntity : FireballEntity
         if (World.IsRemote) return;
         if (hit != null)
         {
-            if (hit is LivingEntity le && le.Attack(FireballDamage(this, Shooter), 5f) && !le.ImmuneToFire) le.FireTicks = Math.Max(le.FireTicks, 100);
+            if (hit is LivingEntity le && le.Attack(FireballDamage(this, Shooter), 5f) && !le.ImmuneToFire) le.SetFire(5);
         }
         else if (block.Hit && World.Rules.MobGriefing)
         {

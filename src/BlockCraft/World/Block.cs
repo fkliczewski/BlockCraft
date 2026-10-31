@@ -160,6 +160,13 @@ public class Block
     public virtual int DropCount(Rng r) => 1;
     public virtual int DropMeta(int meta) => 0;
     public virtual ItemStack PickStack(int meta) => Item.ById[Id] != null ? new ItemStack(Id, 1, DropMeta(meta)) : null;
+    /// <summary>Block.canSilkHarvest + createStackedBlock z 1.8: pełny blok bez TileEntity daje sam siebie (null = zwykły drop).</summary>
+    public virtual ItemStack SilkTouchStack(int meta)
+    {
+        if (!FullCube || HasTileEntity || IsLiquid || Hardness < 0) return null;
+        if (DropOverride > 0 && DropOverride < ById.Length && ById[DropOverride] is SlabBlock) return null; // podwójna płyta
+        return PickStack(meta);
+    }
 
     // --- redstone ---
     /// <summary>Słaba moc emitowana w kierunku 'side' (od tego bloku do odpytującego).</summary>

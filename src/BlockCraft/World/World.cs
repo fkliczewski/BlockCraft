@@ -227,7 +227,9 @@ public sealed partial class World : IBlockAccess
         if (drop && !IsRemote && !b.IsLiquid)
         {
             var list = new List<ItemStack>();
-            b.GetDrops(this, x, y, z, meta, Rand, tool, list);
+            var silk = Items.EnchantHelper.GetLevel(tool, Items.Ench.SilkTouch) > 0 ? b.SilkTouchStack(meta) : null;
+            if (silk != null) list.Add(silk);
+            else b.GetDrops(this, x, y, z, meta, Rand, tool, list);
             foreach (var s in list) if (s != null && s.Count > 0) DropItem(x + 0.5, y + 0.5, z + 0.5, s, true);
         }
         SetBlock(x, y, z, B.Air);
