@@ -144,7 +144,8 @@ public abstract class Entity
         UpdateFluidState();
         if (FireTicks > 0)
         {
-            if (InWater) FireTicks = 0;
+            if (InWater || World.IsRainingAt(MathUtil.FloorToInt(X), MathUtil.FloorToInt(Y), MathUtil.FloorToInt(Z))
+                || World.IsRainingAt(MathUtil.FloorToInt(X), MathUtil.FloorToInt(Y + Height), MathUtil.FloorToInt(Z))) FireTicks = 0;
             else
             {
                 if (FireTicks % 20 == 0 && this is LivingEntity le) le.Attack(DamageSource.OnFire, 1f);

@@ -35,7 +35,7 @@ public sealed partial class Game
                 Player.Yaw = Player.PrevYaw = 135; Player.Pitch = Player.PrevPitch = 32;
                 if (name == "Monument")
                 {
-                    // Kamera tuż za narożnikiem budowli, pod powierzchnią oceanu.
+                    // Kamera blisko szczytu budowli, pod powierzchnią oceanu.
                     // Box obejmuje również fundamenty; jego Y1 nie jest wysokością dachu.
                     Renderer.RenderDistance = 5; World.ChunkManager.Radius = 5;
                     Player.SetPositionAndPrev((box.X0 + box.X1) / 2.0 + 12, 60, (box.Z0 + box.Z1) / 2.0 + 12);

@@ -83,5 +83,6 @@ public static partial class SelfTest
         TestOwCavesAndPopulation();
         TestOwStructures();
         TestOwLargeStructures();
+        TestOwWeather();
     }
 }

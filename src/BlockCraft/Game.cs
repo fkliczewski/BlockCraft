@@ -212,6 +212,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             Difficulty = (Difficulty)level.Difficulty, Storage = storage
         };
         foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString(), out _);
+        w.RestoreWeather(level.Weather);
         if (isNew || (level.SpawnX == 0 && level.SpawnY == 0 && level.SpawnZ == 0))
         {
             var sp = w.Generator.FindSpawn();
@@ -267,6 +268,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         {
             var home = Dimensions?.Get(DimensionId.Overworld) ?? World;
             _level.DayTime = home.DayTime; _level.Time = home.TotalTime;
+            _level.Weather = home.Weather;
             _level.SpawnX = home.SpawnX; _level.SpawnY = home.SpawnY; _level.SpawnZ = home.SpawnZ;
             _level.Difficulty = (int)World.Difficulty;
             _level.GameMode = Player.GameMode;

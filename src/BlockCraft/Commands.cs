@@ -58,7 +58,7 @@ public sealed class Commands
                 case "me": _w.BroadcastMessage($"* {p.Name} " + string.Join(' ', a.Skip(1))); return true;
                 case "xp": return Xp(p, a);
                 case "list": p.SendMessage($"Graczy online: {_w.Players.Count}: " + string.Join(", ", _w.Players.Select(x => x.Name))); return true;
-                case "weather": p.SendMessage("W tym świecie zawsze świeci słońce :) (pogoda nieobsługiwana)"); return true;
+                case "weather": return Weather(p, a);
                 case "heal": p.Health = p.MaxHealth; p.SendMessage("Uleczono."); return true;
                 case "feed": p.FoodLevel = 20; p.Saturation = 20; p.SendMessage("Najedzono."); return true;
                 case "locate": return OwLocators.Command(_w, p, a);
@@ -82,6 +82,7 @@ public sealed class Commands
         p.SendMessage("/summon <zombie|skeleton|creeper|spider|enderman|cow|pig|sheep|chicken> [x y z]");
         p.SendMessage("/setblock, /fill, /kill [@e|@a|gracz], /clear, /xp <n>[L]");
         p.SendMessage("/difficulty <peaceful|easy|normal|hard>, /gamerule <reguła> <wartość>");
+        p.SendMessage("/weather <clear|rain|thunder> [sekundy]");
         p.SendMessage("/seed, /spawnpoint, /setworldspawn, /say, /me, /list, /heal, /feed");
     }
 
@@ -109,6 +110,17 @@ public sealed class Commands
         if (sub == "set") { _w.DayTime = (_w.DayTime / 24000) * 24000 + v; p.SendMessage("Ustawiono czas na " + v); }
         else if (sub == "add") { _w.DayTime += v; p.SendMessage("Dodano do czasu " + v); }
         else throw new Exception("/time <set|add|query>");
+        return true;
+    }
+
+    private bool Weather(Player p, string[] a)
+    {
+        if (a.Length is < 2 or > 3) throw new Exception("/weather <clear|rain|thunder> [sekundy]");
+        string kind = a[1].ToLowerInvariant();
+        int seconds = a.Length == 3 ? int.Parse(a[2], Inv) : (300 + _w.Rand.Next(600));
+        if (seconds is < 1 or > 1000000) throw new Exception("Czas pogody: 1–1000000 sekund");
+        _w.SetWeather(kind, seconds * 20);
+        p.SendMessage($"Pogoda: {kind}, czas: {seconds} s.");
         return true;
     }
 

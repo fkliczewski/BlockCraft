@@ -353,7 +353,10 @@ public sealed partial class World : IBlockAccess
     {
         float a = CelestialAngle(partial);
         float f = 1f - (MathF.Cos(a * MathF.PI * 2f) * 2f + 0.5f);
-        return Math.Clamp(f, 0f, 1f) * 11f;
+        f = 1f - Math.Clamp(f, 0f, 1f);
+        f *= 1f - RainAt(partial) * 5f / 16f;
+        f *= 1f - ThunderAt(partial) * 5f / 16f;
+        return (1f - f) * 11f;
     }
     public int SkyLightSubtracted => (int)SkyDarken(0);
     public float SunBrightness(float partial)
@@ -463,6 +466,7 @@ public sealed partial class World : IBlockAccess
     {
         TotalTime++;
         if (Rules.DoDaylightCycle && Provider.HasDaylightCycle) DayTime++;
+        TickWeather();
         FlushAdds();
         if (!IsRemote)
         {
@@ -503,6 +507,7 @@ public sealed partial class World : IBlockAccess
         if (all)
         {
             DayTime = (DayTime / 24000 + 1) * 24000;
+            ResetWeatherAfterSleep();
             foreach (var p in Players) p.WakeUp();
         }
     }

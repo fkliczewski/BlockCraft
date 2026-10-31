@@ -45,6 +45,7 @@ public sealed partial class PlayerData
 
 public sealed class LevelData
 {
+    public WeatherData Weather { get; set; }
     public string Name { get; set; }
     public long Seed { get; set; }
     public int Type { get; set; }

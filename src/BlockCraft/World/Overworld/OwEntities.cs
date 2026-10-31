@@ -61,6 +61,7 @@ public static partial class Registries
     static partial void EntitiesOverworld()
     {
         OwLocators.Register();
+        OwWeather.Register();
         Entity("snowball", w => new SnowballEntity(w));
         EntityRenderer.Custom[typeof(SnowballEntity)] = (r, e, pt, pos, cam)
             => r.RenderBillboardSprite(TextureGen.Layer("item_snowball"), pos + new Vector3(0, 0.1f, 0), 0.25f, Vector4.One, cam);

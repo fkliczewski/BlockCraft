@@ -266,3 +266,32 @@ Sam raport Nami podaje 221 testów na jej gałęzi; 442 to wynik scalonego kodu.
 Nie testowano jazdy i odtwarzania relacji pasażera przez sieć. GUI kontenerów
 wagonika używa RsGui.Open (wymaga lokalnego Game), więc udane testy GUI
 jednoosobowego nie oznaczają obsługi kontenerów wagonika dla gościa sieciowego.
+
+## Kontynuacja OW po przekazaniu sesji, 2026-10-31
+
+Commit 272253a poprawia podwodną kamerę autotestu monumentu i weryfikuje
+gotowość wszystkich chunków jego obszaru. Przebieg `--autotest --ow`
+zakończył się OK: 12873 bloki prismarynu, 116 latarni, 8 bloków złota.
+Obejrzano zrzut monumentu: widoczna schodkowa bryła i szczyt pod wodą.
+Pierwsza próba kamery przy zewnętrznym narożniku była zbyt odległa i ciemna;
+ostateczna kamera jest bliżej szczytu. Nie zmieniano mgły ani geometrii gry.
+Dowody: `.modus/ow-monument-autotest.log`, `.modus/ow-monument-final/`.
+
+Dodano podstawę pogody według `World.updateWeather` z referencji 1.8:
+oddzielne zegary deszczu, burzy i wymuszonej dobrej pogody, płynne natężenie,
+przyciemnienie światła nieba, reset po śnie, komendę `/weather` z czasem
+w sekundach oraz zapis w opcjonalnym polu `level.json` (starsze zapisy działają).
+Stan przechodzi przez `NetHooks.WorldState`, klient wygładza opady samodzielnie,
+bez przełączania zegarów hosta. Podłączono hak opadów dla ognia i kotła;
+deszcz gasi płonące encje i uwzględnia dach, biom oraz temperaturę.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest: **516 OK, 0 FAIL**,
+w tym 15 nowych testów podstawy pogody i 2 testy komend pogody przez transport
+host–klient (`.modus/ow-weather-selftest.log`). Nie wykonano jeszcze testu
+pogody w dwóch graficznych oknach przez relay.
+
+To nie jest ukończenie OW: pozostały grafika i dźwięk opadów, pioruny,
+akumulacja śniegu/lód, dalsze interakcje z pogodą oraz naturalny spawn
+strażników w monumentach i wiedźm w chatkach. Wydanie `BlockCraft_Gra`
+nie zostało odświeżone o częściową implementację pogody. Pełna zgodność 1:1
+nie została potwierdzona. Dalsze braki ME i końcowa integracja pozostają otwarte.

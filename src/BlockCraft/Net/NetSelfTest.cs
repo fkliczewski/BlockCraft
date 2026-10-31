@@ -158,6 +158,15 @@ public static partial class SelfTest
         Step(25);
         Check(cw.DayTime % 24000 >= 13000 && cw.DayTime % 24000 < 13100, $"Sieć: komenda operatora + czas (pora {cw.DayTime % 24000})");
 
+        client.SendChat("/weather thunder 42");
+        Step(25);
+        Check(hw.Weather.Raining && hw.Weather.Thundering && cw.Weather.Raining && cw.Weather.Thundering,
+            "Sieć: komenda pogody gościa wykonywana na hoście i stan wraca do klienta");
+        client.SendChat("/weather clear 42");
+        Step(25);
+        Check(!hw.Weather.Raining && !cw.Weather.Raining && !cw.Weather.Thundering && cw.Weather.CleanTime > 0,
+            "Sieć: koniec opadów i czas dobrej pogody docierają do klienta");
+
         puppet.Inventory.Main[0] = new ItemStack(B.Stone, 10);
         puppet.Inventory.Main[1] = new ItemStack(I.Diamond, 5);
         Step(3);
