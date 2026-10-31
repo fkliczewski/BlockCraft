@@ -158,6 +158,7 @@ public sealed class ChunkManager : IDisposable
                 }
             foreach (var te in c.TileEntities.Values) { te.X += 0; }
             if (c.PendingEntityData != null) { EntitySerializer.LoadEntities(_w, c.PendingEntityData); c.PendingEntityData = null; }
+            _w.ApplyGeneratedEntities(c);
             if (!c.Populated) { c.Populated = true; _w.Spawner.PopulateChunk(c); }
             // zaplanuj ticki płynów na krawędziach (np. wczytane źródła)
         }

@@ -1,5 +1,27 @@
 # Minecraft 1.8: raport integracji, 2026-10-30
 
+## Odzyskany Overworld, 2026-10-31
+
+Zabezpieczono niecommitowaną pracę Momo na mc18/overworld jako f55f692
+(wioski, twierdze, monumenty, lokatory i wzorce). Osobna gałąź przeszła
+167 testów; następnie scalono ją wraz z wcześniejszym terenem, dekoratorami,
+jaskiniami, kopalniami, lochami i świątyniami do feature/mc18.
+
+Wykryto brak wykonania planów encji struktur: istniały w cache generatora,
+ale znikały przed integracją chunka. Dodano jednorazowe tworzenie na wątku
+świata, przekazanie profesji wieśniaka, wariantu starszego strażnika oraz
+niezależnej kopii łupu wagonika. Testy sprawdzają brak powielania i zapis.
+Wszystkie testy scalonej gry: **499 OK / 0 FAIL**,
+`.modus/ow-population-selftest.log`; Release kompiluje się bez błędów.
+
+Dodano `--autotest --ow`. Przebieg kończy się `OW-TEST KONIEC: OK` i robi
+zrzuty wioski, chatki/świątyni i monumentu. Obejrzano wszystkie trzy: wioska
+i chatka są widoczne, ale kamera monumentu pokazuje głównie wodę. Ujęcie
+wymaga poprawy; sam znacznik OK nie jest dowodem weryfikacji wyglądu monumentu.
+Nadal do zrobienia: pogoda i jej zapis/sieć/render/dźwięki, spawn zwykłych
+strażników w monumentach i pełny autotest OW. Nie oznaczono całego OW jako
+ukończonego. Wydania BlockCraft_Gra jeszcze nie odświeżono o te zmiany.
+
 ## Kontynuacja integracji, 2026-10-31
 
 Goście multiplayera mają teraz właściwe ekrany ekwipunku konia, kontenerów

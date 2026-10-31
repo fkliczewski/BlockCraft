@@ -12,6 +12,7 @@ public static partial class SelfTest
 
     private static void TestOverworld()
     {
+        TestOwEntityPopulation();
         Console.WriteLine("[Overworld]");
         var r = Recipes.Find(new[] { S(B.SpruceLog), null, null, null }, 2, 2);
         Check(r != null && r.Id == B.SprucePlanks && r.Count == 4, "Świerkowa kłoda -> 4 świerkowe deski");

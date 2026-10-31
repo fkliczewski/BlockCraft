@@ -98,6 +98,7 @@ public sealed partial class OwGenerator
         Array.Copy(raw.Meta, c.Meta, Chunk.Volume);
         Array.Copy(raw.Biomes, c.Biomes, 256);
         foreach (var (index, plan) in raw.Tiles) plan.Apply(c, index);
+        if (raw.Entities.Count > 0) c.GeneratedEntityPlans = new(raw.Entities);
         // Duże żyły kamieni mogą przekroczyć drugi dodatni chunk od źródła.
         for (int sx = cx - 2; sx <= cx + 1; sx++)
             for (int sz = cz - 2; sz <= cz + 1; sz++) Population(sx, sz).Apply(c);
@@ -197,5 +198,8 @@ public sealed class OwGenRegion : IGenAccess
         long key = MathUtil.ChunkKey(c.Cx, c.Cz);
         if (_writes.TryGetValue(key, out var edits)) foreach (var (index, state) in edits) { c.Blocks[index] = state.id; c.Meta[index] = state.meta; c.TileEntities.Remove(index); }
         if (_tiles.TryGetValue(key, out var tiles)) foreach (var (index, plan) in tiles) plan.Apply(c, index);
+        foreach (var e in Entities)
+            if (((int)Math.Floor(e.X) >> 4) == c.Cx && ((int)Math.Floor(e.Z) >> 4) == c.Cz)
+                (c.GeneratedEntityPlans ??= new()).Add(e);
     }
 }

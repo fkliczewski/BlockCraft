@@ -47,6 +47,7 @@ public sealed partial class World
         {
             Light.MergeChunk(c); c.MarkAllDirty();
             if (c.PendingEntityData != null) { EntitySerializer.LoadEntities(this,c.PendingEntityData); c.PendingEntityData = null; }
+            ApplyGeneratedEntities(c);
         }
     }
 }

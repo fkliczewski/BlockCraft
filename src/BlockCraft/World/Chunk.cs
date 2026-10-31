@@ -24,6 +24,7 @@ public sealed class Chunk
     public int DirtySections; // maska bitowa sekcji do przebudowy mesha
     public long LastSeen;
     public byte[] PendingEntityData; // wczytane z dysku, encje tworzone przy integracji
+    public List<OwEntityPlan> GeneratedEntityPlans; // nowe struktury, wykonywane raz na wątku świata
     public bool FromDisk;
 
     public Chunk(int cx, int cz) { Cx = cx; Cz = cz; }
