@@ -6,12 +6,12 @@ namespace BlockCraft.World;
 
 public sealed class Chunk
 {
-    public const int Size = 16, Height = 128, Sections = Height / 16, Volume = Size * Size * Height;
+    public const int Size = 16, Height = 256, Sections = Height / 16, Volume = Size * Size * Height;
     public readonly int Cx, Cz;
     public readonly byte[] Blocks = new byte[Volume];
     public readonly byte[] Meta = new byte[Volume];
     public readonly byte[] Light = new byte[Volume]; // górne 4 bity = niebo, dolne = blok
-    public readonly byte[] HeightMap = new byte[Size * Size]; // najwyższy y blokujący światło + 1
+    public readonly short[] HeightMap = new short[Size * Size]; // najwyższy y blokujący światło + 1
     public readonly byte[] Biomes = new byte[Size * Size];
     public readonly Dictionary<int, TileEntity> TileEntities = new();
     public readonly int[] SectionCounts = new int[Sections]; // liczba niepustych bloków w sekcji
@@ -63,7 +63,7 @@ public sealed class Chunk
     {
         int y = Height - 1;
         while (y >= 0 && Block.ById[Blocks[Index(x, y, z)]].LightOpacity == 0) y--;
-        HeightMap[(z << 4) | x] = (byte)(y + 1);
+        HeightMap[(z << 4) | x] = (short)(y + 1);
     }
     public int GetHeight(int x, int z) => HeightMap[(z << 4) | x];
 
@@ -84,14 +84,19 @@ public abstract class TileEntity
 {
     public int X, Y, Z;
     public virtual void Tick(World w) { }
+    /// <summary>Ogólne ustawienie danych bez zależności kompilacyjnej między modułami, np. spawner: SetData("EntityId", "zombie"),
+    /// skrzynia ze skarbem: SetData("LootTable", "dungeon"). Typ ignoruje nieznane klucze.</summary>
+    public virtual void SetData(string key, string value) { }
     public abstract void Save(BinaryWriter bw);
     public abstract void Load(BinaryReader br);
     public abstract int TypeId { get; }
 
-    public static TileEntity Create(int type) => type switch
+    /// <summary>Rejestr typów tile entity (TypeId -> fabryka). Moduły rejestrują własne w Registries.cs.</summary>
+    public static readonly Dictionary<int, Func<TileEntity>> Types = new()
     {
-        1 => new FurnaceTileEntity(),
-        2 => new ChestTileEntity(),
-        _ => null
+        [1] = () => new FurnaceTileEntity(),
+        [2] = () => new ChestTileEntity(),
     };
+
+    public static TileEntity Create(int type) => Types.TryGetValue(type, out var f) ? f() : null;
 }

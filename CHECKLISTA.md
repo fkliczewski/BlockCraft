@@ -1,3 +1,5 @@
+Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
+
 # BlockCraft – checklista implementacji (klon Minecrafta 1.8 w .NET)
 
 ## Narzędzia / technologie
@@ -6,7 +8,7 @@
 - **StbImageWriteSharp** – zapis screenshotów PNG (F2 + autotesty wizualne)
 - **NAudio** (opcjonalnie) – proceduralnie syntezowane dźwięki
 - Wszystkie tekstury generowane proceduralnie w kodzie (16x16 pixel-art w stylu MC), font pixelowy ręcznie zdefiniowany (z polskimi znakami)
-- Sieć: TCP (System.Net.Sockets), serwer autorytatywny wbudowany w grę ("Otwórz w sieci") + tryb serwera dedykowanego `--server` (VPS)
+- Sieć: Tailcat.Link 0.5.4 przez przekaźnik gier gry.fimson.pl:443 (region 304; do 2026-10-30 derp.fimson.pl), host w grze ("Otwórz w sieci") + dołączanie kodem lub zapamiętanym parowaniem; `--server` pozostaje atrapą
 - Testy: xUnit (logika) + tryb `--autotest` (uruchomienie gry, skrypt akcji, screenshoty do weryfikacji)
 
 ## Stan prac (2026-10-16)
@@ -15,7 +17,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 - Kod: ~17,2 tys. linii C# w `src/BlockCraft`; `dotnet build -c Release` → 0 błędów, 4 ostrzeżenia (m.in. CA2014 – `stackalloc` w pętli w `ChunkMesher.cs`)
 - Zbudowana gra w `BlockCraft_Gra/` (poza repo) uruchamia się – GL 3.3, Intel Iris Xe
 - **Następne kroki:**
-  1. Multiplayer – `Net/` (protokół TCP, host w grze, `DedicatedServer`, klient), usunąć `tmpstub/Stubs.cs`, włączyć przycisk w menu
+  1. Multiplayer - moduł G działa przez Tailcat.Link; po scaleniu NE/OW podłączyć wymiary i pogodę przez `NetHooks` (opis: `docs/MC18_NET.md`)
   2. Dźwięki proceduralne – synteza NAudio w `Audio/`, podpiąć pod `Sound.Play`
   3. Projekt `BlockCraft.Tests` (xUnit) – przenieść przypadki z `SelfTest.cs`
   4. Drobne: ostrzeżenie CA2014, `/weather` i `/locate` to atrapy
@@ -64,6 +66,13 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 
 ## Etap 6 – Extra
 - [x] Redstone: pył, pochodnia, dźwignia, przycisk, blok, lampa, repeater, TNT, tłok i lepki tłok, drzwi
-- [ ] Multiplayer: host w grze + serwer dedykowany + klient  *(folder `Net/` pusty, `--server` → stub w `tmpstub/Stubs.cs`, przycisk "Tryb wieloosobowy" wyłączony)*
+- [x] Multiplayer Tailcat.Link: host w grze, kod i zapamiętane parowanie, klient, chunki/bloki/TE/encje, modele i nicki graczy, kontenery, czat, ekwipunek, śmierć i respawn; test dwóch procesów przez prawdziwy przekaźnik (od 2026-10-31 gry.fimson.pl) i PNG z obu okien. Wymiary/pogoda wymagają integracji po scaleniu NE/OW; zbroja modelu i pęknięcia kopania innych graczy pozostają do dodania. Szczegóły: `docs/MC18_NET.md`.
 - [~] Dźwięki proceduralne  *(wywołania `PlaySound` są w całej grze, ale `Sound.Play` w `GameRender.cs` to pusty stub; folder `Audio/` pusty)*
 - [~] Testy jednostkowe + autotest wizualny, publish do pojedynczego folderu  *(zamiast xUnit: `--selftest` (`SelfTest.cs`) + `--autotest` (`GameAutotest.cs`); publish do `BlockCraft_Gra/` działa; brak projektu `BlockCraft.Tests`)*
+
+## Weryfikacja modułu G (2026-10-30)
+
+- [x] Build Release: 0 błędów (4 istniejące ostrzeżenia).
+- [x] 36 testów sieci, w tym FakeDerpRelay i ramka 200 KB. Pełny selftest: 148 OK / 0 FAIL; niestabilny test krów odtworzony również przed zmianami sieciowymi (`b2fb2f2`).
+- [x] `tools/dev/Test-Net.ps1`: logowanie kodem, teren, wspólny złoty blok, modele graczy, czat, 3 diamenty, operator, wyrzucenie, powrót bez kodu z ekwipunkiem, zamknięcie sieci przez hosta. Wyniki i obejrzane zrzuty: `.modus/net-e2e-reviewed`.
+- [ ] Próba na dwóch fizycznych komputerach oraz próby wymiarów/pogody po scaleniu modułów NE/OW.

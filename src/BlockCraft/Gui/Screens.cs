@@ -18,7 +18,7 @@ public sealed class TitleScreen : Screen
         _splash ??= Splashes[new Random().Next(Splashes.Length)];
         int y = H / 4 + 48;
         Add(new Button(W / 2 - 100, y, 200, 20, "Tryb jednoosobowy", () => G.SetScreen(new WorldSelectScreen())));
-        Add(new Button(W / 2 - 100, y + 24, 200, 20, "Tryb wieloosobowy", () => { }) { Enabled = false });
+        Add(new Button(W / 2 - 100, y + 24, 200, 20, "Tryb wieloosobowy", () => G.SetScreen(new Net.MultiplayerScreen(this))));
         Add(new Button(W / 2 - 100, y + 48, 200, 20, "Twórcy i pomoc", () => G.SetScreen(new HelpScreen(this))));
         Add(new Button(W / 2 - 100, y + 72 + 12, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 72 + 12, 98, 20, "Wyjdź z gry", () => G.Quit()));
@@ -33,7 +33,7 @@ public sealed class TitleScreen : Screen
         float scale = Math.Min(1f, W * 0.72f / lw);
         float lx = W / 2f - lw * scale / 2, ly = 30;
         sb.Draw(G.Gui.Logo, lx, ly, lw * scale, lh * scale);
-        sb.TextCentered("JAVA EDITION", W / 2f, ly + lh * scale + 2, 0xFFE0E0E0);
+        sb.TextCentered(".NET/C# EDITION", W / 2f, ly + lh * scale + 2, 0xFFE0E0E0);
         float t = (float)(Environment.TickCount64 % 1000) / 1000f * MathF.PI * 2;
         float s = 1.8f - MathF.Abs(MathF.Sin(t)) * 0.1f;
         s = s * 100f / (sb.Measure(_splash) + 32);
@@ -41,6 +41,8 @@ public sealed class TitleScreen : Screen
         sb.TextCentered(_splash, 0, -8, 0xFF00FFFF);
         sb.PopTransform();
         sb.Text("BlockCraft 1.0 (.NET)", 2, H - 10, 0xFFFFFFFF);
+        var ast = BlockCraft.Audio.AssetStore.Status;
+        if (!string.IsNullOrEmpty(ast)) sb.Text(ast + (BlockCraft.Audio.AssetStore.Done ? "" : " (" + (int)(BlockCraft.Audio.AssetStore.Progress * 100) + "%)"), 2, H - 20, 0xFFA0A0A0);
         string c = "Nie jest powiązane z Mojang AB.";
         sb.Text(c, W - sb.Measure(c) - 2, H - 10, 0xFFFFFFFF);
         base.Render(mx, my, pt);
@@ -197,6 +199,7 @@ public sealed class OptionsScreen : Screen
         Add(new Button(W / 2 + 5, y + 48, 150, 20, "Sterowanie...", () => G.SetScreen(new ControlsScreen(this))));
         Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));
         Add(new Button(W / 2 + 5, y + 72, 150, 20, () => "Licznik FPS: " + (s.ShowFps ? "TAK" : "NIE"), () => s.ShowFps = !s.ShowFps));
+        Add(new Button(W / 2 - 155, y + 24, 150, 20, "Muzyka i dźwięki...", () => G.SetScreen(new BlockCraft.Audio.SoundOptionsScreen(this))));
         Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
     }
     public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };
@@ -281,7 +284,8 @@ public sealed class PauseScreen : Screen
         Add(new Button(W / 2 - 100, y + 24 - 16, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
         Add(new Button(W / 2 - 100, y + 96 - 16, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 96 - 16, 98, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
-        Add(new Button(W / 2 - 100, y + 120 - 16, 200, 20, "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
+        if (G.Client == null) Add(new Button(W / 2 - 100, y + 48 - 16, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));
+        Add(new Button(W / 2 - 100, y + 120 - 16, 200, 20, G.Client != null ? "Rozłącz się" : "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
     }
     public override void Render(int mx, int my, float pt)
     {

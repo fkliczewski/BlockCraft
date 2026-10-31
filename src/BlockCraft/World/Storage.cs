@@ -6,10 +6,17 @@ using BlockCraft.Items;
 
 namespace BlockCraft.World;
 
-public sealed class SlotData { public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; } }
-
-public sealed class PlayerData
+public sealed class SlotData
 {
+    public int Slot { get; set; } public int Id { get; set; } public int Count { get; set; } public int Damage { get; set; }
+    public string Tag { get; set; } // Nbt w base64
+    public static SlotData From(int slot, ItemStack s) => new() { Slot = slot, Id = s.Id, Count = s.Count, Damage = s.Damage, Tag = s.Tag != null && s.Tag.Count > 0 ? Convert.ToBase64String(s.Tag.ToBytes()) : null };
+    public ItemStack ToStack() => new(Id, Count, Damage) { Tag = Tag != null ? Nbt.FromBytes(Convert.FromBase64String(Tag)) : null };
+}
+
+public sealed partial class PlayerData
+{
+    public int Dimension { get; set; }
     public string Name { get; set; } = "Steve";
     public double X { get; set; }
     public double Y { get; set; }
@@ -32,6 +39,7 @@ public sealed class PlayerData
     public int SpawnY { get; set; }
     public int SpawnZ { get; set; }
     public bool Dead { get; set; }
+    public string RidingVehicleId { get; set; }
     public List<SlotData> Inventory { get; set; } = new();
 }
 
@@ -137,7 +145,7 @@ public sealed class WorldStorage
         using (var ds = new DeflateStream(ms, CompressionLevel.Fastest, true))
         using (var bw = new BinaryWriter(ds))
         {
-            bw.Write(2); // wersja
+            bw.Write(3); // wersja (3: wysokość 256)
             bw.Write(c.Blocks);
             bw.Write(c.Meta);
             bw.Write(c.Biomes);
@@ -146,7 +154,9 @@ public sealed class WorldStorage
             foreach (var te in c.TileEntities.Values.ToArray())
             {
                 bw.Write(te.TypeId); bw.Write(te.X); bw.Write(te.Y); bw.Write(te.Z);
-                te.Save(bw);
+                using var tms = new MemoryStream();
+                using (var tbw = new BinaryWriter(tms, System.Text.Encoding.UTF8, true)) te.Save(tbw);
+                bw.Write((int)tms.Length); bw.Write(tms.GetBuffer(), 0, (int)tms.Length);
             }
             if (entityData != null) { bw.Write(entityData.Length); bw.Write(entityData); }
             else bw.Write(0);
@@ -168,16 +178,24 @@ public sealed class WorldStorage
             using var br = new BinaryReader(ds);
             int ver = br.ReadInt32();
             var c = new Chunk(cx, cz);
-            Chunk.Volume.ReadFully(br, c.Blocks);
-            Chunk.Volume.ReadFully(br, c.Meta);
+            (ver >= 3 ? Chunk.Volume : Chunk.Volume / 2).ReadFully(br, c.Blocks);
+            (ver >= 3 ? Chunk.Volume : Chunk.Volume / 2).ReadFully(br, c.Meta);
             256.ReadFully(br, c.Biomes);
             c.Populated = br.ReadBoolean();
             int nte = br.ReadInt32();
             for (int i = 0; i < nte; i++)
             {
                 int type = br.ReadInt32(); int x = br.ReadInt32(), y = br.ReadInt32(), z = br.ReadInt32();
-                var te = TileEntity.Create(type);
-                te.Load(br);
+                TileEntity te;
+                if (ver >= 3)
+                {
+                    var tbytes = br.ReadBytes(br.ReadInt32());
+                    te = TileEntity.Create(type);
+                    if (te == null) { Log.Error("Nieznany typ tile entity: " + type); continue; }
+                    try { te.Load(new BinaryReader(new MemoryStream(tbytes))); }
+                    catch (Exception ex) { Log.Error("Tile entity " + type + ": " + ex.Message); continue; }
+                }
+                else { te = TileEntity.Create(type); te.Load(br); }
                 te.X = x; te.Y = y; te.Z = z;
                 c.TileEntities[Chunk.Index(x & 15, y, z & 15)] = te;
             }
@@ -204,14 +222,18 @@ public static class StreamExt
     public static void WriteStack(this BinaryWriter bw, ItemStack s)
     {
         if (s == null) { bw.Write((short)-1); return; }
-        bw.Write((short)s.Id); bw.Write((byte)s.Count); bw.Write((short)s.Damage);
+        bool tag = s.Tag != null && s.Tag.Count > 0;
+        bw.Write((short)(s.Id | (tag ? 0x4000 : 0))); bw.Write((byte)s.Count); bw.Write((short)s.Damage);
+        if (tag) s.Tag.Write(bw);
     }
     public static ItemStack ReadStack(this BinaryReader br)
     {
         short id = br.ReadInt16();
         if (id < 0) return null;
+        bool tag = (id & 0x4000) != 0; id &= 0x3FFF;
         int count = br.ReadByte(); int dmg = br.ReadInt16();
+        var t = tag ? Nbt.Read(br) : null;
         if (Item.ById[id] == null) return null;
-        return new ItemStack(id, count, dmg);
+        return new ItemStack(id, count, dmg) { Tag = t };
     }
 }

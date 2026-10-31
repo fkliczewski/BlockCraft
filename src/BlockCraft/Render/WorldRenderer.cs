@@ -30,7 +30,7 @@ public struct Particle
     public bool Collide, Emissive, Grow;
 }
 
-public sealed class WorldRenderer : IWorldListener, IDisposable
+public sealed partial class WorldRenderer : IWorldListener, IDisposable
 {
     public World.World World;
     public TextureArray Terrain;
@@ -117,8 +117,10 @@ void main(){ vec4 t = texture(uTex, vUV); if (t.a < uAlphaCut) discard;
 layout(location=0) in vec2 aPos; uniform mat4 uInvViewProj; out vec3 vDir;
 void main(){ gl_Position = vec4(aPos, 0.999, 1.0); vec4 p = uInvViewProj * vec4(aPos, 1.0, 1.0); vDir = p.xyz / p.w; }";
     private const string SkyFrag = @"#version 330 core
-in vec3 vDir; uniform vec3 uSky; uniform vec3 uFog; uniform vec4 uSunset; uniform vec3 uSunDir; out vec4 o;
+in vec3 vDir; uniform vec3 uSky; uniform vec3 uFog; uniform vec4 uSunset; uniform vec3 uSunDir; uniform int uDimension; uniform sampler2DArray uTex; uniform float uEndLayer; out vec4 o;
 void main(){ vec3 d = normalize(vDir);
+ if (uDimension == -1) { o=vec4(uFog,1.0); return; }
+ if (uDimension == 1) { vec3 a=abs(d); vec2 uv=a.x>a.y && a.x>a.z ? d.zy/a.x : a.y>a.z ? d.xz/a.y : d.xy/a.z; o=vec4(texture(uTex,vec3(uv*4.0,uEndLayer)).rgb,1.0); return; }
  float h = d.y;
  vec3 c = mix(uFog, uSky, smoothstep(-0.02, 0.35, h));
  if (h < -0.05) c = mix(c, uSky*0.2 + uFog*0.3, smoothstep(-0.05, -0.4, h));
@@ -412,10 +414,12 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         SunBrightness = sb * 0.8f + 0.2f;
         FogColor = fog; FogMode = 0;
         FogEnd = RenderDistance * 16; FogStart = FogEnd * 0.75f;
+        if (w.Dimension == DimensionId.Nether) { SkyColor = FogColor = new Vector3(.2f,.03f,.03f); FogStart = 0; FogEnd *= .5f; SunBrightness = 1; }
+        else if (w.Dimension == DimensionId.End) { SkyColor = FogColor = new Vector3(.094f,.075f,.094f); SunBrightness = 1; }
         if (headFluid == 1) { FogColor = new Vector3(0.02f, 0.02f, 0.2f) + SkyColor * 0.1f; FogMode = 1; FogDensity = 0.08f; }
         else if (headFluid == 2) { FogColor = new Vector3(0.6f, 0.1f, 0f); FogMode = 1; FogDensity = 2f; }
         // pod ziemią ciemniej (void fog)
-        if (cam.Y < 40 && headFluid == 0)
+        if (cam.Y < 40 && headFluid == 0 && w.Dimension == DimensionId.Overworld)
         {
             float f = (float)Math.Clamp((40 - cam.Y) / 40.0, 0, 1) * 0.6f;
             int sky = w.GetSkyLight(MathUtil.FloorToInt(cam.X), MathUtil.FloorToInt(cam.Y), MathUtil.FloorToInt(cam.Z));
@@ -440,6 +444,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     {
         s.Set("uFogColor", FogColor); s.Set("uFogStart", FogStart); s.Set("uFogEnd", FogEnd); s.Set("uFogDensity", FogDensity); s.Set("uFogMode", FogMode);
         s.Set("uSun", SunBrightness); s.Set("uGamma", Gamma);
+        s.Set("uDimension", (int)World.Dimension);
     }
 
     // ================= rysowanie =================
@@ -462,7 +467,10 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             _sky.Set("uInvViewProj", inv);
             _sky.Set("uSky", SkyColor); _sky.Set("uFog", FogColor);
             _sky.Set("uSunset", SunsetColor(angle)); _sky.Set("uSunDir", sunDir);
+            Terrain.Bind(0); _sky.Set("uTex",0); _sky.Set("uDimension",(int)w.Dimension); _sky.Set("uEndLayer",(float)TextureGen.Layer("end_sky"));
             _skyQuad.DrawQuads();
+            if (w.Dimension == DimensionId.Overworld)
+            {
             // gwiazdy
             float starB = 1f - (MathF.Cos(angle * MathF.PI * 2f) * 2f + 0.25f); starB = Math.Clamp(starB, 0, 1); starB = starB * starB * 0.5f;
             GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
@@ -479,6 +487,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1));
             DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1));
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            }
         }
         GL.DepthMask(true);
         GL.Enable(EnableCap.DepthTest);
@@ -567,7 +576,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (sm.Trans != null) { _chunk.Set("uOffset", off); sm.Trans.DrawQuads(); }
 
         // --- chmury ---
-        if (CloudsEnabled && FogMode == 0) RenderClouds(cam, vp, pt);
+        if (CloudsEnabled && FogMode == 0 && w.Dimension == DimensionId.Overworld) RenderClouds(cam, vp, pt);
 
         // --- obrys zaznaczenia ---
         if (sel.HasValue && sel.Value.Hit)
@@ -761,7 +770,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 if (data < 0)
                 {
                     var it = Item.ById[-data];
-                    int layer = it?.Sprite > 0 ? it.Sprite : 0;
+                    int layer = it != null ? it.GetSprite(new ItemStack(-data)) : 0;
                     for (int i = 0; i < count; i++)
                     {
                         float u = r.Next(12) / 16f, v = r.Next(12) / 16f;
@@ -813,6 +822,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 break;
             case ParticleKind.Crit:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.6f), Rnd(0.4f), TextureGen.Layer("particle_crit"), 0.15f, 10 + r.Next(5), 0.02f, new Vector4(0.9f, 0.9f, 0.6f, 1), false, true);
+                break;
+            case ParticleKind.Spell:
+                for (int i = 0; i < count; i++) AddParticle(p + Rnd(.3f), new Vector3(0, .02f, 0), TextureGen.Layer("particle_smoke_0"), .12f, 24, 0, new Vector4((data >> 16 & 255) / 255f, (data >> 8 & 255) / 255f, (data & 255) / 255f, .8f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Poof:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);

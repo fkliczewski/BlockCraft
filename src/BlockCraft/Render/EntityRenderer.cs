@@ -46,7 +46,7 @@ public sealed class ModelBatch
     }
 }
 
-public sealed class EntityRenderer : IDisposable
+public sealed partial class EntityRenderer : IDisposable
 {
     public readonly Shader Shader;
     private readonly Mesh _mesh;
@@ -54,14 +54,16 @@ public sealed class EntityRenderer : IDisposable
     public TextureArray SkinTex;
     public TextureArray TerrainTex;
 
+    // End: światło przycięte do 1 przed pow(1-c), inaczej przy świetle 15 pow z ujemną podstawą daje NaN (czarne)
     public const string LightmapGlsl = @"
-uniform float uSun; uniform float uGamma;
-float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; return (1.0 - f1)/(f1*3.0 + 1.0); }
+uniform float uSun; uniform float uGamma; uniform int uDimension;
+float tbl(float l){ float f1 = 1.0 - clamp(l,0.0,15.0)/15.0; float a = uDimension == -1 ? 0.1 : 0.0; return (1.0 - f1)/(f1*3.0 + 1.0)*(1.0-a)+a; }
 vec3 lightmap(float sky, float blk){
   float f = uSun; float f1 = f*0.95+0.05;
   float f2 = tbl(sky)*f1; float f3 = tbl(blk)*1.5;
   vec3 c = vec3(f2*(f*0.65+0.35), f2*(f*0.65+0.35), f2) + vec3(f3, f3*((f3*0.6+0.4)*0.6+0.4), f3*(f3*f3*0.6+0.4));
   c = clamp(c*0.96+0.03, 0.0, 1.0);
+  if (uDimension == 1) c = clamp(vec3(0.22,0.28,0.25) + vec3(f3*0.75), 0.0, 1.0);
   vec3 g = 1.0 - pow(1.0 - c, vec3(4.0)); c = mix(c, g, uGamma);
   return clamp(c*0.96+0.03, 0.0, 1.0);
 }";
@@ -95,7 +97,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             GL.EnableVertexAttribArray(6); GL.VertexAttribPointer(6, 4, VertexAttribPointerType.Float, false, s, 52);
         });
         SkinGen.Ensure();
-        SkinTex = new TextureArray(64, SkinGen.Skins, false);
+        SkinTex = new TextureArray(SkinGen.TexSize, SkinGen.Layers(), false);
     }
 
     public void Flush(ModelBatch b, TextureArray tex)
@@ -213,9 +215,10 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         if (e.FireTicks > 0) blk = 15;
         Skin.Sky = Terrain.Sky = sky; Skin.Blk = Terrain.Blk = blk;
         Skin.Color = Terrain.Color = Vector4.One; Skin.Overlay = Terrain.Overlay = Vector4.Zero;
+        if (FindCustom(Custom, e.GetType()) is { } custom) { custom(this, e, pt, pos, cam); return; }
         switch (e)
         {
-            case LivingEntity le: RenderLiving(le, pt, pos); break;
+            case LivingEntity le: RenderLiving(le, pt, pos); if (le is Mob { LeashHolder: not null } lm) RenderLeash(lm, pt, pos, cam); break;
             case ItemEntity ie: RenderItemEntity(ie, pt, pos); break;
             case XpOrbEntity xp: RenderBillboardSprite(TextureGen.Layer("particle_crit"), pos + new Vector3(0, 0.25f, 0), 0.3f, new Vector4(0.6f, 1f, 0.3f, 1f), cam); break;
             case FallingBlockEntity fb: RenderBlockAt(fb.BlockId, fb.Meta, Matrix4.CreateTranslation(pos + new Vector3(0, 0.5f, 0))); break;
@@ -281,7 +284,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
 
     public static bool IsBlockModel(Item it)
     {
-        if (it.Id >= 256 || it.Sprite > 0) return false;
+        if (it.Id >= 256 || it.Sprite > 0 || it.SpriteFn != null) return false;
         var b = Block.ById[it.BlockId];
         return b.Render is RenderType.Cube or RenderType.Model or RenderType.Cactus;
     }
@@ -292,7 +295,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         var it = s.Item;
         if (it == null) return;
         if (IsBlockModel(it)) RenderBlockAt(it.BlockId, s.Damage, m);
-        else RenderSpriteExtruded(it.IsBlock && it.Sprite < 0 ? Block.ById[it.BlockId].Tex[0] : it.Sprite, m);
+        else RenderSpriteExtruded(it.GetSprite(s), m);
     }
 
     private sealed class NullAccess : IBlockAccess { public byte GetBlock(int x, int y, int z) => 0; public int GetMeta(int x, int y, int z) => 0; }
@@ -337,7 +340,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         {
             if (mb.Uv != null) { u0 = mb.Uv[f * 4]; v0 = mb.Uv[f * 4 + 1]; u1 = mb.Uv[f * 4 + 2]; v1 = mb.Uv[f * 4 + 3]; }
             Terrain.Layer = mb.Tex[f];
-            var pa = T(m, a.X, a.Y, a.Z); var pb = T(m, b.X, b.Y, b.Z); var pc = T(m, c.X, c.Y, c.Z); var pd = T(m, d.X, d.Y, d.Z);
+            var pa = T(m, a.X, a.Y + a.X * mb.SlopeX + a.Z * mb.SlopeZ, a.Z); var pb = T(m, b.X, b.Y + b.X * mb.SlopeX + b.Z * mb.SlopeZ, b.Z);
+            var pc = T(m, c.X, c.Y + c.X * mb.SlopeX + c.Z * mb.SlopeZ, c.Z); var pd = T(m, d.X, d.Y + d.X * mb.SlopeX + d.Z * mb.SlopeZ, d.Z);
             var n = Vector3.Cross(pb - pa, pd - pa); if (n.LengthSquared > 1e-12f) n.Normalize();
             float s = Terrain.ShadeFor(n);
             Terrain.Quad(pa, pb, pc, pd, u0, v0, u1, v1, s);
@@ -408,6 +412,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         la.RX = MathF.Cos(limb * 0.6662f) * 2f * amt * 0.5f;
         rl.RX = MathF.Cos(limb * 0.6662f) * 1.4f * amt;
         ll.RX = MathF.Cos(limb * 0.6662f + MathF.PI) * 1.4f * amt;
+        if (e is Player { RidingMob: not null } || e is Mob { Vehicle: not null }) // ModelBiped.isRiding
+        { ra.RX -= MathF.PI / 5f; la.RX -= MathF.PI / 5f; rl.RX = ll.RX = -MathF.PI * 2f / 5f; rl.RY = MathF.PI / 10f; ll.RY = -MathF.PI / 10f; }
         if (e.HeldItem != null || e is Player p && p.Inventory.Selected != null) ra.RX = ra.RX * 0.5f - MathF.PI / 10f;
         float swing = e.PrevSwingProgress + (e.SwingProgress - e.PrevSwingProgress) * pt;
         if (swing > 0)
@@ -442,8 +448,25 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         legs[3].RX = MathF.Cos(limb * 0.6662f) * 1.4f * amt;
     }
 
+    // ---- rejestr rendererów modułów (zamiast dopisywania gałęzi do switchy) ----
+    public delegate void CustomEntityRender(EntityRenderer r, Entity e, float pt, Vector3 pos, Vector3 cam);
+    /// <summary>Pozycja i animacja moba w chwili renderu (Root ma już obrót ciała i przewrócenie po śmierci).</summary>
+    public struct LivingPose { public float Pt, BodyYaw, HeadYaw, Pitch, Limb, LimbAmt, Age; public Vector3 Pos; public Matrix4 Root; public bool ForGui; }
+    public delegate void CustomLivingRender(EntityRenderer r, LivingEntity e, LivingPose pose);
+    /// <summary>Renderery encji nie-żywych (wagoniki, łódki, ramki...). Klucz: typ encji (dziedziczony też przez podklasy).</summary>
+    public static readonly Dictionary<Type, CustomEntityRender> Custom = new();
+    /// <summary>Renderery modeli mobów. Wołane z RenderLiving po ustawieniu oświetlenia, nakładki obrażeń i Root.</summary>
+    public static readonly Dictionary<Type, CustomLivingRender> CustomLiving = new();
+    private static T FindCustom<T>(Dictionary<Type, T> d, Type t) where T : class
+    {
+        if (d.Count == 0) return null;
+        for (var x = t; x != null && x != typeof(object); x = x.BaseType) if (d.TryGetValue(x, out var f)) return f;
+        return null;
+    }
+
     public void RenderLiving(LivingEntity e, float pt, Vector3 pos, bool forGui = false)
     {
+        if (e.HasEffect(Effect.Invisibility) && !forGui) return;
         float bodyYaw = MathUtil.LerpAngle(e.PrevBodyYaw, e.BodyYaw, pt);
         float headYawAbs = MathUtil.LerpAngle(e.PrevYaw, e.Yaw, pt);
         float headYaw = MathUtil.WrapDegrees(headYawAbs - bodyYaw);
@@ -462,6 +485,11 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             // obrót na bok
             root = Matrix4.CreateTranslation(0, -1.5078125f, 0) * Matrix4.CreateScale(-1, -1, 1)
                    * Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(f * 90f)) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(180 - bodyYaw)) * Matrix4.CreateTranslation(pos);
+        }
+        if (FindCustom(CustomLiving, e.GetType()) is { } cl)
+        {
+            cl(this, e, new LivingPose { Pt = pt, BodyYaw = bodyYaw, HeadYaw = headYaw, Pitch = pitch, Limb = limb, LimbAmt = amt, Age = age, Pos = pos, Root = root, ForGui = forGui });
+            return;
         }
         switch (e)
         {
@@ -575,8 +603,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
                         RenderPart(Skin, _shHead, aroot); RenderPart(Skin, _shBody, aroot); foreach (var l in _shLegs) RenderPart(Skin, l, aroot);
                         if (!sh.Sheared)
                         {
-                            uint[] wc = { 0xE9ECEC, 0x8E8E86, 0x3E4447, 0x141519, 0x724728, 0xED8DAC };
-                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[Math.Clamp(sh.Color, 0, 5)]);
+                            uint[] wc = Items.Dyes.Rgb;
+                            Skin.Layer = SkinGen.Get("sheep_fur"); Skin.Color = HexColor(wc[sh.Color & 15]);
                             if (sh.Color == 0) Skin.Color = Vector4.One;
                             _fHead.RY = _shHead.RY; _fHead.RX = _shHead.RX; _fHead.PY = _shHead.PY; _fBody.RX = MathF.PI / 2;
                             for (int i = 0; i < 4; i++) _fLegs[i].RX = _shLegs[i].RX;
@@ -700,7 +728,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             gs.Rotate(-135f, 0, 1, 0);
             gs.Rotate(25f, 0, 0, 1);
             gs.Scale(1.05f, 1.05f, 1.05f);
-            RenderSpriteExtruded(it.IsBlock && it.Sprite < 0 ? Block.ById[it.BlockId].Tex[0] : it.Sprite, gs.M);
+            RenderSpriteExtruded(it.GetSprite(held), gs.M);
         }
     }
 

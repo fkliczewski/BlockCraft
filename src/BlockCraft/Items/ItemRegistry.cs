@@ -3,7 +3,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Items;
 
-public static class ItemRegistry
+public static partial class ItemRegistry
 {
     private static bool _init;
     public static readonly string[] MaterialNames = { "Drewniany", "Kamienny", "Żelazny", "Złoty", "Diamentowy" };
@@ -25,7 +25,7 @@ public static class ItemRegistry
         if (_init) return; _init = true;
         Blocks.Init();
         // przedmioty-bloki
-        for (int i = 1; i < B.Count; i++)
+        for (int i = 1; i < 256; i++)
         {
             var b = Block.ById[i];
             if (b == null || b.Id == 0 && i != 0) continue;
@@ -142,6 +142,8 @@ public static class ItemRegistry
         var door = Simple(I.Door, "wooden_door", "Drewniane drzwi", Red, 64); door.BlockId = B.OakDoor;
         var bed = Simple(I.Bed, "bed", "Łóżko", Deco, 1); bed.BlockId = B.Bed;
         var rep = Simple(I.RepeaterItem, "repeater", "Przekaźnik", Red); rep.BlockId = B.Repeater;
+
+        ModuleItems();
     }
 
     public static Item ById(int id) => Item.ById[id];
@@ -163,8 +165,7 @@ public static class ItemRegistry
         {
             if (!it.InCreative) continue;
             if (tab >= 0 && it.CreativeTab != tab) continue;
-            if (it.Id == B.Wool) { for (int m = 0; m < 6; m++) list.Add(new ItemStack(it.Id, 1, m)); continue; }
-            list.Add(new ItemStack(it.Id, 1));
+            foreach (int m in it.GetVariants()) list.Add(new ItemStack(it.Id, 1, m));
         }
         return list;
     }

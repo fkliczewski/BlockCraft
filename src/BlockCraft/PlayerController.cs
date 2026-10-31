@@ -6,17 +6,20 @@ using BlockCraft.World;
 namespace BlockCraft;
 
 /// <summary>Logika interakcji gracza: kopanie, stawianie, używanie przedmiotów, atak.</summary>
-public sealed class PlayerController
+public sealed partial class PlayerController
 {
     private readonly Game _g;
-    public World.World W => _g.World;
-    public Player P => _g.Player;
+    private readonly World.World _w; private readonly Player _p;
+    public World.World W => _w ?? _g.World;
+    public Player P => _p ?? _g.Player;
     public float BreakProgress; public int BreakX, BreakY, BreakZ = int.MinValue; private int _breakSoundTicks;
     public int BlockHitDelay, RightClickDelay;
     public World.World.HitResult Hit; public Entity HitEntity;
     public bool LeftWasDown;
 
     public PlayerController(Game g) { _g = g; }
+    /// <summary>Sterowanie graczem bez okna gry (zdalny gracz na hoście).</summary>
+    public PlayerController(World.World w, Player p) { _w = w; _p = p; }
 
     public double Reach => P.Creative ? 5.0 : 4.5;
 
@@ -32,7 +35,7 @@ public sealed class PlayerController
         if (best > er) best = er;
         foreach (var e in W.Entities)
         {
-            if (e == p || !e.CanBeAttacked || e.Removed) continue;
+            if (e == p || e == p.RidingEntity || !e.CanBeAttacked || e.Removed) continue;
             if (e.DistanceSq(ex, ey, ez) > 64) continue;
             var bb = e.BoundingBox.Grow(0.1);
             if (bb.Contains(ex, ey, ez)) { HitEntity = e; best = 0; continue; }
@@ -47,7 +50,7 @@ public sealed class PlayerController
     {
         if (b.Hardness < 0) return 0;
         if (b.Hardness == 0) return 1;
-        float f = b.GetDigSpeed(tool);
+        float f = b.GetDigSpeed(tool) * EffectLogic.Mining(p);
         if (p.IsHeadInWater()) f /= 5f;
         if (!p.OnGround && !p.Flying) f /= 5f;
         return b.CanHarvest(tool) ? f / b.Hardness / 30f : f / b.Hardness / 100f;
@@ -86,7 +89,7 @@ public sealed class PlayerController
         if (_breakSoundTicks++ % 4 == 0)
         {
             W.PlaySound("step_" + b.Sound.ToString().ToLowerInvariant(), x + 0.5, y + 0.5, z + 0.5, 0.25f, 0.5f);
-            _g.Renderer.BlockCrackParticle(x, y, z, Hit.Face);
+            _g?.Renderer.BlockCrackParticle(x, y, z, Hit.Face);
         }
         if (BreakProgress >= 1f)
         {
@@ -106,11 +109,11 @@ public sealed class PlayerController
         var tool = P.Inventory.Selected;
         if (!P.Creative) b.OnDestroyedByPlayer(W, x, y, z, meta, P);
         // liście: ścinanie sąsiadów przyspiesza zanik
-        if (b.Id == B.OakLog || b.Id == B.BirchLog)
+        if (b is LogBlock)
             for (int dx = -4; dx <= 4; dx++) for (int dy = -4; dy <= 4; dy++) for (int dz = -4; dz <= 4; dz++)
                     {
                         int id = W.GetBlock(x + dx, y + dy, z + dz);
-                        if ((id == B.OakLeaves || id == B.BirchLeaves) && W.Rand.Next(3) == 0) W.ScheduleTick(x + dx, y + dy, z + dz, (byte)id, 20 + W.Rand.Next(200));
+                        if (Block.ById[id] is LeavesBlock && W.Rand.Next(3) == 0) W.ScheduleTick(x + dx, y + dy, z + dz, (byte)id, 20 + W.Rand.Next(200));
                     }
         W.BreakBlock(x, y, z, drop && !P.Creative, P, tool);
     }
@@ -124,17 +127,21 @@ public sealed class PlayerController
         if (p.ItemInUse != null) return;
         RightClickDelay = 4;
         var held = p.Inventory.Selected;
-        if (HitEntity != null)
+        if (p.RidingMob is Pig ridden && held?.Id == I.CarrotOnAStick) { if (ridden.Boost(p)) p.SwingArm(); return; }
+        if (HitEntity != null && HitEntity != p.RidingMob)
         {
+            if (HitEntity is Mob named && held?.Id == I.NameTag && !string.IsNullOrEmpty(held.CustomName))
+            { named.CustomName = held.CustomName; named.PersistenceRequired = true; Mob.ConsumeHeld(p); p.SwingArm(); return; }
             if (HitEntity.Interact(p)) { p.SwingArm(); return; }
         }
         if (Hit.Hit)
         {
             int x = Hit.X, y = Hit.Y, z = Hit.Z;
             var b = Block.Get(W.GetBlock(x, y, z));
+            if (LeashKnot.TryTie(W, p, x, y, z)) { p.SwingArm(); return; }
             if (!p.Sneaking || held == null)
                 if (b.OnActivated(W, x, y, z, p)) { p.SwingArm(); return; }
-            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; return; }
+            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
         }
         if (held != null) UseInAir(held);
     }
@@ -142,6 +149,8 @@ public sealed class PlayerController
     private bool UseInAir(ItemStack held)
     {
         var p = P; var it = held.Item;
+        if (it.UseInAir != null && it.UseInAir(p, held)) return true;
+        if (PlayerAlchemy.Use(p, held)) return true;
         if (it.IsFood) { if (p.CanEat(it.Id == I.GoldenApple)) p.StartUsing(held); return true; }
         if (it.Id == I.MilkBucket) { p.StartUsing(held); return true; }
         if (it.Id == I.Bow) { if (p.Creative || p.Inventory.CountOf(I.Arrow) > 0) p.StartUsing(held); return true; }
@@ -209,6 +218,18 @@ public sealed class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
+        if (held.Id == I.SpawnEgg)
+        {
+            var egg = SpawnEggs.Find(held.Damage);
+            if (egg == null) return false;
+            if (W.GetTileEntity(x, y, z) is MobSpawnerTile spawner)
+            { spawner.SetData("EntityId", egg.Key); Consume(held); return true; }
+            double sx = x + Dir.X[face] + .5, sy = y + Dir.Y[face], sz = z + Dir.Z[face] + .5;
+            if (SpawnEggs.Spawn(W, held, sx, sy, sz) == null) return false;
+            Consume(held); return true;
+        }
+        if (it is IBlockUseItem use) return use.UseOnBlock(W, p, held, x, y, z, face);
         // motyka
         if (it.Tool == ToolType.Hoe && face != Dir.Down && (id == B.Grass || id == B.Dirt) && W.GetBlock(x, y + 1, z) == B.Air)
         {
@@ -227,7 +248,10 @@ public sealed class PlayerController
         if (it.Id == I.FlintAndSteel)
         {
             if (id == B.Tnt) { TntBlock.Ignite(W, x, y, z, 80); p.DamageHeld(1); return true; }
-            return false;
+            int fx = x + Dir.X[face], fy = y + Dir.Y[face], fz = z + Dir.Z[face];
+            if (W.GetBlock(fx, fy, fz) != B.Air) return false;
+            W.PlaySound("fire.ignite", fx + 0.5, fy + 0.5, fz + 0.5, 1f, W.Rand.NextFloat() * 0.4f + 0.8f);
+            W.SetBlock(fx, fy, fz, B.Fire, 0); p.DamageHeld(1); return true;
         }
         if (it.IsFood || it.Id == I.MilkBucket || it.Id == I.Bow || it.Id == I.EnderPearl || it.Id == I.Egg || it.ArmorSlot >= 0) return UseInAir(held);
         if (!it.IsBlock) return false;
@@ -292,16 +316,16 @@ public sealed class PlayerController
                     if (e is LivingEntity && !e.Dead && !(e is Player pl && pl.Spectator)) return false;
             }
         }
-        if (bid == B.OakDoor)
+        if (nb is DoorBlock)
         {
             if (ty + 1 >= Chunk.Height || !Block.Get(W.GetBlock(tx, ty + 1, tz)).Replaceable || !Block.Get(W.GetBlock(tx, ty - 1, tz)).Opaque) return false;
             int d = (Dir.HorizFromYaw(p.Yaw) + 3) & 3;
             // zawias: zależnie od sąsiadów
             int lx = tx - Dir.HorizX[(d + 1) & 3], lz = tz - Dir.HorizZ[(d + 1) & 3];
-            bool hinge = W.GetBlock(lx, ty, lz) == B.OakDoor;
-            W.SetBlock(tx, ty, tz, B.OakDoor, d, false);
-            W.SetBlock(tx, ty + 1, tz, B.OakDoor, 8 | (hinge ? 1 : 0), true);
-            W.NotifyNeighbors(tx, ty, tz, B.OakDoor);
+            bool hinge = W.GetBlock(lx, ty, lz) == bid;
+            W.SetBlock(tx, ty, tz, bid, d, false);
+            W.SetBlock(tx, ty + 1, tz, bid, 8 | (hinge ? 1 : 0), true);
+            W.NotifyNeighbors(tx, ty, tz, bid);
             Consume(held); PlaceSound(nb, tx, ty, tz);
             return true;
         }

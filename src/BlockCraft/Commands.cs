@@ -279,7 +279,7 @@ public sealed class Commands
             bool? v = a[1].ToLowerInvariant() switch
             {
                 "dodaylightcycle" => r.DoDaylightCycle, "keepinventory" => r.KeepInventory, "domobspawning" => r.DoMobSpawning,
-                "mobgriefing" => r.MobGriefing, "naturalregeneration" => r.NaturalRegeneration, _ => null
+                "mobgriefing" => r.MobGriefing, "naturalregeneration" => r.NaturalRegeneration, "doentitydrops" => r.DoEntityDrops, _ => null
             };
             p.SendMessage(v == null ? "Nieznana reguła" : $"{a[1]} = {v.Value.ToString().ToLowerInvariant()}");
             return true;

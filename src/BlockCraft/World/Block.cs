@@ -8,7 +8,7 @@ namespace BlockCraft.World;
 public enum RenderType { None, Cube, Cross, Crops, Liquid, Torch, Model, Wire, Cactus }
 public enum RenderLayer { Solid, Cutout, Translucent }
 public enum ToolType { None, Pickaxe, Axe, Shovel, Sword, Shears, Hoe }
-public enum TintType { None, Grass, Foliage, Birch, RedstoneWire }
+public enum TintType { None, Grass, Foliage, Birch, RedstoneWire, Spruce, Water, Custom }
 public enum SoundType { Stone, Wood, Gravel, Grass, Sand, Glass, Wool, Metal, Ladder }
 
 /// <summary>Box modelu (współrzędne 0..1) z teksturami per ściana.</summary>
@@ -19,8 +19,10 @@ public struct ModelBox
     public float[] Uv;              // opcjonalnie: 6*4 (u0,v0,u1,v1) w pikselach /16
     public int[] UvRot;             // opcjonalnie rotacja UV per ściana
     public bool NoCull;
+    // Pochylenie płaskiego modelu (tory): y += x * SlopeX + z * SlopeZ.
+    public float SlopeX, SlopeZ;
     public ModelBox(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
-    { X0 = x0; Y0 = y0; Z0 = z0; X1 = x1; Y1 = y1; Z1 = z1; Tex = tex; Uv = null; UvRot = null; NoCull = false; }
+    { X0 = x0; Y0 = y0; Z0 = z0; X1 = x1; Y1 = y1; Z1 = z1; Tex = tex; Uv = null; UvRot = null; NoCull = false; SlopeX = SlopeZ = 0; }
     public static ModelBox Px(float x0, float y0, float z0, float x1, float y1, float z1, int[] tex)
         => new(x0 / 16f, y0 / 16f, z0 / 16f, x1 / 16f, y1 / 16f, z1 / 16f, tex);
     public static int[] All(int t) => new[] { t, t, t, t, t, t };
@@ -58,8 +60,12 @@ public class Block
     public bool NeedsSupport;         // np. rośliny, pochodnie
     public bool IsPowerSource;
     public bool HasTileEntity;
+    /// <summary>OnEntityCollide wołane, gdy encja jest w bloku (pajęczyna, portale, płyty naciskowe...).</summary>
+    public bool EntityInside;
     public bool Flammable;
     public int DropOverride = -1, DropOverrideCount = 1;
+    /// <summary>Warianty meta pokazywane w kreatywnym i jako osobne ikony (null = tylko 0).</summary>
+    public int[] Variants;
 
     public Block(byte id, string key, string name)
     {
@@ -89,9 +95,15 @@ public class Block
     public Block Light(int l) { LightEmit = l; return this; }
     public Block Tab(int t) { CreativeTab = t; return this; }
     public Block NotCreative() { InCreative = false; return this; }
+    public Block Vars(params int[] metas) { Variants = metas; return this; }
+    public Block Vars(int count) { Variants = Enumerable.Range(0, count).ToArray(); return this; }
 
     // --- zachowanie ---
     public virtual int GetTexture(int face, int meta) => Tex[face];
+    /// <summary>Tint zależny od meta (np. podwójne rośliny: tylko trawa i paproć). Custom = kolor z CustomTint.</summary>
+    public virtual TintType TintAt(int meta) => Tint;
+    /// <summary>Kolor RGB dla TintType.Custom (np. łodygi dyni zależne od wieku).</summary>
+    public virtual uint CustomTint(int meta) => 0xFFFFFF;
     public virtual bool IsOpaqueCube(int meta) => Opaque;
 
     /// <summary>Boxy kolizji w lokalnych współrzędnych bloku (0..1).</summary>
@@ -132,6 +144,10 @@ public class Block
     public virtual void OnRandomTick(World w, int x, int y, int z, Rng r) { }
     public virtual void OnEntityCollide(World w, int x, int y, int z, Entity e) { }
     public virtual void OnEntityWalk(World w, int x, int y, int z, Entity e) { }
+    /// <summary>MC onLanded: encja wylądowała na bloku z prędkością motionY (MotionY jest już wyzerowane; szlam odbija).</summary>
+    public virtual void OnEntityLanded(World w, Entity e, double motionY) { }
+    /// <summary>MC onFallenUpon: mnożnik obrażeń od upadku na ten blok (szlam: 0, gdy encja nie skrada się).</summary>
+    public virtual float FallDamageMultiplier(World w, Entity e) => 1f;
     public virtual void OnDestroyedByPlayer(World w, int x, int y, int z, int meta, Player p) { }
 
     public virtual void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
@@ -166,8 +182,9 @@ public class Block
         var it = tool?.Item;
         if (it == null) return 1f;
         if (it.Tool == Tool && Tool != ToolType.None) return it.ToolSpeed;
-        if (it.Tool == ToolType.Sword && (Id == B.OakLeaves || Id == B.BirchLeaves)) return 1.5f;
-        if (it.Tool == ToolType.Shears && (Id == B.OakLeaves || Id == B.BirchLeaves)) return 15f;
+        if (it.Tool == ToolType.Sword && Id == B.Cobweb) return 15f;
+        if (it.Tool == ToolType.Sword && (this is LeavesBlock || Id is B.Vine or B.Pumpkin or B.Melon or B.JackOLantern || Render is RenderType.Cross or RenderType.Crops)) return 1.5f;
+        if (it.Tool == ToolType.Shears && (this is LeavesBlock || Id == B.Cobweb)) return 15f;
         if (it.Tool == ToolType.Shears && Id == B.Wool) return 5f;
         return 1f;
     }

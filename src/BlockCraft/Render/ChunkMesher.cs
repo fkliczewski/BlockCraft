@@ -35,7 +35,7 @@ public sealed class VertexBuffer
     }
 }
 
-public sealed class ChunkMesher
+public sealed partial class ChunkMesher
 {
     // wyściełane dane 18x18x18
     private const int P = 18;
@@ -43,7 +43,7 @@ public sealed class ChunkMesher
     private readonly byte[] _meta = new byte[P * P * P];
     private readonly byte[] _sky = new byte[P * P * P];
     private readonly byte[] _blk = new byte[P * P * P];
-    private readonly uint[] _grass = new uint[P * P], _foliage = new uint[P * P];
+    private readonly uint[] _grass = new uint[P * P], _foliage = new uint[P * P], _water = new uint[P * P];
     private readonly bool[] _opaque = new bool[256];
     public readonly VertexBuffer Solid = new(), Translucent = new();
     public static bool FancyLeaves = true;
@@ -51,7 +51,6 @@ public sealed class ChunkMesher
     private int _ox, _oy, _oz; // początek sekcji w świecie
     private readonly List<ModelBox> _boxes = new();
     private readonly SnapshotAccess _access;
-    private static int _leavesOpaqueOak = -1, _leavesOpaqueBirch = -1;
 
     private static readonly float[] FaceShade = { 0.5f, 1.0f, 0.8f, 0.8f, 0.6f, 0.6f };
 
@@ -106,9 +105,10 @@ public sealed class ChunkMesher
                 byte bio = c != null ? c.Biomes[(lz << 4) | lx] : (byte)0;
                 _grass[(z + 1) * P + x + 1] = Biome.GrassColor(bio);
                 _foliage[(z + 1) * P + x + 1] = Biome.FoliageColor(bio);
+                _water[(z + 1) * P + x + 1] = Biome.WaterColor(bio);
             }
         for (int i = 0; i < 256; i++) { var b = Block.ById[i]; _opaque[i] = b != null && b.Opaque; }
-        if (!FancyLeaves) { _opaque[B.OakLeaves] = true; _opaque[B.BirchLeaves] = true; }
+        if (!FancyLeaves) for (int i = 0; i < 256; i++) if (Block.ById[i] is LeavesBlock) _opaque[i] = true;
     }
 
     private uint BlendColor(uint[] arr, int x, int z)
@@ -129,11 +129,14 @@ public sealed class ChunkMesher
 
     private uint TintFor(Block b, int x, int y, int z, int meta)
     {
-        switch (b.Tint)
+        switch (b.TintAt(meta))
         {
             case TintType.Grass: return BlendColor(_grass, x, z);
             case TintType.Foliage: return BlendColor(_foliage, x, z);
             case TintType.Birch: return Rgb(0x80A755);
+            case TintType.Spruce: return Rgb(0x619961);
+            case TintType.Water: return BlendColor(_water, x, z);
+            case TintType.Custom: return Rgb(b.CustomTint(meta));
             case TintType.RedstoneWire:
                 {
                     float f = meta / 15f;
@@ -149,7 +152,6 @@ public sealed class ChunkMesher
     {
         Solid.Clear(); Translucent.Clear();
         Snapshot(w, cx, sy, cz);
-        if (_leavesOpaqueOak < 0) { _leavesOpaqueOak = TextureGen.Layer("leaves_oak_opaque"); _leavesOpaqueBirch = TextureGen.Layer("leaves_birch_opaque"); }
         for (int y = 0; y < 16; y++)
             for (int z = 0; z < 16; z++)
                 for (int x = 0; x < 16; x++)
@@ -183,8 +185,8 @@ public sealed class ChunkMesher
             if (nid == B.Piston || nid == B.StickyPiston) return !Block.ById[nid].IsOpaqueCube(_meta[ni]);
             return false;
         }
-        if (nid == b.Id && (b.Id == B.Glass || b.Id == B.Ice)) return false;
-        if (!FancyLeaves && nid == b.Id && (b.Id == B.OakLeaves || b.Id == B.BirchLeaves)) return false;
+        if (nid == b.Id && (b.Id == B.Glass || b.Id == B.Ice || b.Id == B.StainedGlass && _meta[ni] == _meta[Idx(x, y, z)])) return false;
+        if (!FancyLeaves && nid == b.Id && b is LeavesBlock) return false;
         var nb = Block.ById[nid];
         if (nb is SlabBlock && b.Opaque)
         {
@@ -225,12 +227,12 @@ public sealed class ChunkMesher
         bool translucent = b.Layer == RenderLayer.Translucent;
         var buf = translucent ? Translucent : Solid;
         uint tint = TintFor(b, x, y, z, meta);
-        bool leaves = !FancyLeaves && (b.Id == B.OakLeaves || b.Id == B.BirchLeaves);
+        bool leaves = !FancyLeaves && b is LeavesBlock;
         for (int f = 0; f < 6; f++)
         {
             if (!ShouldDrawFace(b, x, y, z, f)) continue;
             int tex = b.GetTexture(f, meta);
-            if (leaves) tex = b.Id == B.OakLeaves ? _leavesOpaqueOak : _leavesOpaqueBirch;
+            if (leaves) tex = ((LeavesBlock)b).OpaqueTex;
             uint t = tint;
             int flags = 0;
             if (b.TintMaskSides && f >= 2) flags = 1;
@@ -579,7 +581,7 @@ public sealed class ChunkMesher
                 int kk = (k + rot) & 3;
                 float u = uvs[kk * 2], v = uvs[kk * 2 + 1];
                 if (f == 0) { u = uvs[kk * 2]; v = uvs[kk * 2 + 1]; }
-                buf.V(x + px, y + py, z + pz, u, v, tex, 0, shade, sky, blk, tint);
+                buf.V(x + px, y + py + px * mb.SlopeX + pz * mb.SlopeZ, z + pz, u, v, tex, 0, shade, sky, blk, tint);
             }
             // płaskie: dodaj stronę odwrotną
             if (mb.NoCull && (x0 == x1 || z0 == z1 || y0 == y1))
@@ -588,7 +590,7 @@ public sealed class ChunkMesher
                 {
                     float px = fv[k * 3] == 0 ? x0 : x1, py = fv[k * 3 + 1] == 0 ? y0 : y1, pz = fv[k * 3 + 2] == 0 ? z0 : z1;
                     int kk = (k + rot) & 3;
-                    buf.V(x + px, y + py, z + pz, uvs[kk * 2], uvs[kk * 2 + 1], tex, 0, shade, sky, blk, tint);
+                    buf.V(x + px, y + py + px * mb.SlopeX + pz * mb.SlopeZ, z + pz, uvs[kk * 2], uvs[kk * 2 + 1], tex, 0, shade, sky, blk, tint);
                 }
             }
         }

@@ -13,7 +13,7 @@ public sealed class IconAtlas : IDisposable
 
     public bool TryGet(ItemStack s, out int layer)
     {
-        int key = s.Id | ((s.Id == World.B.Wool ? s.Damage : 0) << 16);
+        int key = s.Id | (HasVariants(s.Id) ? s.Damage << 16 : 0);
         return _layer.TryGetValue(key, out layer);
     }
 
@@ -23,8 +23,7 @@ public sealed class IconAtlas : IDisposable
         foreach (var it in Item.All)
         {
             if (!EntityRenderer.IsBlockModel(it)) continue;
-            if (it.Id == World.B.Wool) { for (int m = 0; m < 6; m++) keys.Add((it.Id, m)); }
-            else keys.Add((it.Id, 0));
+            foreach (int m in it.GetVariants()) keys.Add((it.Id, m));
         }
         var empty = new List<uint[]>();
         for (int i = 0; i < Math.Max(1, keys.Count); i++) empty.Add(new uint[Size * Size]);
@@ -55,11 +54,13 @@ public sealed class IconAtlas : IDisposable
             er.Flush(b, terrain);
             Array.Bind(0);
             GL.CopyTexSubImage3D(TextureTarget.Texture2DArray, 0, 0, 0, i, 0, 0, Size, Size);
-            _layer[keys[i].id | (keys[i].id == World.B.Wool ? keys[i].meta << 16 : 0)] = i;
+            _layer[keys[i].id | (HasVariants(keys[i].id) ? keys[i].meta << 16 : 0)] = i;
         }
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         fbo.Dispose();
     }
+
+    private static bool HasVariants(int id) { var it = Item.ById[id]; return it != null && it.GetVariants().Length > 1; }
 
     /// <summary>Ustawia jasność wg normalnej (obliczonej z pozycji wierzchołków).</summary>
     private static void ShadeFaces(ModelBatch b)

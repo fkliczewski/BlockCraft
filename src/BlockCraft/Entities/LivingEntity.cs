@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public abstract class LivingEntity : Entity
+public abstract partial class LivingEntity : Entity
 {
     public float Health, MaxHealth = 20;
     public int HurtTime, MaxHurtTime = 10, DeathTime, HurtResistantTime;
@@ -49,16 +49,50 @@ public abstract class LivingEntity : Entity
 
     private void UpdateSwing()
     {
-        const int len = 6;
+        int len = HasEffect(Effect.Haste) ? Math.Max(1, 6 - (EffectLevel(Effect.Haste) + 1)) : 6 + 2 * (EffectLevel(Effect.MiningFatigue) + 1);
         if (IsSwinging) { SwingTicks++; if (SwingTicks >= len) { SwingTicks = 0; IsSwinging = false; } }
         else SwingTicks = 0;
         SwingProgress = (float)SwingTicks / len;
+    }
+
+    // ---- efekty statusu (mikstury) ----
+    public readonly Dictionary<Effect, EffectInstance> Effects = new();
+    public bool HasEffect(Effect id) => Effects.ContainsKey(id);
+    /// <summary>Poziom efektu (0 = I) albo -1 gdy brak.</summary>
+    public int EffectLevel(Effect id) => Effects.TryGetValue(id, out var e) ? e.Amplifier : -1;
+    public virtual bool CanHaveEffect(Effect id) => !IsUndead || id is not (Effect.Poison or Effect.Regeneration);
+    public void AddEffect(EffectInstance ef)
+    {
+        if (!CanHaveEffect(ef.Id) || ef.Duration <= 0 || ef.Amplifier < 0 || !Enum.IsDefined(ef.Id) || ef.Id == Effect.None) return;
+        ef = ef.Copy();
+        if (Effects.TryGetValue(ef.Id, out var cur))
+        {
+            // jak w MC: wyższy poziom nadpisuje, ten sam poziom przedłuża
+            if (ef.Amplifier > cur.Amplifier) { EffectLogic.Removed(this, cur); cur.Amplifier = ef.Amplifier; cur.Duration = ef.Duration; EffectLogic.Applied(this, cur); }
+            else if (ef.Amplifier == cur.Amplifier && cur.Duration < ef.Duration) cur.Duration = ef.Duration;
+            cur.Ambient = ef.Ambient; cur.ShowParticles = ef.ShowParticles;
+        }
+        else { Effects[ef.Id] = ef; EffectLogic.Applied(this, ef); }
+    }
+    public void AddEffect(Effect id, int duration, int amplifier = 0) => AddEffect(new EffectInstance(id, duration, amplifier));
+    public void RemoveEffect(Effect id) { if (Effects.Remove(id, out var e)) EffectLogic.Removed(this, e); }
+    public void ClearEffects() { foreach (var id in Effects.Keys.ToList()) RemoveEffect(id); }
+    private void TickEffects()
+    {
+        if (Effects.Count == 0) return;
+        EffectLogic.Particles(this);
+        foreach (var ef in Effects.Values.ToList())
+        {
+            EffectLogic.Tick(this, ef);
+            if (--ef.Duration <= 0) RemoveEffect(ef.Id);
+        }
     }
 
     public override void Tick()
     {
         base.Tick();
         UpdateSwing();
+        if (!IsRemoteControlled) TickEffects();
         if (IsRemoteControlled)
         {
             UpdateLimbs();
@@ -82,6 +116,11 @@ public abstract class LivingEntity : Entity
         }
         BaseLivingTick();
         if (Dead) return;
+        if (RidingEntity != null)
+        {
+            if (RidingEntity.Removed || this is Player && Sneaking) Mount(null);
+            else { MotionX = MotionY = MotionZ = 0; RidingEntity.UpdatePassenger(); UpdateLimbs(); return; }
+        }
         UpdateAI();
         LivingUpdate();
         UpdateLimbs();
@@ -92,7 +131,7 @@ public abstract class LivingEntity : Entity
         // duszenie się w bloku
         if (IsInsideOpaqueBlock() && !NoClip) Attack(DamageSource.InWall, 1f);
         // tonięcie
-        if (IsHeadInWater() && !CanBreatheUnderwater && !(this is Player { Invulnerable: true }))
+        if (IsHeadInWater() && !CanBreatheUnderwater && !HasEffect(Effect.WaterBreathing) && !(this is Player { Invulnerable: true }))
         {
             Air--;
             if (Air <= -20)
@@ -147,7 +186,7 @@ public abstract class LivingEntity : Entity
 
     public virtual void Jump()
     {
-        MotionY = 0.42;
+        MotionY = 0.42 + .1 * (EffectLevel(Effect.JumpBoost) + 1);
         if (Sprinting)
         {
             float yr = Yaw * MathUtil.Deg2Rad;
@@ -175,7 +214,7 @@ public abstract class LivingEntity : Entity
         }
     }
 
-    public virtual float GetSpeed() => AiMoveSpeed * (Sprinting ? 1.3f : 1f);
+    public virtual float GetSpeed() => AiMoveSpeed * (Sprinting ? 1.3f : 1f) * EffectLogic.Movement(this);
     protected virtual float JumpMovementFactor => Sprinting ? 0.026f : 0.02f;
     protected virtual bool IsFlyingNow => false;
 
@@ -260,11 +299,11 @@ public abstract class LivingEntity : Entity
 
     public virtual bool IsInvulnerableTo(DamageSource s) => false;
 
-    public virtual bool Attack(DamageSource src, float amount)
+    public override bool Attack(DamageSource src, float amount)
     {
-        if (World.IsRemote && this is not Player) return false;
+        if (World.IsRemote) return false; // na kliencie obrażenia liczy host
         if (Dead || Health <= 0 || IsInvulnerableTo(src)) return false;
-        if (src.IsFire && ImmuneToFire) return false;
+        if (src.IsFire && (ImmuneToFire || HasEffect(Effect.FireResistance))) return false;
         if (HurtResistantTime > 10)
         {
             if (amount <= LastDamage) return false;
@@ -298,8 +337,8 @@ public abstract class LivingEntity : Entity
         World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f);
     }
 
-    public virtual string HurtSound => "hurt";
-    public virtual string DeathSound => HurtSound;
+    public virtual string HurtSound => "game.neutral.hurt";
+    public virtual string DeathSound => "game.neutral.die";
 
     protected virtual void DamageEntity(DamageSource src, float amount)
     {
@@ -309,7 +348,9 @@ public abstract class LivingEntity : Entity
             amount = amount * (25 - armor) / 25f;
             OnArmorDamaged(amount);
         }
-        Health = Math.Max(0, Health - amount);
+        if (src.Type is not ("outOfWorld" or "kill") && HasEffect(Effect.Resistance)) amount *= Math.Max(0, 1 - .2f * (EffectLevel(Effect.Resistance) + 1));
+        float absorbed = Math.Min(Absorption, amount); Absorption -= absorbed;
+        Health = Math.Max(0, Health - (amount - absorbed));
     }
 
     protected virtual void OnArmorDamaged(float amount) { }
@@ -364,11 +405,15 @@ public abstract class LivingEntity : Entity
     {
         base.Save(bw);
         bw.Write(Health); bw.Write(Air);
+        bw.Write(Effects.Count);
+        foreach (var e in Effects.Values) { bw.Write((int)e.Id); bw.Write(e.Duration); bw.Write(e.Amplifier); bw.Write(e.Ambient); bw.Write(e.ShowParticles); }
     }
     public override void Load(BinaryReader br)
     {
         base.Load(br);
         Health = br.ReadSingle(); Air = br.ReadInt32();
+        int ne = br.ReadInt32();
+        for (int i = 0; i < ne; i++) { var e = new EffectInstance((Effect)br.ReadInt32(), br.ReadInt32(), br.ReadInt32(), br.ReadBoolean(), br.ReadBoolean()); AddEffect(e); }
         BodyYaw = PrevBodyYaw = HeadYaw = PrevHeadYaw = Yaw;
     }
 }

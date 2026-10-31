@@ -228,10 +228,10 @@ public sealed class ArrowEntity : Entity
             float speed = (float)len;
             int dmg = (int)Math.Ceiling(speed * Damage);
             if (Critical) dmg += World.Rand.Next(dmg / 2 + 2);
-            if (target is LivingEntity le && le.Attack(DamageSource.Arrow(this, Shooter ?? this), dmg))
+            if (target.Attack(DamageSource.Arrow(this, Shooter ?? this), dmg))
             {
                 double h = Math.Sqrt(MotionX * MotionX + MotionZ * MotionZ);
-                if (h > 0) { le.MotionX += MotionX * 0.6 / h * 0.6; le.MotionY += 0.1; le.MotionZ += MotionZ * 0.6 / h * 0.6; }
+                if (h > 0 && target is LivingEntity) { target.MotionX += MotionX * 0.6 / h * 0.6; target.MotionY += 0.1; target.MotionZ += MotionZ * 0.6 / h * 0.6; }
                 World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
                 Kill();
             }
@@ -248,6 +248,7 @@ public sealed class ArrowEntity : Entity
             InGround = true; Shake = 7; Critical = false;
             World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
             if (_gid == B.Tnt && FireTicks > 0) TntBlock.Ignite(World, _gx, _gy, _gz, 80);
+            if (!World.IsRemote) Block.ById[_gid].OnEntityCollide(World, _gx, _gy, _gz, this); // MC 1.8: strzała trafia blok (drewniany przycisk, płyta)
             return;
         }
         X = ex; Y = ey; Z = ez;
@@ -328,6 +329,8 @@ public sealed class ThrownEntity : Entity
             World.SpawnParticles(ParticleKind.Portal, X, Y, Z, 32);
             if (Thrower is Player p && !p.Dead)
             {
+                // MC 1.8: 5% szans na endermita w miejscu gracza (moduł NE rejestruje "endermite")
+                if (World.Rand.NextFloat() < 0.05f && World.Rules.DoMobSpawning && EntitySerializer.Create("endermite", World) is { } mite) { mite.SetPositionAndPrev(p.X, p.Y, p.Z); mite.Yaw = p.Yaw; World.SpawnEntity(mite); }
                 p.SetPositionAndPrev(X, Y, Z); p.FallDistance = 0;
                 p.NetTeleportHook?.Invoke();
                 if (!p.Creative) p.Attack(DamageSource.Fall, 5f);
@@ -355,7 +358,7 @@ public static class Explosion
         w.PlaySound("explode", x, y, z, 4f, (1f + (w.Rand.NextFloat() - w.Rand.NextFloat()) * 0.2f) * 0.7f);
         w.SpawnParticles(power >= 2 ? ParticleKind.Explosion : ParticleKind.LargeSmoke, x, y, z, 1, (int)(power * 10));
         var affected = new HashSet<(int, int, int)>();
-        if (breakBlocks && w.Rules.MobGriefing || breakBlocks && source is TntEntity)
+        if (breakBlocks && (w.Rules.MobGriefing || source is TntEntity or TntMinecartEntity))
         {
             for (int i = 0; i < 16; i++)
                 for (int j = 0; j < 16; j++)
@@ -374,10 +377,10 @@ public static class Explosion
                             if (id != 0)
                             {
                                 var b = Block.ById[id];
-                                float res = b.IsLiquid ? 100 : b.BlastResistance;
+                                float res = source is IExplosionBlockRules rules ? rules.Resistance(w, bx, by, bz, b) : b.IsLiquid ? 100 : b.BlastResistance;
                                 f -= (res + 0.3f) * 0.3f;
                             }
-                            if (f > 0 && by >= 0 && by < Chunk.Height) affected.Add((bx, by, bz));
+                            if (f > 0 && by >= 0 && by < Chunk.Height && (source is not IExplosionBlockRules rules2 || rules2.CanDestroy(w, bx, by, bz))) affected.Add((bx, by, bz));
                             px += dx * 0.3; py += dy * 0.3; pz += dz * 0.3;
                         }
                     }
@@ -396,7 +399,7 @@ public static class Explosion
             double exposure = Exposure(w, x, y, z, e.BoundingBox);
             double impact = (1 - dist) * exposure;
             float dmg = (float)((impact * impact + impact) / 2 * 8 * r2 + 1);
-            if (e is LivingEntity le) le.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
+            if (e.CanBeAttacked) e.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
             else if (e is ItemEntity || e is XpOrbEntity) { e.Kill(); continue; }
             e.MotionX += ex * impact; e.MotionY += ey * impact; e.MotionZ += ez * impact;
         }

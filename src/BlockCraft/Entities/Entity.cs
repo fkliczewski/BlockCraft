@@ -59,6 +59,8 @@ public abstract class Entity
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
     public float FallDistance;
+    /// <summary>W pajęczynie (MC isInWeb): następny ruch spowolniony.</summary>
+    public bool InWeb;
     public int Age;
     public int FireTicks;
     public float StepHeight = 0.5f;
@@ -66,6 +68,43 @@ public abstract class Entity
     // interpolacja sieciowa
     public double NetX, NetY, NetZ; public float NetYaw, NetPitch; public int NetSteps;
     public int RiddenTicks;
+    public Entity RidingEntity, Passenger;
+    public string SaveId = Guid.NewGuid().ToString("N");
+    public string PendingVehicleId;
+
+    public virtual bool Attack(DamageSource source, float amount) => false;
+    public bool Mount(Entity vehicle)
+    {
+        if (vehicle == this || vehicle != null && (vehicle.Removed || vehicle.Passenger != null)) return false;
+        for (var parent = vehicle; parent != null; parent = parent.RidingEntity) if (parent == this) return false;
+        PendingVehicleId = null;
+        var old = RidingEntity;
+        if (old != null) old.Passenger = null;
+        RidingEntity = vehicle;
+        MotionX = MotionY = MotionZ = 0; FallDistance = 0;
+        if (vehicle != null) { vehicle.Passenger = this; vehicle.UpdatePassenger(); }
+        else if (old != null)
+        {
+            // Wysiadanie na wolne miejsce obok pojazdu.
+            var boxes = new List<AABB>();
+            bool found = false;
+            foreach (var (dx, dz) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                var bb = new AABB(old.X + dx - Width / 2, old.Y + 0.5, old.Z + dz - Width / 2,
+                    old.X + dx + Width / 2, old.Y + 0.5 + Height, old.Z + dz + Width / 2);
+                if (World.GetCollisionBoxes(bb, boxes).Count != 0) continue;
+                SetPosition(old.X + dx, old.Y + 0.5, old.Z + dz); found = true; break;
+            }
+            if (!found) SetPosition(old.X, old.Y + old.Height, old.Z);
+        }
+        return true;
+    }
+    public virtual void UpdatePassenger()
+    {
+        if (Passenger == null) return;
+        if (Passenger.Dead || Passenger.Removed) { Passenger.Mount(null); return; }
+        Passenger.SetPosition(X, Y + 0.35, Z); Passenger.FallDistance = 0;
+    }
 
     protected Entity(World.World w) { World = w; }
 
@@ -93,6 +132,15 @@ public abstract class Entity
     {
         Age++;
         if (IsRemoteControlled) { NetInterpolate(); return; }
+        if (!Dead && PendingVehicleId != null)
+        {
+            if (this is Player { Sneaking: true }) PendingVehicleId = null;
+            else
+            {
+                var vehicle = World.Entities.FirstOrDefault(e => !e.Removed && e.SaveId == PendingVehicleId);
+                if (vehicle != null) Mount(vehicle);
+            }
+        }
         UpdateFluidState();
         if (FireTicks > 0)
         {
@@ -188,6 +236,7 @@ public abstract class Entity
     public void MoveWithCollision(double dx, double dy, double dz)
     {
         if (NoClip) { X += dx; Y += dy; Z += dz; return; }
+        if (InWeb) { InWeb = false; dx *= 0.25; dy *= 0.05000000074505806; dz *= 0.25; MotionX = 0; MotionY = 0; MotionZ = 0; }
         double odx = dx, ody = dy, odz = dz;
         var box = BoundingBox;
 
@@ -240,13 +289,18 @@ public abstract class Entity
         CollidedH = odx != dx || odz != dz;
         CollidedV = ody != dy;
         OnGround = CollidedV && ody < 0;
+        UpdateStepSound(dx, dz);
         if (odx != dx) MotionX = 0;
         if (odz != dz) MotionZ = 0;
-        if (ody != dy) MotionY = 0;
+        // blok pod stopami jak w MC (floor(posY - 0.2)): lądowanie, upadek, chodzenie (szlam, ruda redstone)
+        int fx = MathUtil.FloorToInt(X), fy = MathUtil.FloorToInt(Y - 0.2), fz = MathUtil.FloorToInt(Z);
+        var feet = Block.Get(World.GetBlock(fx, fy, fz));
+        if (ody != dy) { double my = MotionY; MotionY = 0; if (ody < 0) feet.OnEntityLanded(World, this, my); }
 
         if (OnGround)
         {
-            if (FallDistance > 0) { OnFall(FallDistance); FallDistance = 0; }
+            if (FallDistance > 0) { OnFall(FallDistance * feet.FallDamageMultiplier(World, this)); FallDistance = 0; }
+            if (!World.IsRemote && this is LivingEntity { Sneaking: false }) feet.OnEntityWalk(World, fx, fy, fz, this);
         }
         else if (dy < 0) FallDistance -= (float)dy;
 
@@ -266,12 +320,43 @@ public abstract class Entity
                             var cb = new AABB(x + 1 / 16.0, y, z + 1 / 16.0, x + 15 / 16.0, y + 1, z + 15 / 16.0);
                             if (cb.Intersects(bb)) Block.ById[id].OnEntityCollide(World, x, y, z, this);
                         }
+                        else if (id != 0) Block.ById[id].OnEntityCollide(World, x, y, z, this); // MC doBlockCollisions (płyty, linka, tory)
                     }
+    }
+
+    // ---- dźwięk kroków (MC 1.8: distanceWalkedModified / nextStepDistance) ----
+    private float _distWalked, _nextStep = 1f;
+    /// <summary>Zdarzenie kroku moba (np. mob.cow.step); null = dźwięk bloku pod nogami.</summary>
+    public virtual string StepSoundName => null;
+    protected virtual bool SilentSteps => this is LivingEntity le && le.Sneaking;
+
+    private void UpdateStepSound(double dx, double dz)
+    {
+        if (!(this is LivingEntity) || NoClip) return;
+        if (SilentSteps) return;
+        _distWalked += (float)Math.Sqrt(dx * dx + dz * dz) * 0.6f;
+        if (_distWalked <= _nextStep) return;
+        _nextStep = (int)_distWalked + 1;
+        int bx = MathUtil.FloorToInt(X), by = MathUtil.FloorToInt(Y - 0.2), bz = MathUtil.FloorToInt(Z);
+        if (InWater)
+        {
+            float f = (float)Math.Sqrt(MotionX * MotionX * 0.2 + MotionY * MotionY + MotionZ * MotionZ * 0.2) * 0.35f;
+            if (f > 1f) f = 1f;
+            World.PlaySound(this is Player ? "game.player.swim" : "game.neutral.swim", X, Y, Z, f, 1f + (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.4f);
+            return;
+        }
+        if (!OnGround) return;
+        int id = World.GetBlock(bx, by, bz);
+        if (id == 0) return;
+        var b = Block.Get(id);
+        if (b.IsLiquid) return;
+        string name = StepSoundName ?? BlockCraft.Audio.SoundEvents.Step(b.Sound);
+        World.PlaySound(name, X, Y, Z, 0.15f, 1f);
     }
 
     protected virtual void OnFall(float distance) { }
 
-    public void Kill() { Dead = true; Removed = true; }
+    public void Kill() { PendingVehicleId = null; Passenger?.Mount(null); if (RidingEntity != null) Mount(null); Dead = true; Removed = true; }
 
     public double DistanceSq(Entity o) { double dx = X - o.X, dy = Y - o.Y, dz = Z - o.Z; return dx * dx + dy * dy + dz * dz; }
     public double DistanceSq(double x, double y, double z) { double dx = X - x, dy = Y - y, dz = Z - z; return dx * dx + dy * dy + dz * dz; }
@@ -285,7 +370,11 @@ public abstract class Entity
     }
 
     public virtual void OnCollideWithPlayer(Player p) { }
+    /// <summary>Uderzenie pioruna (MC: onStruckByLightning) - domyślnie 5 obrażeń od ognia i podpalenie; creeper, świnia, wieśniak nadpisują.</summary>
+    public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); FireTicks = Math.Max(FireTicks, 160); }
     public virtual bool Interact(Player p) => false;
+    /// <summary>Gracz uderza encję, która nie jest żywa (np. odbicie kuli ognia). True = obsłużone.</summary>
+    public virtual bool AttackedByPlayer(Player p) => false;
 
     public virtual void Save(BinaryWriter bw)
     {
@@ -307,25 +396,28 @@ public abstract class Entity
 
 public static class EntitySerializer
 {
-    public static Entity Create(string key, World.World w) => key switch
+    /// <summary>Rejestr typów encji (klucz -> fabryka). Moduły rejestrują własne w Registries.cs (Registries.InitEntities).</summary>
+    public static readonly Dictionary<string, Func<World.World, Entity>> Types = new()
     {
-        "item" => new ItemEntity(w, 0, 0, 0, new ItemStack(1)),
-        "cow" => new Cow(w),
-        "pig" => new Pig(w),
-        "sheep" => new Sheep(w),
-        "chicken" => new Chicken(w),
-        "zombie" => new Zombie(w),
-        "skeleton" => new Skeleton(w),
-        "creeper" => new Creeper(w),
-        "spider" => new Spider(w),
-        "enderman" => new Enderman(w),
-        "arrow" => new ArrowEntity(w),
-        "tnt" => new TntEntity(w, 0, 0, 0, 80),
-        "falling_block" => new FallingBlockEntity(w, 0, 0, 0, B.Sand, 0),
-        "xp_orb" => new XpOrbEntity(w, 0, 0, 0, 1),
-        "thrown" => new ThrownEntity(w, 0, null),
-        _ => null
+        ["item"] = w => new ItemEntity(w, 0, 0, 0, new ItemStack(1)),
+        ["cow"] = w => new Cow(w),
+        ["pig"] = w => new Pig(w),
+        ["sheep"] = w => new Sheep(w),
+        ["chicken"] = w => new Chicken(w),
+        ["zombie"] = w => new Zombie(w),
+        ["skeleton"] = w => new Skeleton(w),
+        ["creeper"] = w => new Creeper(w),
+        ["spider"] = w => new Spider(w),
+        ["enderman"] = w => new Enderman(w),
+        ["arrow"] = w => new ArrowEntity(w),
+        ["tnt"] = w => new TntEntity(w, 0, 0, 0, 80),
+        ["falling_block"] = w => new FallingBlockEntity(w, 0, 0, 0, B.Sand, 0),
+        ["xp_orb"] = w => new XpOrbEntity(w, 0, 0, 0, 1),
+        ["thrown"] = w => new ThrownEntity(w, 0, null),
     };
+
+    public static Entity Create(string key, World.World w) => Types.TryGetValue(key, out var f) ? f(w) : null;
+
 
     public static byte[] SaveEntities(List<Entity> ents)
     {
@@ -341,6 +433,10 @@ public static class EntitySerializer
             bw.Write((int)ems.Length);
             bw.Write(ems.ToArray());
         }
+        // Opcjonalny ogon zachowuje zgodność starych rekordów encji i zapisuje relacje także między chunkami.
+        bw.Write(0x52534452); // RDSR
+        bw.Write(ents.Count);
+        foreach (var e in ents) { bw.Write(e.SaveId); bw.Write(e.RidingEntity?.SaveId ?? e.PendingVehicleId ?? ""); }
         return ms.ToArray();
     }
 
@@ -350,6 +446,7 @@ public static class EntitySerializer
         {
             using var br = new BinaryReader(new MemoryStream(data));
             int n = br.ReadInt32();
+            var loaded = new Entity[n];
             for (int i = 0; i < n; i++)
             {
                 string key = br.ReadString();
@@ -357,8 +454,19 @@ public static class EntitySerializer
                 var bytes = br.ReadBytes(len);
                 var e = Create(key, w);
                 if (e == null) continue;
-                try { e.Load(new BinaryReader(new MemoryStream(bytes))); w.SpawnEntity(e); }
+                try { e.Load(new BinaryReader(new MemoryStream(bytes))); loaded[i] = e; w.SpawnEntity(e); }
                 catch (Exception ex) { Log.Error("Entity load " + key + ": " + ex.Message); }
+            }
+            if (br.BaseStream.Length - br.BaseStream.Position >= 8 && br.ReadInt32() == 0x52534452)
+            {
+                int links = br.ReadInt32();
+                for (int i = 0; i < links; i++)
+                {
+                    string id = br.ReadString(), vehicle = br.ReadString();
+                    if (i >= n || loaded[i] == null) continue;
+                    loaded[i].SaveId = id;
+                    loaded[i].PendingVehicleId = vehicle.Length == 0 ? null : vehicle;
+                }
             }
         }
         catch (Exception ex) { Log.Error("Entities load: " + ex.Message); }

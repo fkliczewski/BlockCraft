@@ -10,11 +10,6 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace BlockCraft;
 
-public static class Sound
-{
-    public static void Play(string name, double x, double y, double z, float vol, float pitch, Player listener) { }
-}
-
 public sealed partial class Game
 {
     private Matrix4 _proj;
@@ -103,14 +98,17 @@ public sealed partial class Game
             if (id == B.Water && ey < by + FluidBlock.HeightOf(w.GetMeta(bx, by, bz))) { headFluid = 1; fov *= 60f / 70f; }
             if (id == B.Lava) headFluid = 2;
         }
+        if (p.HasEffect(Effect.Nausea)) { float wave = MathF.Sin((p.Age + pt) * .08f); view *= Matrix4.CreateRotationZ(wave * .035f) * Matrix4.CreateScale(1 + wave * .06f, 1, 1); }
         _proj = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Math.Clamp(fov, 10, 150)), fw / (float)Math.Max(1, fh), 0.05f, Math.Max(256f, Renderer.RenderDistance * 32f));
         Renderer.Update(cam);
         var look = -new Vector3(view.M13, view.M23, view.M33);
         Renderer.ComputeAtmosphere(cam, look, pt, headFluid);
+        ApplyEffectAtmosphere(p, pt);
         GL.ClearColor(Renderer.FogColor.X, Renderer.FogColor.Y, Renderer.FogColor.Z, 1);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         World.World.HitResult? sel = Ctrl.Hit.Hit && !p.Spectator && !HideGui ? Ctrl.Hit : null;
         Renderer.Render(cam, view, _proj, pt, p, third, sel, Ctrl.BreakStage);
+        NetCaptureCamera(cam, view);
 
         // ręka
         if (!third && !p.Spectator && !p.Sleeping && !HideGui)
@@ -164,15 +162,14 @@ public sealed partial class Game
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
     {
         if (s == null || s.Item == null) return;
-        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16);
+        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
         else
         {
             var it = s.Item;
-            int sp = it.Sprite > 0 ? it.Sprite : (it.IsBlock ? Block.Get(it.BlockId).Tex[0] : 0);
-            uint col = 0xFFFFFFFF;
-            var b = it.IsBlock ? Block.Get(it.BlockId) : null;
-            if (b != null && b.Tint == TintType.Grass) col = 0xFF5AC079;
+            int sp = it.GetSprite(s);
+            uint col = it.GetColor(s, 0);
             Sb.DrawLayer(Renderer.Terrain, sp, x, y, 16, 16, col);
+            if (it.OverlayFn != null) { var (ol, oc) = it.OverlayFn(s); if (ol > 0) Sb.DrawLayer(Renderer.Terrain, ol, x, y, 16, 16, oc); }
         }
         if (count && s.Count > 1)
         {
@@ -246,6 +243,7 @@ public sealed partial class Game
             if (w.GetBlock(bx, by, bz) == B.Lava) sb.Fill(0, 0, W, H, 0xA00050FF);
             if (p.IsInsideOpaqueBlock() && !p.Spectator) sb.Fill(0, 0, W, H, 0xC0101010);
         }
+        NetDrawNameTags(pt);
         // winieta
         sb.Gradient(0, 0, W, H / 6f, 0x30000000, 0x00000000);
         sb.Gradient(0, H - H / 6f, W, H / 6f, 0x00000000, 0x30000000);
@@ -265,6 +263,7 @@ public sealed partial class Game
             sb.Flush();
             GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
         }
+        DrawBossBar();
         if (ShowDebug) DrawDebug();
         if (p.Spectator) { DrawChat(); return; }
         // hotbar
@@ -300,6 +299,7 @@ public sealed partial class Game
                 if (i * 2 + 1 < hp) sb.DrawPx(Gui.Icons, x, y, GuiTextures.HeartFull, 0, 9, 9);
                 else if (i * 2 + 1 == hp) sb.DrawPx(Gui.Icons, x, y, GuiTextures.HeartHalf, 0, 9, 9);
             }
+            DrawEffectHearts(p, hx, heartY);
             // zbroja
             int armor = p.ArmorValue;
             if (armor > 0)
@@ -366,7 +366,7 @@ public sealed partial class Game
         {
             $"BlockCraft 1.0 ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
             $"C: {Renderer.RenderedSections}/{Renderer.TotalSections} sekcji, E: {w.Entities.Count}, P: {Renderer.Particles.Count}",
-            $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager.PendingCount} w kolejce",
+            $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager?.PendingCount ?? 0} w kolejce",
             "",
             $"XYZ: {p.X:F3} / {p.Y:F5} / {p.Z:F3}",
             $"Blok: {bx} {by} {bz}   Chunk: {bx & 15} {by & 15} {bz & 15} w {bx >> 4} {by >> 4} {bz >> 4}",

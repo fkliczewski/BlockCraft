@@ -12,17 +12,18 @@ public sealed class Recipe
     public ItemStack Result;
 }
 
-public static class Recipes
+public static partial class Recipes
 {
     public static readonly List<Recipe> All = new();
-    public const int AnyPlanks = -1, AnyLog = -2, AnyCoal = -3;
+    public const int AnyPlanks = -1, AnyLog = -2, AnyCoal = -3, AnyWoodSlab = -4;
 
     private static bool Matches(int want, int wantMeta, ItemStack s)
     {
         if (want == 0) return s == null;
         if (s == null) return false;
-        if (want == AnyPlanks) return s.Id == B.OakPlanks || s.Id == B.BirchPlanks;
-        if (want == AnyLog) return s.Id == B.OakLog || s.Id == B.BirchLog;
+        if (want == AnyPlanks) return s.Id is B.OakPlanks or B.BirchPlanks or B.SprucePlanks or B.JunglePlanks or B.AcaciaPlanks or B.DarkOakPlanks;
+        if (want == AnyLog) return s.Id is B.OakLog or B.BirchLog or B.SpruceLog or B.JungleLog or B.AcaciaLog or B.DarkOakLog;
+        if (want == AnyWoodSlab) return s.Id is B.OakSlab or B.BirchSlab or B.SpruceSlab or B.JungleSlab or B.AcaciaSlab or B.DarkOakSlab;
         if (want == AnyCoal) return s.Id == I.Coal || s.Id == I.Charcoal;
         return s.Id == want && (wantMeta < 0 || s.Damage == wantMeta);
     }
@@ -125,13 +126,13 @@ public static class Recipes
         Shaped(S(B.Chest), "###", "# #", "###", '#', AnyPlanks);
         Shaped(S(B.Torch, 4), "C", "S", 'C', AnyCoal, 'S', I.Stick);
         Shaped(S(B.Ladder, 3), "S S", "SSS", "S S", 'S', I.Stick);
-        Shaped(S(B.Fence, 3), "PSP", "PSP", 'P', AnyPlanks, 'S', I.Stick);
-        Shaped(S(B.FenceGate), "SPS", "SPS", 'P', AnyPlanks, 'S', I.Stick);
-        Shaped(S(I.Door, 3), "PP", "PP", "PP", 'P', AnyPlanks);
+        Shaped(S(B.Fence, 3), "PSP", "PSP", 'P', B.OakPlanks, 'S', I.Stick);
+        Shaped(S(B.FenceGate), "SPS", "SPS", 'P', B.OakPlanks, 'S', I.Stick);
+        Shaped(S(I.Door, 3), "PP", "PP", "PP", 'P', B.OakPlanks);
         Shaped(S(I.Bed), "WWW", "PPP", 'W', B.Wool, 'P', AnyPlanks);
         Shaped(S(I.Bowl, 4), "P P", " P ", 'P', AnyPlanks);
-        Shaped(S(B.OakSlab, 6), "PPP", 'P', AnyPlanks);
-        Shaped(S(B.OakStairs, 4), "P  ", "PP ", "PPP", 'P', AnyPlanks);
+        Shaped(S(B.OakSlab, 6), "PPP", 'P', B.OakPlanks);
+        Shaped(S(B.OakStairs, 4), "P  ", "PP ", "PPP", 'P', B.OakPlanks);
         Shaped(S(B.Bookshelf), "PPP", "BBB", "PPP", 'P', AnyPlanks, 'B', I.Book);
 
         // narzędzia
@@ -166,7 +167,7 @@ public static class Recipes
 
         // jedzenie
         Shaped(S(I.Bread), "WWW", 'W', I.Wheat);
-        Shaped(S(I.Cookie, 8), "WCW", 'W', I.Wheat, 'C', I.Sugar);
+        Shaped(S(I.Cookie, 8), "WCW", 'W', I.Wheat, 'C', (I.Dye, 3));
         Shaped(S(I.GoldenApple), "GGG", "GAG", "GGG", 'G', I.GoldIngot, 'A', I.Apple);
         Shapeless(S(I.Sugar), I.SugarCane);
         Shaped(S(I.Paper, 3), "###", '#', I.SugarCane);
@@ -181,19 +182,17 @@ public static class Recipes
         Compress(I.IronIngot, B.IronBlock); Compress(I.GoldIngot, B.GoldBlock); Compress(I.Diamond, B.DiamondBlock);
         Compress(I.Coal, B.CoalBlock); Compress(I.Redstone, B.RedstoneBlock); Compress(I.Lapis, B.LapisBlock);
         Shaped(S(I.GoldIngot), "###", "###", "###", '#', I.GoldNugget);
-        Shaped(S(B.StoneBricks, 4), "##", "##", '#', B.Stone);
-        Shaped(S(B.Sandstone), "##", "##", '#', B.Sand);
+        Shaped(S(B.StoneBricks, 4), "##", "##", '#', ((int)B.Stone, 0));
+        Shaped(S(B.Sandstone), "##", "##", '#', ((int)B.Sand, 0));
         Shaped(S(B.CobbleSlab, 6), "###", '#', B.Cobblestone);
-        Shaped(S(B.StoneSlab, 6), "###", '#', B.Stone);
+        Shaped(S(B.StoneSlab, 6), "###", '#', ((int)B.Stone, 0));
         Shaped(S(B.CobbleStairs, 4), "#  ", "## ", "###", '#', B.Cobblestone);
         Shaped(S(B.Bricks), "##", "##", '#', I.Brick);
         Shaped(S(B.Clay), "##", "##", '#', I.ClayBall);
         Shaped(S(B.Wool), "##", "##", '#', I.String);
         Shaped(S(B.Tnt), "GSG", "SGS", "GSG", 'G', I.Gunpowder, 'S', B.Sand);
         Shapeless(S(I.BoneMeal, 3), I.Bone);
-        Shapeless(S(B.MossyCobblestone), B.Cobblestone, I.Seeds);
-        Shapeless(S(B.Wool, 1, 3), B.Wool, I.Coal);   // czarna
-        Shapeless(S(B.Wool, 1, 2), B.Wool, B.Gravel);   // szara (uproszczenie)
+        Shapeless(S(B.MossyCobblestone), B.Cobblestone, B.Vine);
         Shapeless(S(B.Glowstone), I.Redstone, I.GoldNugget, I.Redstone, I.GoldNugget);
 
         // redstone
@@ -206,6 +205,7 @@ public static class Recipes
         Shapeless(S(B.StickyPiston), B.Piston, I.String);
 
         Smelting.Init();
+        ModuleRecipes();
     }
 }
 
@@ -232,18 +232,26 @@ public static class Smelting
         Add(I.RawChicken, I.CookedChicken, 0.35f);
         Add(I.RawMutton, I.CookedMutton, 0.35f);
         Add(I.ClayBall, I.Brick, 0.3f);
-        Add(B.Clay, B.Bricks, 0.3f);
-        Add(B.Cactus, B.Wool, 0.2f); // brak barwników – kaktus zamiast zielonego barwnika nieużywany
-        Table.Remove(B.Cactus);
     }
 
-    public static ItemStack Result(ItemStack input) => input != null && Table.TryGetValue(input.Id, out var r) ? r.result : null;
-    public static float Xp(ItemStack input) => input != null && Table.TryGetValue(input.Id, out var r) ? r.xp : 0;
+    /// <summary>Przetapianie zależne od meta wejścia (np. mokra gąbka, kamienne cegły). Sprawdzane przed Table.</summary>
+    public static readonly Dictionary<(int id, int meta), (ItemStack result, float xp)> MetaTable = new();
+    /// <summary>Paliwa modułów (id -> czas palenia w tickach). Sprawdzane przed wbudowaną listą.</summary>
+    public static readonly Dictionary<int, int> Fuel = new();
+
+    private static bool Lookup(ItemStack input, out (ItemStack result, float xp) r)
+    {
+        r = default;
+        return input != null && (MetaTable.TryGetValue((input.Id, input.Damage), out r) || Table.TryGetValue(input.Id, out r));
+    }
+    public static ItemStack Result(ItemStack input) => Lookup(input, out var r) ? r.result : null;
+    public static float Xp(ItemStack input) => Lookup(input, out var r) ? r.xp : 0;
 
     public static int BurnTime(ItemStack s)
     {
         if (s == null) return 0;
         int id = s.Id;
+        if (Fuel.TryGetValue(id, out int fuel)) return fuel;
         if (id == I.Coal || id == I.Charcoal) return 1600;
         if (id == B.CoalBlock) return 16000;
         if (id == I.LavaBucket) return 20000;
@@ -252,7 +260,6 @@ public static class Smelting
             || id == B.Fence || id == B.FenceGate || id == B.OakStairs || id == B.Bookshelf || id == B.Ladder) return 300;
         if (id == B.OakSlab) return 150;
         if (id == B.OakSapling || id == B.BirchSapling) return 100;
-        if (id == B.Wool) return 100;
         var it = s.Item;
         if (it != null && it.IsTool && it.ToolLevel == 0 && it.MaxDamage == 59) return 200; // drewniane narzędzia
         if (id == I.Bow) return 300;

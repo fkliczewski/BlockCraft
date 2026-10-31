@@ -24,7 +24,7 @@ public sealed class ModelPart
 }
 
 /// <summary>Skórki mobów rysowane proceduralnie w układzie UV jak w MC (64x32).</summary>
-public static class SkinGen
+public static partial class SkinGen
 {
     public const int W = 64, H = 64;
     public static readonly List<uint[]> Skins = new();
@@ -66,7 +66,14 @@ public static class SkinGen
     {
         if (_init) return; _init = true;
         Steve(); Zombie(); Skeleton(); Creeper(); Spider(); Enderman(); Cow(); Pig(); Sheep(); SheepFur(); Chicken();
+        SkinsOverworld(); SkinsRedstone(); SkinsNetherEnd(); SkinsMobs(); SkinsMechanics();
     }
+    // skórki modułów (64x64; większe tekstury moduł trzyma we własnej tablicy)
+    static partial void SkinsOverworld();
+    static partial void SkinsRedstone();
+    static partial void SkinsNetherEnd();
+    static partial void SkinsMobs();
+    static partial void SkinsMechanics();
 
     private static uint V(Rng r, long c, float a = 0.12f) => TextureGen.Mul(Hx((uint)c), 1 - a / 2 + r.NextFloat() * a);
 
