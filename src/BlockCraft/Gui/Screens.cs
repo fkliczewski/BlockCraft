@@ -40,7 +40,7 @@ public sealed class TitleScreen : Screen
         sb.PushTransform(lx + lw * scale - 20, ly + lh * scale - 6, -20, s);
         sb.TextCentered(_splash, 0, -8, 0xFF00FFFF);
         sb.PopTransform();
-        sb.Text("BlockCraft 1.0 (.NET)", 2, H - 10, 0xFFFFFFFF);
+        sb.Text("BlockCraft " + GameVersion.Name + " (.NET)", 2, H - 10, 0xFFFFFFFF);
         var ast = BlockCraft.Audio.AssetStore.Status;
         if (!string.IsNullOrEmpty(ast)) sb.Text(ast + (BlockCraft.Audio.AssetStore.Done ? "" : " (" + (int)(BlockCraft.Audio.AssetStore.Progress * 100) + "%)"), 2, H - 20, 0xFFA0A0A0);
         string c = "Nie jest powiązane z Mojang AB.";
