@@ -640,6 +640,7 @@ public static partial class TextureGen
             ("iron", 0x353535, 0x8C8C8C, 0xC6C6C6, 0xEFEFEF),
             ("golden", 0x5E4A0E, 0xC79F21, 0xF2D33A, 0xFFFBA0),
             ("diamond", 0x0E3D3A, 0x1BA59D, 0x4AEDD9, 0xC6FFF6),
+            ("chainmail", 0x262626, 0x5A5A5A, 0x9A9A9A, 0xC8C8C8),
         };
         var helmet = new[]
         {

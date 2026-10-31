@@ -75,7 +75,7 @@ public class Item
     public int Hunger; public float SaturationMod;
     public int ArmorSlot = -1;        // 0=hełm,1=napierśnik,2=spodnie,3=buty
     public int ArmorPoints;
-    public int ArmorMaterial = -1;    // 0 skóra,1 żelazo,2 złoto,3 diament
+    public int ArmorMaterial = -1;    // 0 skóra,1 żelazo,2 złoto,3 diament,4 kolczuga
     public int CreativeTab = 3;
     public bool InCreative = true;
     public bool Handheld;             // trzymany jak narzędzie (po przekątnej)

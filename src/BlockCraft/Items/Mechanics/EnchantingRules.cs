@@ -36,9 +36,8 @@ public static class EnchantingRules
         if (stack == null) return 0;
         int id = stack.Id; var item = stack.Item;
         if (id is I.Book or I.Bow or I.FishingRod) return 1;
-        if (id is >= I.ChainHelmet and <= I.ChainBoots) return 12;
         if (item == null) return 0;
-        if (item.ArmorSlot >= 0) return item.ArmorMaterial switch { 0 => 15, 1 => 9, 2 => 25, 3 => 10, _ => 0 };
+        if (item.ArmorSlot >= 0) return item.ArmorMaterial switch { 0 => 15, 1 => 9, 2 => 25, 3 => 10, 4 => 12, _ => 0 };
         if (item.Tool is not (ToolType.Pickaxe or ToolType.Axe or ToolType.Shovel or ToolType.Sword)) return 0;
         return id switch
         {
@@ -72,12 +71,17 @@ public static class EnchantingRules
         return id is Ench.LuckOfTheSea or Ench.Lure && stack.Id == I.FishingRod;
     }
 
-    public static bool Compatible(Ench a, Ench b)
+    /// <summary>Enchantment.canApplyTogether z 1.8: owner (już na przedmiocie) ocenia kandydata. Relacja nie jest symetryczna:
+    /// Grabież/Szczęście/Morska fortuna odrzucają Jedwabny dotyk, a Jedwabny dotyk odrzuca tylko Szczęście.</summary>
+    public static bool Compatible(Ench owner, Ench candidate)
     {
-        if (a == b) return false;
-        if ((int)a is >= 0 and <= 4 && (int)b is >= 0 and <= 4) return a == Ench.FeatherFalling || b == Ench.FeatherFalling;
-        if ((int)a is >= 16 and <= 18 && (int)b is >= 16 and <= 18) return false;
-        return !((a == Ench.SilkTouch && b == Ench.Fortune) || (b == Ench.SilkTouch && a == Ench.Fortune));
+        if (owner == candidate) return false;
+        if ((int)owner is >= 0 and <= 4)
+            return (int)candidate is >= 0 and <= 4 ? owner == Ench.FeatherFalling || candidate == Ench.FeatherFalling : true;
+        if ((int)owner is >= 16 and <= 18) return (int)candidate is not (>= 16 and <= 18);
+        if (owner == Ench.SilkTouch) return candidate != Ench.Fortune;
+        if (owner is Ench.Looting or Ench.Fortune or Ench.LuckOfTheSea) return candidate != Ench.SilkTouch;
+        return true;
     }
 
     public static int LevelCost(JRandom random, ItemStack stack, int slot, int bookshelves)
@@ -119,7 +123,7 @@ public static class EnchantingRules
         result.Add(Pick());
         for (int remaining = boosted; random.NextInt(50) <= remaining; remaining >>= 1)
         {
-            candidates.RemoveAll(c => result.Any(e => !Compatible(c.Id, e.Id)));
+            candidates.RemoveAll(c => result.Any(e => !Compatible(e.Id, c.Id)));
             if (candidates.Count > 0) result.Add(Pick());
         }
         return result;
