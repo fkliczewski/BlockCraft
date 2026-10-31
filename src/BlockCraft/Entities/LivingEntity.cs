@@ -305,6 +305,12 @@ public abstract partial class LivingEntity : Entity
         if (World.IsRemote) return false; // na kliencie obrażenia liczy host
         if (Dead || Health <= 0 || IsInvulnerableTo(src)) return false;
         if (src.IsFire && (ImmuneToFire || HasEffect(Effect.FireResistance))) return false;
+        // 1.8: hełm przyjmuje część uderzenia kowadła albo spadającego bloku
+        if (src.Type is "anvil" or "fallingBlock" && this is Player { Inventory.Armor: var arm } && arm[0] != null)
+        {
+            if (arm[0].DamageItem((int)(amount * 4 + World.Rand.NextFloat() * amount * 2))) arm[0] = null;
+            amount *= .75f;
+        }
         if (HurtResistantTime > 10)
         {
             if (amount <= LastDamage) return false;

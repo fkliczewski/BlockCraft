@@ -274,6 +274,12 @@ public sealed class RemoteClient : IPlayerHandler
         if (c.Enchant(P, button)) ForceSync();
     }
 
+    public void AnvilName(byte window, string name)
+    {
+        if (P.Dead || WindowById(window) is not AnvilContainer c || !c.StillValid(P)) return;
+        c.SetName(name); ForceSync();
+    }
+
     public void SelectRecipe(byte window, int index)
     {
         if (P.Dead || WindowById(window) is not MerchantContainer c || !c.StillValid(P)

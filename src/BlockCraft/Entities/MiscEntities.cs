@@ -121,15 +121,44 @@ public sealed class FallingBlockEntity : Entity
         MoveWithCollision(MotionX, MotionY, MotionZ);
         MotionX *= 0.98; MotionY *= 0.98; MotionZ *= 0.98;
         if (World.IsRemote) return;
+        if (MotionY < 0) _fall -= (float)MotionY / 0.98f;
         if (OnGround)
         {
             int bx = MathUtil.FloorToInt(X), by = MathUtil.FloorToInt(Y + 0.01), bz = MathUtil.FloorToInt(Z);
             var at = Block.Get(World.GetBlock(bx, by, bz));
             Kill();
-            if (at.Replaceable || at.Id == 0) World.SetBlock(bx, by, bz, BlockId, Meta);
-            else World.DropItem(X, Y + 0.5, Z, new ItemStack(BlockId));
+            bool broken = HurtEntities && Land(_fall);
+            if (broken) return; // całkiem zniszczone kowadło znika
+            if (at.Replaceable || at.Id == 0)
+            {
+                World.SetBlock(bx, by, bz, BlockId, Meta);
+                if (BlockId == B.Anvil) World.PlaySound("random.anvil_land", bx + .5, by + .5, bz + .5, .3f, World.Rand.NextFloat() * .1f + .9f);
+            }
+            else World.DropItem(X, Y + 0.5, Z, new ItemStack(BlockId, 1, Block.Get(BlockId).DropMeta(Meta)));
         }
-        else if (Age > 600) { Kill(); World.DropItem(X, Y, Z, new ItemStack(BlockId)); }
+        else if (Age > 600) { Kill(); World.DropItem(X, Y, Z, new ItemStack(BlockId, 1, Block.Get(BlockId).DropMeta(Meta))); }
+    }
+
+    /// <summary>EntityFallingBlock.hurtEntities (kowadło): 2 za blok ponad pierwszy, maks. 40.</summary>
+    public bool HurtEntities;
+    private float _fall;
+
+    /// <summary>EntityFallingBlock.fall z 1.8. True = kowadło rozpadło się (uszkodzenie powyżej 2).</summary>
+    private bool Land(float distance)
+    {
+        int i = (int)MathF.Ceiling(distance - 1f);
+        if (i <= 0) return false;
+        bool anvil = BlockId == B.Anvil;
+        var src = new DamageSource(anvil ? "anvil" : "fallingBlock", this);
+        foreach (var e in World.GetEntitiesInBox(BoundingBox, this).ToList())
+            if (e.CanBeAttacked) e.Attack(src, Math.Min(MathF.Floor(i * 2f), 40f));
+        if (anvil && World.Rand.NextFloat() < .05f + i * .05f)
+        {
+            int dmg = (Meta >> 2 & 3) + 1;
+            if (dmg > 2) return true;
+            Meta = Meta & 3 | dmg << 2;
+        }
+        return false;
     }
     public override void Save(BinaryWriter bw) { base.Save(bw); bw.Write(BlockId); bw.Write(Meta); }
     public override void Load(BinaryReader br) { base.Load(br); BlockId = br.ReadByte(); Meta = br.ReadInt32(); }

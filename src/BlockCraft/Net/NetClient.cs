@@ -196,6 +196,11 @@ public sealed class NetClient
         if (_window is not EnchantingContainer) return;
         var writer = Out.Begin(C2S.EnchantItem); writer.Write(_windowId); writer.Write((byte)button); Out.End();
     }
+    public void AnvilName(string name)
+    {
+        if (_window is not AnvilContainer) return;
+        var writer = Out.Begin(C2S.AnvilName); writer.Write(_windowId); writer.Write(name ?? ""); Out.End();
+    }
     public void SendDrop(bool all) { var w = Out.Begin(C2S.DropSelected); w.Write(all); Out.End(); }
 
     private void ClickHook(Container c, int slot, int button, ClickType type, Player p)

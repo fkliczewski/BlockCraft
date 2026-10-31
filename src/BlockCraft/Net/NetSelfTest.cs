@@ -282,6 +282,22 @@ public static partial class SelfTest
         }
         else Check(false, "Sieć: GUI stołu do zaklinania", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
 
+        // kowadło: nazwa od gościa, rozliczenie poziomów na hoście
+        hw.SetBlock(6, gy + 1, 8, B.Anvil); puppet.XpLevel = 5; Step(5);
+        puppet.OpenBlockGui(GuiKind.Anvil, 6, gy + 1, 8); Step(4);
+        if (puppet.OpenContainer is AnvilContainer serverAnvil && host.Player.OpenContainer is AnvilContainer clientAnvil)
+        {
+            serverAnvil.Inv.Set(0, new ItemStack(I.DiamondSword)); serverAnvil.Inv.Changed(); Step(4);
+            clientAnvil.SetName("Mieczyk"); client.AnvilName("Mieczyk"); Step(4);
+            Check(serverAnvil.RepairedName == "Mieczyk" && serverAnvil.MaximumCost == 1 && clientAnvil.MaximumCost == 1 && clientAnvil.Output.Get(0)?.CustomName == "Mieczyk",
+                "Sieć: nazwa z kowadła gościa dociera do hosta", serverAnvil.RepairedName + " " + serverAnvil.MaximumCost);
+            clientAnvil.Click(2, 0, ClickType.QuickMove, host.Player); client.Flush(); Step(4);
+            Check(puppet.XpLevel == 4 && puppet.Inventory.Main.Any(s => s?.CustomName == "Mieczyk") && host.Player.Inventory.Main.Any(s => s?.CustomName == "Mieczyk") && serverAnvil.Inv.Get(0) == null,
+                "Sieć: odbiór z kowadła rozliczony przez hosta", $"lvl {puppet.XpLevel}");
+            host.Player.CloseContainer(); Step(3);
+        }
+        else Check(false, "Sieć: GUI kowadła", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
+
         // Kontenery encji: ekran klienta, akcje i rozliczenie po stronie hosta.
         var horse = new Horse(hw) { Tamed = true };
         horse.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(horse);

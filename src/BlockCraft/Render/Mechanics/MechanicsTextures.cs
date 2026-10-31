@@ -18,6 +18,7 @@ public static partial class TextureGen
         }
         TexMechanicsItems();
         TexEnchanting();
+        TexAnvil();
         var liquid = New(); for (int y = 9; y < 14; y++) for (int x = 5; x < 11; x++) liquid[y * 16 + x] = Hex(0xFFFFFF); Add("me_potion_liquid", liquid);
         foreach (var (key, color) in new[] { ("fermented_spider_eye", 0x6E382Fu), ("speckled_melon", 0xECA32Bu), ("golden_carrot", 0xF6C33Bu), ("brewing_stand", 0xA48A55u), ("cauldron", 0x555761u) })
         {
@@ -47,6 +48,30 @@ public static partial class TextureGen
             else side[i] = obs[i];
         }
         Add("me_enchant_side", side);
+    }
+    /// <summary>Kowadło: ciemne kute żelazo, wierzch z wgłębieniem i rysami zależnymi od uszkodzenia.</summary>
+    private static void TexAnvil()
+    {
+        var noise = TileNoise(93, 8);
+        var b = New();
+        for (int i = 0; i < 256; i++) b[i] = Mul(Hex(0x444444), .78f + noise[i] * .35f);
+        for (int x = 0; x < 16; x++) { b[x] = Mul(b[x], 1.25f); b[15 * 16 + x] = Mul(b[15 * 16 + x], .7f); }
+        Add("me_anvil_base", b);
+        var rnd = new Random(1808);
+        var cracks = new List<(int x, int y)>();
+        for (int d = 0; d < 3; d++)
+        {
+            var t = New();
+            for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
+            {
+                int i = y * 16 + x; bool rim = x < 2 || x > 13 || y < 1 || y > 14;
+                t[i] = Mul(Hex(rim ? 0x4C4C4Cu : 0x5E5E5Eu), .8f + noise[i] * .3f);
+                if (!rim && (x == 2 || x == 13)) t[i] = Mul(t[i], .75f);
+            }
+            for (int k = 0; k < d * 14; k++) cracks.Add((3 + rnd.Next(10), 1 + rnd.Next(14)));
+            if (d > 0) foreach (var (cx, cy) in cracks) { t[cy * 16 + cx] = Hex(0x262626); if (cy + 1 < 15) t[(cy + 1) * 16 + cx] = Hex(0x303030); }
+            Add("me_anvil_top_" + d, t);
+        }
     }
     private static void TexMechanicsItems()
     {

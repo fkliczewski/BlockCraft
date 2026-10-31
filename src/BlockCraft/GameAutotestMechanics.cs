@@ -75,6 +75,36 @@ public sealed partial class Game
             SetScreen(new Gui.ContainerScreen(Player, Player.InventoryContainer));
         });
         Step(10, () => Shot("me_04_ekwipunek_polysk"));
+        AnvilContainer ac = null;
+        Step(5, () =>
+        {
+            SetScreen(null);
+            for (int d = 0; d < 3; d++) World.SetBlock(tx - 1 + d, ty, tz - 2, B.Anvil, d << 2 | (d == 1 ? 1 : 0));
+            Player.SetPositionAndPrev(tx + .5, ty, tz - 4.5); Player.Pitch = Player.PrevPitch = 30; HideGui = true;
+        });
+        Step(20, () => Shot("me_05_kowadla"));
+        Step(5, () =>
+        {
+            HideGui = false;
+            OpenBlockGui(GuiKind.Anvil, tx, ty, tz - 2);
+            ac = Player.OpenContainer as AnvilContainer;
+            MeCheck(ac != null && CurrentScreen is Gui.AnvilScreen, "otwarcie kowadła");
+            var s = new ItemStack(I.DiamondSword); EnchantHelper.Set(s, Ench.Sharpness, 3);
+            var book = new ItemStack(I.EnchantedBook); EnchantingRules.AddStored(book, new EnchantmentRoll(Ench.Sharpness, 3));
+            ac.Inv.Set(0, s); ac.Inv.Set(1, book); ac.Inv.Changed();
+        });
+        Step(5, () =>
+        {
+            foreach (char ch in "Ostrze") CurrentScreen.CharTyped(ch);
+            MeCheck(ac.MaximumCost == 5 && ac.Output.Get(0)?.CustomName != null && EnchantHelper.GetLevel(ac.Output.Get(0), Ench.Sharpness) == 4, "kowadło: Ostrość IV i nazwa za 5", ac.MaximumCost + " " + ac.Output.Get(0)?.CustomName);
+        });
+        Step(10, () => Shot("me_06_kowadlo_gui"));
+        Step(5, () =>
+        {
+            int lvl = Player.XpLevel;
+            ac.Click(2, 0, ClickType.QuickMove, Player);
+            MeCheck(Player.XpLevel == lvl - 5 && Player.Inventory.Main.Any(x => x != null && EnchantHelper.GetLevel(x, Ench.Sharpness) == 4), "kowadło: odbiór", $"{lvl} -> {Player.XpLevel}");
+        });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }
