@@ -103,7 +103,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer.CloudsEnabled = Settings.Clouds;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
-        if (World != null) World.Difficulty = (Difficulty)Settings.Difficulty;
+        if (World != null && Client == null) World.Difficulty = (Difficulty)Settings.Difficulty; // gość: trudność ustala host
         if (fancyChanged || _lastSmooth != Settings.SmoothLighting) MarkAllDirty();
         _lastSmooth = Settings.SmoothLighting;
         UpdateGuiScale();

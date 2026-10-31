@@ -7,6 +7,8 @@ public partial class Player
 {
     /// <summary>Zdalny gracz na hoście: pozycję i ruch podaje jego klient, host nie liczy mu fizyki (Player.LivingUpdate).</summary>
     public bool NetPuppet;
+    /// <summary>Host: ruchy od klienta nakładane w ticku encji (po PrevTick), żeby interpolacja i animacja nóg widziały przesunięcie.</summary>
+    public Action NetPuppetMove;
 
     /// <summary>Host: przyjęcie ruchu od klienta. Obrażenia od upadku i wyczerpanie od skoku liczone jak na serwerze MC.</summary>
     public void NetApplyMove(double x, double y, double z, float yaw, float pitch, bool onGround)

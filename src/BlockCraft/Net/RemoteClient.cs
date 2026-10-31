@@ -91,16 +91,7 @@ public sealed class RemoteClient : IPlayerHandler
         // host przesunął gracza od ostatniego ruchu klienta (komenda, perła, łóżko) - ten ruch jest już nieaktualny
         double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
         if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) SendTeleport();
-        if (_ackTeleport >= TeleportId && !p.Sleeping && !p.Dead)
-        {
-            double dx = i.X - p.X, dy = i.Y - p.Y, dz = i.Z - p.Z;
-            if (double.IsFinite(i.X + i.Y + i.Z) && dx * dx + dy * dy + dz * dz < 100 * 100)
-            {
-                p.NetApplyMove(i.X, i.Y, i.Z, i.Yaw, i.Pitch, i.OnGround);
-                LastX = p.X; LastY = p.Y; LastZ = p.Z;
-            }
-            else SendTeleport();
-        }
+        if (i.TeleportAck >= TeleportId && !p.Sleeping && !p.Dead) _inMoves.Enqueue(i);
         p.Sneaking = i.Sneaking; p.Sprinting = i.Sprinting; p.IsJumping = i.Jumping;
         p.Flying = i.Flying && p.AllowFlying;
         p.MoveForward = Math.Clamp((int)i.Forward, -1, 1); p.MoveStrafe = Math.Clamp((int)i.Strafe, -1, 1);
@@ -135,6 +126,34 @@ public sealed class RemoteClient : IPlayerHandler
             QueueBlockState(i.HitX, i.HitY, i.HitZ);
             if (i.RightPressed || i.RightDown) QueueBlockState(i.HitX + Dir.X[i.HitFace], i.HitY + Dir.Y[i.HitFace], i.HitZ + Dir.Z[i.HitFace]);
         }
+    }
+
+    // Ruchy klienta przychodzą przez przekaźnik paczkami (0, 2, 1, 3 na tick). Host nakłada je w ticku gracza po PrevTick,
+    // jeden na tick, z małym buforem: gracz u hosta porusza się płynnie, ma animację chodu i nie przeskakuje.
+    private readonly Queue<NetInput> _inMoves = new();
+    private const int MoveBuffer = 2;
+
+    internal void ApplyQueuedMoves()
+    {
+        var p = P;
+        if (p == null || _inMoves.Count == 0) return;
+        int n = _inMoves.Count > MoveBuffer + 1 ? _inMoves.Count - MoveBuffer : 1;
+        Server.SetActor(this);
+        try
+        {
+            for (int k = 0; k < n && _inMoves.Count > 0; k++)
+            {
+                var i = _inMoves.Dequeue();
+                if (i.TeleportAck < TeleportId || p.Sleeping || p.Dead) continue;
+                double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
+                if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) { SendTeleport(); return; }
+                double dx = i.X - p.X, dy = i.Y - p.Y, dz = i.Z - p.Z;
+                if (!double.IsFinite(i.X + i.Y + i.Z) || dx * dx + dy * dy + dz * dz >= 100 * 100) { SendTeleport(); return; }
+                p.NetApplyMove(i.X, i.Y, i.Z, i.Yaw, i.Pitch, i.OnGround);
+                LastX = p.X; LastY = p.Y; LastZ = p.Z;
+            }
+        }
+        finally { Server.SetActor(null); }
     }
 
     private Container WindowById(byte win) => win == 0 ? P.InventoryContainer : win == _windowId && P.OpenContainer == _window ? _window : null;
@@ -307,6 +326,7 @@ public sealed class RemoteClient : IPlayerHandler
     private void SendTeleport()
     {
         TeleportId++;
+        _inMoves.Clear();
         var w = Out.Begin(S2C.Teleport);
         w.Write(TeleportId); w.Write(P.X); w.Write(P.Y); w.Write(P.Z); w.Write(P.Yaw); w.Write(P.Pitch);
         Out.End();

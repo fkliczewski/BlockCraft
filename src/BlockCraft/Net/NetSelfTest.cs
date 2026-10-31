@@ -135,6 +135,25 @@ public static partial class SelfTest
         Check(host.Player.Y > gy - 1 && host.Player.Y < gy + 3, $"Sieć: gracz klienta stoi na ziemi (y={host.Player.Y:F2}, grunt {gy})");
         Check(Math.Abs(puppet.Y - host.Player.Y) < 0.01, "Sieć: host zna pozycję klienta");
 
+        // ruch gościa u hosta: przesunięcie widoczne między PrevX a X (płynny render) i animacja nóg
+        double maxStep = 0, startX = puppet.X;
+        for (int k = 0; k < 12; k++)
+        {
+            host.Player.SetPosition(host.Player.X + 0.2, host.Player.Y, host.Player.Z);
+            Step(1);
+            maxStep = Math.Max(maxStep, puppet.X - puppet.PrevX);
+        }
+        Step(4);
+        Check(maxStep > 0.1 && puppet.X - startX > 2 && puppet.LimbSwing > 1, "Sieć: gość u hosta idzie płynnie i ma animację chodu",
+            $"krok {maxStep:F2}, droga {puppet.X - startX:F2}, nogi {puppet.LimbSwing:F2}");
+        host.Player.SetPosition(startX, host.Player.Y, host.Player.Z); Step(6);
+        var heard = new LightningSounds(); cw.Listeners.Add(heard);
+        hw.PlaySound("eat", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
+        hw.PlaySound("random.pop", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
+        Step(3);
+        cw.Listeners.Remove(heard);
+        Check(!heard.Sounds.Contains("eat") && heard.Sounds.Contains("random.pop"), "Sieć: dźwięk przewidziany przez gościa nie wraca echem, pozostałe docierają", string.Join(",", heard.Sounds));
+
         hw.SetBlock(8, gy + 4, 8, B.Stone);
         Step(3);
         Check(cw.GetBlock(8, gy + 4, 8) == B.Stone, "Sieć: zmiana bloku dociera do klienta");

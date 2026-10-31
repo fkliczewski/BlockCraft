@@ -194,7 +194,7 @@ public sealed class OptionsScreen : Screen
         Add(new Button(W / 2 + 5, y, 150, 20, () => "Poziom trudności: " + DiffName(G.CurrentDifficulty), () =>
         {
             G.CurrentDifficulty = (G.CurrentDifficulty + 1) % 4; s.Difficulty = G.CurrentDifficulty;
-        }) { Enabled = G.World == null || !G.World.Hardcore });
+        }) { Enabled = (G.World == null || !G.World.Hardcore) && G.Client == null }); // gość: trudność ustala host
         Add(new Button(W / 2 - 155, y + 48, 150, 20, "Ustawienia graficzne...", () => G.SetScreen(new VideoScreen(this))));
         Add(new Button(W / 2 + 5, y + 48, 150, 20, "Sterowanie...", () => G.SetScreen(new ControlsScreen(this))));
         Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));

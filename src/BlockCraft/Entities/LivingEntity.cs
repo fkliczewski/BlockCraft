@@ -337,8 +337,13 @@ public abstract partial class LivingEntity : Entity
 
     protected virtual void OnHurt(DamageSource src)
     {
-        World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f);
+        UnpredictedSound = true;
+        try { World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
+        finally { UnpredictedSound = false; }
     }
+
+    /// <summary>Sieć: dźwięk, którego klient sam nie odtwarza (obrażenia, śmierć liczy host) - idzie też do gracza-sprawcy akcji.</summary>
+    [ThreadStatic] public static bool UnpredictedSound;
 
     public virtual string HurtSound => "game.neutral.hurt";
     public virtual string DeathSound => "game.neutral.die";
@@ -373,7 +378,9 @@ public abstract partial class LivingEntity : Entity
         if (Dead) return;
         Dead = true;
         Health = 0;
-        World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f);
+        UnpredictedSound = true;
+        try { World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f); }
+        finally { UnpredictedSound = false; }
         if (!World.IsRemote && this is not Player)
         {
             bool byPlayer = RecentlyHitByPlayer > 0;

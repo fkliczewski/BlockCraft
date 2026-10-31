@@ -76,6 +76,7 @@ public partial class Player : LivingEntity
     public override void Tick()
     {
         if (IsRemoteControlled) { base.Tick(); return; }
+        if (NetPuppet) NetPuppetMove?.Invoke();
         if (Sleeping)
         {
             SleepTimer++; if (SleepTimer > 100) SleepTimer = 100;

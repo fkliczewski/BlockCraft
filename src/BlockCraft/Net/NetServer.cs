@@ -174,6 +174,7 @@ public sealed partial class NetServer
         var target = data != null && Main.Dimensions != null ? Main.Dimensions.Get((DimensionId)data.Dimension) : Main;
         if (target != Main) target.EnsureDimensionArea(MathUtil.FloorToInt(data.X), MathUtil.FloorToInt(data.Z), 32);
         var p = new Player(target) { Name = name, Handler = c, NetPuppet = true, IsLocal = false };
+        p.NetPuppetMove = c.ApplyQueuedMoves;
         if (data != null) p.FromData(data);
         else
         {
@@ -412,6 +413,8 @@ public sealed partial class NetServer
 
     // ================= zdarzenia świata =================
 
+    internal static readonly HashSet<string> OwnerPredicted = new() { "eat", "drink", "burp", "fall_big", "fall_small", "splash", "game.player.swim" };
+
     private sealed class WorldTap : IWorldListener
     {
         private readonly NetServer _s; private readonly World.World _w;
@@ -426,7 +429,9 @@ public sealed partial class NetServer
             double r = Math.Max(16, 16 * volume);
             foreach (var c in _s.Clients)
             {
-                if (c == _s._actor || c.P?.World != _w || c.P.DistanceSq(x, y, z) > r * r) continue;
+                if (c == _s._actor && !LivingEntity.UnpredictedSound || c.P?.World != _w || c.P.DistanceSq(x, y, z) > r * r) continue;
+                // dźwięki gracza, które jego klient odtworzył już sam (jedzenie, upadek, plusk) - inaczej słychać echo z opóźnieniem sieci
+                if (OwnerPredicted.Contains(name) && c.P.DistanceSq(x, y, z) < 0.01) continue;
                 var bw = c.Out.Begin(S2C.Sound);
                 bw.Write(name); bw.Write(x); bw.Write(y); bw.Write(z); bw.Write(volume); bw.Write(pitch);
                 c.Out.End();
