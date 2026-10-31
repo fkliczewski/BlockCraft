@@ -12,6 +12,8 @@ public static partial class SelfTest
     {
         Console.WriteLine("[Redstone 1.8]");
         var w = MakeWorld(1, WorldType.Superflat, 7);
+        // Testowane układy i pojazdy nie mogą być poruszane przez losowo zespawnowane moby.
+        w.Rules.DoMobSpawning = false;
         var p = SpawnPlayer(w, 0, 4, -10);
 
         // zegar z pochodni: pochodnia na kamieniu, pył wraca i wskazuje w kamień -> przepalenie

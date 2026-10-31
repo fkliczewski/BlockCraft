@@ -447,6 +447,7 @@ public abstract class Container
 
     public virtual void OnClose(Player p)
     {
+        if (p.World.IsRemote) return; // kursor i zwrot przedmiotów rozlicza host
         if (CraftGrid != null)
         {
             for (int i = 0; i < CraftGrid.Size; i++)

@@ -186,6 +186,11 @@ public sealed class NetClient
 
     public void SendChat(string s) { var w = Out.Begin(C2S.Chat); w.Write(s); Out.End(); }
     public void SendRespawn() { Out.Begin(C2S.Respawn); Out.End(); }
+    public void SelectRecipe(int index)
+    {
+        if (_window is not MerchantContainer) return;
+        var writer = Out.Begin(C2S.SelectRecipe); writer.Write(_windowId); writer.Write(index); Out.End();
+    }
     public void SendDrop(bool all) { var w = Out.Begin(C2S.DropSelected); w.Write(all); Out.End(); }
 
     private void ClickHook(Container c, int slot, int button, ClickType type, Player p)
@@ -386,6 +391,19 @@ public sealed class NetClient
                 }
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
+            case S2C.MerchantOffers:
+                {
+                    byte id = r.ReadByte(); int index = r.ReadInt32(), n = r.ReadInt32();
+                    if (n < 0 || n > 4096) throw new InvalidDataException("Za dużo ofert handlu");
+                    var offers = new List<MerchantRecipe>();
+                    for (int i = 0; i < n; i++) offers.Add(MerchantRecipe.Load(r));
+                    if (id == _windowId && _window is MerchantContainer merchant)
+                    {
+                        merchant.Villager.Recipes.Clear(); merchant.Villager.Recipes.AddRange(offers);
+                        merchant.Index = index;
+                    }
+                    break;
+                }
             case S2C.WindowSlots:
                 {
                     byte id = r.ReadByte(); int n = r.ReadInt16();
@@ -403,8 +421,10 @@ public sealed class NetClient
                     byte id = r.ReadByte();
                     if (id == _windowId && _window != null && P.OpenContainer == _window)
                     {
+                        var closed = _window;
                         _window = null; // bez odsyłania CloseWindow
                         G.SetScreen(null);
+                        if (P.OpenContainer == closed) P.CloseContainer();
                     }
                     break;
                 }
@@ -533,7 +553,24 @@ public sealed class NetClient
         var layout = new List<(bool player, int index, int sx, int sy, int flags)>();
         for (int i = 0; i < n; i++) layout.Add((r.ReadByte() == 0, r.ReadInt16(), r.ReadInt16(), r.ReadInt16(), r.ReadByte()));
         Container c = kind >= 0 ? ContainerFactory.Create(W, P, (GuiKind)kind, x, y, z) : null;
+        if (kind == -2)
+        {
+            var horse = new Horse(W); horse.Load(r); c = new HorseContainer(P.Inventory, horse);
+        }
+        else if (kind == -3)
+        {
+            var villager = new Villager(W); villager.Load(r);
+            var merchant = new MerchantContainer(P.Inventory, villager) { Index = r.ReadInt32() };
+            merchant.Inv.OnChanged = null; // wynik i zapłata przychodzą wyłącznie od hosta
+            c = merchant;
+        }
+        else if (kind == -4)
+        {
+            var rsLayout = (RsContainer.Layout)r.ReadByte();
+            c = new RsContainer(P.Inventory, new SimpleInventory(rsLayout == RsContainer.Layout.Hopper ? 5 : rsLayout == RsContainer.Layout.Grid3 ? 9 : 27), title, rsLayout);
+        }
         if (c == null || c.Slots.Count != n) c = new NetContainer(P.Inventory, title, width, height, layout);
+        c.Title = title;
         if (G.CurrentScreen != null) G.SetScreen(null);
         if (_window != null) { var o = Out.Begin(C2S.CloseWindow); o.Write(_windowId); Out.End(); }
         _windowId = id; _window = c;

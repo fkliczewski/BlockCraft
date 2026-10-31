@@ -128,7 +128,8 @@ public static partial class SelfTest
         for (int i = 0; i < 8; i++) hopper.Tick();
         Check(!hopper.Enabled && hopper.Get(0)?.Count == countBefore, "Tor aktywacyjny blokuje pobieranie wagonika");
         w.SetBlock(45, y - 1, -80, B.Stone); hopper.Tick();
-        Check(hopper.Enabled, "Niezasilany tor aktywacyjny włącza lej"); hopper.Kill();
+        Check(hopper.Enabled, "Niezasilany tor aktywacyjny włącza lej",
+            $"pos={hopper.X:F3},{hopper.Y:F3},{hopper.Z:F3} meta={w.GetMeta(45, y, -80)}"); hopper.Kill();
 
         w.SetBlock(50, y, -80, B.Rail);
         var furnace = (FurnaceMinecartEntity)Cart(MinecartKind.Furnace, 50.5, -79.5);

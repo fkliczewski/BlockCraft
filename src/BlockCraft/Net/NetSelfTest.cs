@@ -220,6 +220,63 @@ public static partial class SelfTest
             host.Player.CloseContainer(); Step(4);
         }
 
+        // Kontenery encji: ekran klienta, akcje i rozliczenie po stronie hosta.
+        var horse = new Horse(hw) { Tamed = true };
+        horse.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(horse);
+        puppet.Sneaking = true; horse.Interact(puppet); puppet.Sneaking = false;
+        puppet.Inventory.Main[0] = new ItemStack(I.Saddle); Step(5);
+        Check(host.CurrentScreen is HorseScreen && host.Player.OpenContainer is HorseContainer,
+            "Sieć: ekran ekwipunku konia u gościa");
+        if (host.Player.OpenContainer is HorseContainer remoteHorse)
+        {
+            remoteHorse.Click(remoteHorse.FirstPlayerSlot + 27, 0, ClickType.QuickMove, host.Player); Step(4);
+            Check(horse.Inv.Get(0)?.Id == I.Saddle && remoteHorse.Horse.Inv.Get(0)?.Id == I.Saddle
+                && puppet.Inventory.Main[0] == null, "Sieć: siodło przeniesione do konia przez hosta");
+        }
+        host.Player.CloseContainer(); Step(3);
+
+        var cart = new ChestMinecartEntity(hw);
+        cart.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(cart);
+        cart.Set(0, new ItemStack(I.GoldIngot, 3)); cart.Interact(puppet); Step(4);
+        Check(host.CurrentScreen is RsContainerScreen && host.Player.OpenContainer is RsContainer,
+            "Sieć: ekran wagonika ze skrzynią u gościa");
+        if (host.Player.OpenContainer is RsContainer remoteCart)
+        {
+            remoteCart.Click(0, 0, ClickType.QuickMove, host.Player); Step(4);
+            Check(cart.Get(0) == null && puppet.Inventory.CountOf(I.GoldIngot) == 3
+                && host.Player.Inventory.CountOf(I.GoldIngot) == 3, "Sieć: ładunek wagonika przeniesiony bez powielania");
+        }
+        host.Player.CloseContainer(); Step(3);
+
+        var villager = new Villager(hw, 0);
+        villager.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(villager);
+        villager.Recipes.Clear();
+        villager.Recipes.Add(new(new ItemStack(I.Wheat, 4), null, new ItemStack(I.Emerald)));
+        villager.Recipes.Add(new(new ItemStack(I.Wheat, 8), null, new ItemStack(I.Emerald, 2)) { MaxUses = 1 });
+        villager.Interact(puppet); Step(5);
+        Check(host.CurrentScreen is MerchantScreen && host.Player.OpenContainer is MerchantContainer,
+            "Sieć: ekran handlu z ofertami u gościa");
+        if (host.Player.OpenContainer is MerchantContainer remoteTrade && puppet.OpenContainer is MerchantContainer trade)
+        {
+            client.SelectRecipe(1); Step(3);
+            Check(trade.Index == 1 && remoteTrade.Index == 1 && remoteTrade.Current.Sell.Count == 2,
+                "Sieć: wybór oferty potwierdzony przez hosta");
+            client.SelectRecipe(999); Step(2);
+            Check(trade.Index == 1, "Sieć: nieprawidłowy indeks oferty jest odrzucany");
+            puppet.Cursor = new ItemStack(I.Wheat, 8); Step(3);
+            remoteTrade.Click(0, 0, ClickType.Pickup, host.Player); Step(3);
+            Check(remoteTrade.Inv.Get(2)?.Count == 2, "Sieć: wynik handlu dociera od hosta");
+            remoteTrade.Click(2, 0, ClickType.Pickup, host.Player); Step(4);
+            Check(trade.Inv.Get(0) == null && puppet.Cursor?.Id == I.Emerald && puppet.Cursor.Count == 2
+                && host.Player.Cursor?.Count == 2 && trade.Current.Uses == 1 && remoteTrade.Current.Disabled,
+                "Sieć: zapłata, wynik i wyczerpanie oferty rozliczone raz");
+            var cursor = host.Player.Cursor; int emeralds = host.Player.Inventory.CountOf(I.Emerald);
+            remoteTrade.OnClose(host.Player);
+            Check(host.Player.Cursor == cursor && host.Player.Inventory.CountOf(I.Emerald) == emeralds,
+                "Sieć: lokalne zamknięcie GUI nie przenosi kursora ponownie do ekwipunku");
+            puppet.CloseContainer(); client.SelectRecipe(0); Step(4);
+            Check(trade.Index == 1 && host.Player.OpenContainer == null, "Sieć: spóźniony wybór zamkniętego okna jest odrzucany");
+        }
         puppet.SetGameMode(1);
         var nether = dimensions.Get(DimensionId.Nether);
         // Zajmij ID w nowym wymiarze, aby przetestować zmianę ID gracza w protokole.

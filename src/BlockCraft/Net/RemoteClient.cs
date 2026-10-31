@@ -227,6 +227,7 @@ public sealed class RemoteClient : IPlayerHandler
 
     private void OpenWindow(int kind, int x, int y, int z, Container c)
     {
+        if (kind < 0) kind = c is HorseContainer ? -2 : c is MerchantContainer ? -3 : c is RsContainer ? -4 : -1;
         _windowId = (byte)(_windowId % 100 + 1);
         _window = c;
         _winHash = new long[c.Slots.Count];
@@ -241,7 +242,18 @@ public sealed class RemoteClient : IPlayerHandler
             w.Write((short)s.Index); w.Write((short)s.X); w.Write((short)s.Y);
             w.Write((byte)((s.IsOutput ? 1 : 0) | ((s.ArmorType + 1) << 1)));
         }
+        if (kind == -2) ((HorseContainer)c).Horse.Save(w);
+        else if (kind == -3) { ((MerchantContainer)c).Villager.Save(w); w.Write(((MerchantContainer)c).Index); }
+        else if (kind == -4) w.Write((byte)((RsContainer)c).Kind);
+        _merchantState = null;
         Out.End();
+    }
+
+    public void SelectRecipe(byte window, int index)
+    {
+        if (P.Dead || WindowById(window) is not MerchantContainer c || !c.StillValid(P)
+            || index < 0 || index >= c.Villager.Recipes.Count) return;
+        c.SetIndex(index); ForceSync();
     }
 
     // ================= wysyłka po ticku =================
@@ -481,8 +493,14 @@ public sealed class RemoteClient : IPlayerHandler
         }
     }
 
+    private byte[] _merchantState;
     private void SyncWindow()
     {
+        var current = P.OpenContainer;
+        if (current is HorseContainer hc && !hc.StillValid(P)
+            || current is MerchantContainer mc && !mc.StillValid(P)
+            || current is RsContainer rc && rc.Inv is Entity e && (e.Removed || e.Dead || e.World != W || e.DistanceSq(P) > 64))
+            P.CloseContainer();
         if (P.OpenContainer != _window)
         {
             if (P.OpenContainer == null)
@@ -494,6 +512,21 @@ public sealed class RemoteClient : IPlayerHandler
         }
         var c = _window;
         if (c == null) return;
+        if (c is MerchantContainer merchant)
+        {
+            using var data = new MemoryStream();
+            using (var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(merchant.Index); writer.Write(merchant.Villager.Recipes.Count);
+                foreach (var offer in merchant.Villager.Recipes) offer.Save(writer);
+            }
+            var state = data.ToArray();
+            if (_merchantState == null || !state.AsSpan().SequenceEqual(_merchantState))
+            {
+                _merchantState = state;
+                var writer = Out.Begin(S2C.MerchantOffers); writer.Write(_windowId); writer.Write(state); Out.End();
+            }
+        }
         var changed = new List<int>();
         for (int i = 0; i < c.Slots.Count; i++)
         {

@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 2;
+    public const int Version = 3;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -29,6 +29,7 @@ public enum C2S : byte
     DropSelected = 9,   // bool cały stos
     Respawn = 10,
     KeepAlive = 11,     // long czas klienta (ms)
+    SelectRecipe = 12,  // byte okno, int indeks oferty
 }
 
 /// <summary>Pakiety host -> klient.</summary>
@@ -64,6 +65,7 @@ public enum S2C : byte
     ChangeDimension = 28,// sbyte wymiar
     KeepAlive = 29,     // long czas klienta (echo)
     Settings = 30,      // byte trudność, bool hardcore, bool komendy, gamerules (byte n, n x (string, bool))
+    MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>

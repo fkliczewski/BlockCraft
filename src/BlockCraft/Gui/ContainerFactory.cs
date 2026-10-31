@@ -26,6 +26,8 @@ public static class ContainerFactory
     {
         [typeof(BrewingContainer)] = (p, c) => new BrewingScreen(p, (BrewingContainer)c),
         [typeof(World.RsContainer)] = (p, c) => new RsContainerScreen(p, c),
+        [typeof(HorseContainer)] = (p, c) => new HorseScreen(p, (HorseContainer)c),
+        [typeof(MerchantContainer)] = (p, c) => new MerchantScreen(p, (MerchantContainer)c),
     };
 
     public static Container Create(World.World w, Player p, GuiKind kind, int x, int y, int z)

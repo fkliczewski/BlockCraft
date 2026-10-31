@@ -90,6 +90,7 @@ public sealed partial class Game
         });
         WaitUntil(() => File.Exists(NetTestFile("verified")) && _chat.Any(c => c.text.Contains("NET-CLIENT-ACK")));
         Step(20, () => Shot("08_remote_player"));
+        SetupNetEntityHostTest();
         Step(1, () => Server.Kick(Server.Clients.Single(c => c.P != null), "Test wyrzucania przez hosta"));
         WaitUntil(() => File.Exists(NetTestFile("disconnected")));
         WaitUntil(() => File.Exists(NetTestFile("rejoined")) && Server.Clients.Any(c => c.P != null));
@@ -113,6 +114,7 @@ public sealed partial class Game
             && _chat.Any(c => c.text.Contains("Witaj przez gry.fimson.pl!"))
             && _chat.Any(c => c.text.Contains("uprawnienia operatora")));
         Step(20, () => { Shot("04_synced"); SendChat("NET-CLIENT-ACK"); NetTestSignal("verified"); });
+        SetupNetEntityJoinTest();
         WaitUntil(() => Client == null && _screen is DisconnectedScreen);
         Step(15, () => { Shot("05_kicked"); NetTestSignal("disconnected"); });
         Step(10, () => SetScreen(new ConnectingScreen(new MultiplayerScreen(new TitleScreen()), null, "TestGuest")));
@@ -123,6 +125,67 @@ public sealed partial class Game
         {
             Shot("07_host_closed"); NetTestSignal("closed");
             NetTestFinish(true, "teren, model hosta, zmiana bloku, 3 diamenty, czat, operator, wyrzucenie, powrót bez kodu i zapis ekwipunku");
+        });
+    }
+    private void SetupNetEntityHostTest()
+    {
+        Horse horse = null; ChestMinecartEntity cart = null; Villager villager = null;
+        Player Guest() => Server.Clients.Single(c => c.P != null).P;
+        Step(1, () =>
+        {
+            var p = Guest(); p.Inventory.Main[8] = new ItemStack(I.Saddle);
+            horse = new Horse(p.World) { Tamed = true }; horse.SetPositionAndPrev(p.X + 1, p.Y, p.Z);
+            p.World.AddEntityNow(horse); p.OpenEntityContainer(new HorseContainer(p.Inventory, horse));
+        });
+        WaitUntil(() => File.Exists(NetTestFile("horse-window")));
+        Step(1, () =>
+        {
+            if (horse.Inv.Get(0)?.Id != I.Saddle) throw new InvalidOperationException("Brak siodła u konia hosta");
+            var p = Guest(); p.CloseContainer(); cart = new ChestMinecartEntity(p.World);
+            cart.SetPositionAndPrev(p.X + 1, p.Y, p.Z); p.World.AddEntityNow(cart);
+            cart.Set(0, new ItemStack(I.Apple, 5)); cart.Interact(p);
+        });
+        WaitUntil(() => File.Exists(NetTestFile("cart-window")));
+        Step(1, () =>
+        {
+            if (cart.Get(0) != null || Guest().Inventory.CountOf(I.Apple) != 5) throw new InvalidOperationException("Niezgodny ładunek wagonika");
+            var p = Guest(); p.CloseContainer(); villager = new Villager(p.World, 0) { Customer = p };
+            villager.SetPositionAndPrev(p.X + 1, p.Y, p.Z); p.World.AddEntityNow(villager);
+            villager.Recipes.Add(new(new ItemStack(I.Wheat, 4), null, new ItemStack(I.Emerald)));
+            villager.Recipes.Add(new(new ItemStack(I.Wheat, 8), null, new ItemStack(I.Emerald, 2)) { MaxUses = 1 });
+            p.Cursor = new ItemStack(I.Wheat, 8); p.OpenEntityContainer(new MerchantContainer(p.Inventory, villager));
+        });
+        WaitUntil(() => File.Exists(NetTestFile("merchant-window")));
+        Step(1, () =>
+        {
+            if (villager.Recipes[1].Uses != 1 || Guest().Cursor?.Id != I.Emerald || Guest().Cursor.Count != 2
+                || Guest().Inventory.CountOf(I.Wheat) != 0)
+                throw new InvalidOperationException("Handel nie został poprawnie rozliczony na hoście");
+            Guest().CloseContainer();
+        });
+    }
+
+    private void SetupNetEntityJoinTest()
+    {
+        WaitUntil(() => _screen is HorseScreen && Player.OpenContainer is HorseContainer && Player.Inventory.Main[8]?.Id == I.Saddle);
+        Step(1, () => { var c = (HorseContainer)Player.OpenContainer; c.Click(c.FirstPlayerSlot + 35, 0, ClickType.QuickMove, Player); });
+        WaitUntil(() => Player.OpenContainer is HorseContainer c && c.Horse.Inv.Get(0)?.Id == I.Saddle);
+        Step(10, () => { Shot("08_horse_inventory"); NetTestSignal("horse-window"); });
+        WaitUntil(() => _screen is RsContainerScreen && Player.OpenContainer is RsContainer);
+        Step(1, () => Player.OpenContainer.Click(0, 0, ClickType.QuickMove, Player));
+        WaitUntil(() => Player.Inventory.CountOf(I.Apple) == 5);
+        Step(10, () => { Shot("09_cart_inventory"); NetTestSignal("cart-window"); });
+        WaitUntil(() => _screen is MerchantScreen && Player.OpenContainer is MerchantContainer && Player.Cursor?.Id == I.Wheat);
+        Step(1, () => Client.SelectRecipe(1));
+        WaitUntil(() => Player.OpenContainer is MerchantContainer c && c.Index == 1);
+        Step(1, () => Player.OpenContainer.Click(0, 0, ClickType.Pickup, Player));
+        WaitUntil(() => Player.OpenContainer.Slots[2].Stack?.Count == 2);
+        Step(1, () => Player.OpenContainer.Click(2, 0, ClickType.Pickup, Player));
+        WaitUntil(() => Player.Cursor?.Id == I.Emerald && Player.Cursor.Count == 2 && Player.OpenContainer is MerchantContainer c && c.Current.Disabled);
+        Step(10, () =>
+        {
+            if (Player.Inventory.CountOf(I.Wheat) != 0) throw new InvalidOperationException("Powielona zapłata po zmianie okna");
+            Shot("10_merchant_trade"); NetTestSignal("merchant-window");
         });
     }
 }

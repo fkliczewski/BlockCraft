@@ -11,12 +11,7 @@ namespace BlockCraft
         /// <summary>Otwiera ekran dla kontenera encji (koń, wieśniak).</summary>
         public void OpenEntityScreen(Player p, Container c)
         {
-            Gui.ContainerScreen s = c switch
-            {
-                HorseContainer hc => new Gui.HorseScreen(p, hc),
-                MerchantContainer mc => new Gui.MerchantScreen(p, mc),
-                _ => new Gui.ContainerScreen(p, c)
-            };
+            var s = global::BlockCraft.Gui.ContainerFactory.ScreenFor(p, c);
             SetScreen(s);
             p.OpenContainer = c;
         }
@@ -131,9 +126,14 @@ namespace BlockCraft.Gui
         private static bool In(int mx, int my, int x, int y, int w, int h) => mx >= x && my >= y && mx < x + w && my < y + h;
         public override void MouseDown(int mx, int my, int btn)
         {
-            if (btn == 0 && In(mx, my, Prev.x, Prev.y, 12, 19) && _mc.Index > 0) { _mc.SetIndex(_mc.Index - 1); return; }
-            if (btn == 0 && In(mx, my, Next.x, Next.y, 12, 19) && _mc.Index < Count - 1) { _mc.SetIndex(_mc.Index + 1); return; }
+            if (btn == 0 && In(mx, my, Prev.x, Prev.y, 12, 19) && _mc.Index > 0) { Select(_mc.Index - 1); return; }
+            if (btn == 0 && In(mx, my, Next.x, Next.y, 12, 19) && _mc.Index < Count - 1) { Select(_mc.Index + 1); return; }
             base.MouseDown(mx, my, btn);
+        }
+        private void Select(int index)
+        {
+            if (P.World.IsRemote) G.Client?.SelectRecipe(index);
+            else _mc.SetIndex(index);
         }
         public override void Render(int mx, int my, float pt)
         {

@@ -1,5 +1,33 @@
 # Minecraft 1.8: raport integracji, 2026-10-30
 
+## Kontynuacja integracji, 2026-10-31
+
+Goście multiplayera mają teraz właściwe ekrany ekwipunku konia, kontenerów
+wagoników i handlu. Host wysyła opis kontenera i stan encji/ofert, odbiera
+wybór oferty z identyfikatorem okna i rozlicza zapłatę, wynik oraz limit użyć.
+Klient nie wylicza własnego wyniku handlu i nie zwraca sam przedmiotów przy
+zamykaniu GUI. Stanowiło to błąd przy zmianie okna z równoczesnym nadejściem
+nowej zawartości kursora; pierwszy zrzut testowy wykazał powielenie pszenicy.
+Poprawiono wspólny Container.OnClose i powtórzono test z asercją braku kopii.
+Host odrzuca błędne i spóźnione wybory, zamyka oddalone kontenery encji.
+Protokół podniesiono do **3**; host i goście potrzebują tego samego wydania.
+
+Weryfikacja: **467 OK / 0 FAIL** w `.modus/entity-windows-verified.log`.
+Test dwóch procesów przez `gry.fimson.pl` zakończony OK dla hosta i gościa:
+`.modus/entity-windows-e2e-fixed`. Sprawdza siodłanie przez GUI, odbiór
+ładunku wagonika, zmianę oferty, zapłatę i wyczerpanie oferty bez powielenia,
+a następnie wyrzucenie, powrót i zamknięcie sieci. Obejrzano zrzuty konia,
+wagonika i handlu; ostatni zrzut nie zawiera już powielonej pszenicy.
+Build/publish Release przechodzą, wydanie `BlockCraft_Gra` odświeżone.
+
+Testy układów redstone mają wyłączony naturalny spawn od początku scenariusza,
+aby obce moby nie popychały wagoników. Dopisano diagnostykę pozycji i meta
+w razie błędu odblokowania leja. To izolacja testu; nie zmieniono fizyki gry
+i nie uznano przypuszczenia o źródle wcześniejszej niestabilności za dowiedzione.
+Do dalszej integracji pozostają m.in. części smoka w protokole, jazda
+pojazdami przez sieć, OW i niedokończone mechaniki ME. Historyczne braki GUI
+w raportach poniżej zastępuje ta aktualizacja.
+
 ## Priorytet audio, 2026-10-31
 
 Zgłoszenie: odgłosy nakładały się i robiły bardzo głośne. Mikser sumował
@@ -95,9 +123,10 @@ NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy int
 
 ## Pierwsze niezakończone zadania
 
-1. MO: podłączyć GUI konia i handlu do multiplayera, uzupełnić oferty zależne
+1. MO: uzupełnić oferty zależne
    od przedmiotów ME i sprawdzić zgodność AI. Modele, spawn według biomu,
    wieśniacy, handel i ekwipunek konia już scalone - aktualizacja Tory poniżej.
+   GUI konia, handlu i wagoników podłączono do sieci 2026-10-31.
 2. NE: ukończyć podłączenie przywoływania Withera do prawdziwych czaszek ME;
    sprawdzić zgodność generatorów i układu fortec z oryginałem. Smok, kryształy,
    Wither i napisy są już scalone - patrz aktualizacja Hiro poniżej.

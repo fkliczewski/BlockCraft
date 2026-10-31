@@ -154,6 +154,7 @@ public sealed partial class NetServer
                     break;
                 }
             case C2S.CloseWindow: c.CloseWindow(r.ReadByte()); break;
+            case C2S.SelectRecipe: c.SelectRecipe(r.ReadByte(), r.ReadInt32()); break;
             case C2S.CreativeSlot: c.CreativeSlot(r.ReadInt16(), r.ReadStack()); break;
             case C2S.CreativeDrop: { var s = r.ReadStack(); if (c.P.Creative && s != null) c.P.DropStack(s, false); break; }
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;

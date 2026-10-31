@@ -462,6 +462,7 @@ public sealed class MerchantContainer : Container
     }
     public void OnTrade()
     {
+        if (Villager.World.IsRemote) return;
         var r = Match(out bool swapped);
         if (r == null) return;
         int ia = swapped ? 1 : 0, ib = swapped ? 0 : 1;
@@ -494,6 +495,7 @@ public sealed class MerchantContainer : Container
     public override void OnClose(Player p)
     {
         base.OnClose(p);
+        if (p.World.IsRemote) return; // zwrot zapłaty i stan handlu rozlicza host
         for (int i = 0; i < 2; i++) if (Inv.Get(i) is { } s) { Inv.Set(i, null); if (!p.Inventory.Add(s)) p.DropStack(s, false); }
         Inv.Set(2, null);
         if (Villager.Customer == p) Villager.Customer = null;

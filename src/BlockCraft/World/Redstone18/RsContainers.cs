@@ -708,10 +708,8 @@ namespace BlockCraft.World
     {
         public static void Open(Player p, RsContainer c)
         {
-            if (p.World.IsRemote || p.Handler is not Game g) return;
-            p.CloseContainer();
-            p.OpenContainer = c;
-            g.SetScreen(new RsContainerScreen(p, c));
+            if (p.World.IsRemote) return;
+            p.OpenEntityContainer(c);
         }
     }
 }
