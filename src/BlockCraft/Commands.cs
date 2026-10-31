@@ -92,7 +92,10 @@ public sealed class Commands
         if (sel == "@a") return _w.Players.ToList();
         if (sel == "@r") return _w.Players.Count > 0 ? new() { _w.Players[_w.Rand.Next(_w.Players.Count)] } : new();
         var pl = _w.Players.FirstOrDefault(x => x.Name.Equals(sel, StringComparison.OrdinalIgnoreCase));
-        return pl != null ? new() { pl } : new();
+        if (pl != null) return new() { pl };
+        // wygoda zamiast dopełniania Tabem: jednoznaczny początek nicku ("jeff" -> JeffreyEpstein)
+        var pre = _w.Players.Where(x => x.Name.StartsWith(sel, StringComparison.OrdinalIgnoreCase)).ToList();
+        return pre.Count == 1 ? pre : new();
     }
 
     private bool Time(Player p, string[] a)
@@ -164,7 +167,24 @@ public sealed class Commands
             if (a.Length == 2) { p.SetPositionAndPrev(t[0].X, t[0].Y, t[0].Z); p.NetTeleportHook?.Invoke(); p.SendMessage("Przeteleportowano do " + t[0].Name); return true; }
             target = t[0]; i = 2;
         }
-        if (a.Length - i < 3) throw new Exception("/tp [gracz] <x> <y> <z>");
+        if (a.Length == 3)
+        {
+            // /tp <gracz> <gracz-cel> (MC 1.8)
+            var who = Players(p, a[1]); var dest = Players(p, a[2]);
+            if (who.Count == 0) throw new Exception("Nie znaleziono gracza " + a[1]);
+            if (dest.Count == 0) throw new Exception("Nie znaleziono gracza " + a[2]);
+            var d = dest[0];
+            foreach (var t in who)
+            {
+                if (t.World != d.World) { p.SendMessage("§c" + t.Name + " jest w innym wymiarze niż " + d.Name); continue; }
+                t.SetPositionAndPrev(d.X, d.Y, d.Z); t.Yaw = d.Yaw; t.Pitch = d.Pitch;
+                t.MotionX = t.MotionY = t.MotionZ = 0; t.FallDistance = 0;
+                t.NetTeleportHook?.Invoke();
+                p.SendMessage("Przeteleportowano " + t.Name + " do " + d.Name);
+            }
+            return true;
+        }
+        if (a.Length - i < 3) throw new Exception("/tp [gracz] <x> <y> <z> albo /tp [gracz] <gracz-cel>");
         double x = Coord(a[i], target.X), y = Coord(a[i + 1], target.Y), z = Coord(a[i + 2], target.Z);
         if (!a[i].StartsWith("~") && !a[i].Contains('.')) x += 0.5;
         if (!a[i + 2].StartsWith("~") && !a[i + 2].Contains('.')) z += 0.5;

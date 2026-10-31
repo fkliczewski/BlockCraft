@@ -191,7 +191,7 @@ public abstract class Entity
 
     private void ApplyFlow(AABB bb)
     {
-        if (this is Player p && p.Flying) return;
+        if (this is Player p && (p.Flying || p.NetPuppet)) return; // gość: prąd liczy jego klient
         double fx = 0, fz = 0; int n = 0;
         for (int x = MathUtil.FloorToInt(bb.MinX); x <= MathUtil.FloorToInt(bb.MaxX); x++)
             for (int y = MathUtil.FloorToInt(bb.MinY); y <= MathUtil.FloorToInt(bb.MaxY); y++)
