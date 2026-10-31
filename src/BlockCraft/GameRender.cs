@@ -159,6 +159,16 @@ public sealed partial class Game
     }
 
     // ================= przedmioty w GUI =================
+    /// <summary>Połysk zaklęcia: fioletowa, pulsująca kopia kształtu przedmiotu (przybliżenie RenderItem.renderEffect).</summary>
+    private void DrawGlint(ItemStack s, float x, float y)
+    {
+        float t = (Environment.TickCount64 % 3000) / 3000f;
+        int a = (int)(70 + 50 * Math.Sin(t * Math.PI * 2 + x * .05));
+        uint c = SpriteBatch.Col(150, 80, 255, a);
+        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, c, 0, 1, 1, 0);
+        else Sb.DrawLayer(Renderer.Terrain, s.Item.GetSprite(s), x, y, 16, 16, c);
+    }
+
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
     {
         if (s == null || s.Item == null) return;
@@ -171,6 +181,7 @@ public sealed partial class Game
             Sb.DrawLayer(Renderer.Terrain, sp, x, y, 16, 16, col);
             if (it.OverlayFn != null) { var (ol, oc) = it.OverlayFn(s); if (ol > 0) Sb.DrawLayer(Renderer.Terrain, ol, x, y, 16, 16, oc); }
         }
+        if (s.Item.Glint || s.Id == I.EnchantedBook || EnchantHelper.IsEnchanted(s)) DrawGlint(s, x, y);
         if (count && s.Count > 1)
         {
             string t = s.Count.ToString();

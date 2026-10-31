@@ -249,6 +249,12 @@ public sealed class RemoteClient : IPlayerHandler
         Out.End();
     }
 
+    public void EnchantItem(byte window, int button)
+    {
+        if (P.Dead || WindowById(window) is not EnchantingContainer c || !c.StillValid(P)) return;
+        if (c.Enchant(P, button)) ForceSync();
+    }
+
     public void SelectRecipe(byte window, int index)
     {
         if (P.Dead || WindowById(window) is not MerchantContainer c || !c.StillValid(P)
@@ -455,7 +461,7 @@ public sealed class RemoteClient : IPlayerHandler
         using (var bw = new BinaryWriter(ms))
         {
             bw.Write(P.Health); bw.Write(P.MaxHealth); bw.Write(P.FoodLevel); bw.Write(P.Saturation);
-            bw.Write(P.XpLevel); bw.Write(P.XpProgress); bw.Write(P.XpTotal); bw.Write(P.Air);
+            bw.Write(P.XpLevel); bw.Write(P.XpProgress); bw.Write(P.XpTotal); bw.Write(P.Air); bw.Write(P.EnchantmentSeed);
             bw.Write((byte)P.GameMode); bw.Write(P.FireTicks > 0); bw.Write(P.Dead); bw.Write(P.Sleeping);
             bw.Write(P.HasSpawn); bw.Write(P.SpawnX); bw.Write(P.SpawnY); bw.Write(P.SpawnZ);
             bw.Write((byte)P.Effects.Count);

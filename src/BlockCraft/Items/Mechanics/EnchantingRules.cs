@@ -6,7 +6,7 @@ public readonly record struct EnchantmentRoll(Ench Id, int Level);
 public sealed record EnchantOffer(int RequiredLevel, int Lapis, IReadOnlyList<EnchantmentRoll> Enchantments, EnchantmentRoll? Clue);
 
 /// <summary>Reguły EnchantmentHelper/ContainerEnchantment z Java 1.8, niezależne od GUI.</summary>
-public static class EnchantingRules
+public static partial class EnchantingRules
 {
     private sealed record Rule(Ench Id, int Weight, int Start, int Step, int Spread, bool BaseMax = false);
     private static readonly Rule[] Rules =

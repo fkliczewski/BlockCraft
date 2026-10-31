@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest }
+public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest, Enchanting = 30, Anvil }
 
 public interface IPlayerHandler
 {

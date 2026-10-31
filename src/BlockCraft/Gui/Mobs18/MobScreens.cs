@@ -142,7 +142,7 @@ namespace BlockCraft.Gui
             if (r == null || P.Cursor != null) return;
             if (In(mx, my, Left + 36, Top + 24, 16, 16)) GuiDraw.Tooltip(G, GuiDraw.ItemTooltip(r.Buy1, false), mx, my);
             else if (r.Buy2 != null && In(mx, my, Left + 62, Top + 24, 16, 16)) GuiDraw.Tooltip(G, GuiDraw.ItemTooltip(r.Buy2, false), mx, my);
-            else if (In(mx, my, Left + 120, Top + 24, 16, 16)) GuiDraw.Tooltip(G, GuiDraw.ItemTooltip(r.Sell, false) + Enchants(r.Sell), mx, my);
+            else if (In(mx, my, Left + 120, Top + 24, 16, 16)) GuiDraw.Tooltip(G, GuiDraw.ItemTooltip(r.Sell, false), mx, my);
         }
         private static string Enchants(ItemStack s)
         {

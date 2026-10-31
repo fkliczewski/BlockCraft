@@ -191,6 +191,11 @@ public sealed class NetClient
         if (_window is not MerchantContainer) return;
         var writer = Out.Begin(C2S.SelectRecipe); writer.Write(_windowId); writer.Write(index); Out.End();
     }
+    public void EnchantItem(int button)
+    {
+        if (_window is not EnchantingContainer) return;
+        var writer = Out.Begin(C2S.EnchantItem); writer.Write(_windowId); writer.Write((byte)button); Out.End();
+    }
     public void SendDrop(bool all) { var w = Out.Begin(C2S.DropSelected); w.Write(all); Out.End(); }
 
     private void ClickHook(Container c, int slot, int button, ClickType type, Player p)
@@ -522,7 +527,7 @@ public sealed class NetClient
     {
         var p = P;
         p.Health = r.ReadSingle(); p.MaxHealth = r.ReadSingle(); p.FoodLevel = r.ReadInt32(); p.Saturation = r.ReadSingle();
-        p.XpLevel = r.ReadInt32(); p.XpProgress = r.ReadSingle(); p.XpTotal = r.ReadInt32(); p.Air = r.ReadInt32();
+        p.XpLevel = r.ReadInt32(); p.XpProgress = r.ReadSingle(); p.XpTotal = r.ReadInt32(); p.Air = r.ReadInt32(); p.EnchantmentSeed = r.ReadInt32();
         int gm = r.ReadByte(); bool fire = r.ReadBoolean(), dead = r.ReadBoolean(), sleeping = r.ReadBoolean();
         p.HasSpawn = r.ReadBoolean(); p.SpawnX = r.ReadInt32(); p.SpawnY = r.ReadInt32(); p.SpawnZ = r.ReadInt32();
         int ne = r.ReadByte();

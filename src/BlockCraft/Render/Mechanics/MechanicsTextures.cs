@@ -17,12 +17,36 @@ public static partial class TextureGen
             Add("item_" + key, px);
         }
         TexMechanicsItems();
+        TexEnchanting();
         var liquid = New(); for (int y = 9; y < 14; y++) for (int x = 5; x < 11; x++) liquid[y * 16 + x] = Hex(0xFFFFFF); Add("me_potion_liquid", liquid);
         foreach (var (key, color) in new[] { ("fermented_spider_eye", 0x6E382Fu), ("speckled_melon", 0xECA32Bu), ("golden_carrot", 0xF6C33Bu), ("brewing_stand", 0xA48A55u), ("cauldron", 0x555761u) })
         {
             var px = New(); for (int y = 2; y < 14; y++) for (int x = 2; x < 14; x++) if (Math.Abs(x - 8) + Math.Abs(y - 8) < 9) px[y * 16 + x] = Hex(color);
             Add("item_" + key, px);
         }
+    }
+    private static void TexEnchanting()
+    {
+        var noise = TileNoise(91, 8); var obs = Get16("obsidian");
+        var top = New();
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
+        {
+            int i = y * 16 + x; bool edge = x == 0 || y == 0 || x == 15 || y == 15;
+            bool corner = (x < 3 || x > 12) && (y < 3 || y > 12);
+            uint c = corner ? (x + y) % 2 == 0 ? Hex(0x5DECF5) : Hex(0x2CB5C0) : edge ? Hex(0x1A0A0A)
+                : Math.Abs(x - 7.5) < 3 && Math.Abs(y - 7.5) < 3 ? Hex(0x5A1414) : Hex(0x8F2424);
+            top[i] = corner || edge ? c : Mul(c, .85f + noise[i] * .25f);
+        }
+        Add("me_enchant_top", top);
+        var side = New();
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
+        {
+            int i = y * 16 + x;
+            if (y < 8) side[i] = y == 7 && x % 3 == 1 ? Hex(0x5A1414) : Mul(Hex(0x8F2424), .85f + noise[i] * .25f);
+            else if (y == 8 && (x is 1 or 2 or 13 or 14)) side[i] = Hex(0x5DECF5);
+            else side[i] = obs[i];
+        }
+        Add("me_enchant_side", side);
     }
     private static void TexMechanicsItems()
     {

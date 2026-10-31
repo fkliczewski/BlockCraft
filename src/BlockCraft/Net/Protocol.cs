@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 3;
+    public const int Version = 4;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -30,6 +30,7 @@ public enum C2S : byte
     Respawn = 10,
     KeepAlive = 11,     // long czas klienta (ms)
     SelectRecipe = 12,  // byte okno, int indeks oferty
+    EnchantItem = 13,   // byte okno, byte przycisk (0-2)
 }
 
 /// <summary>Pakiety host -> klient.</summary>
