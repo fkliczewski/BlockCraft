@@ -20,6 +20,13 @@ public sealed class MobSpawner
 
     private static readonly SpawnKind[] Kinds = { SpawnKind.Monster, SpawnKind.Creature, SpawnKind.Ambient, SpawnKind.Water };
 
+    internal SpawnEntry[] EntriesAt(SpawnKind kind, int x, int y, int z)
+    {
+        if (kind == SpawnKind.Monster && _w.Dimension == DimensionId.Overworld && _w.Type != WorldType.Superflat
+            && BiomeSpawns.ForStructure(_w.Generator.Overworld.StructureMonsterAt(x, y, z)) is { } special) return special;
+        return BiomeSpawns.For(_w.GetBiome(x, z), kind);
+    }
+
     public void Tick()
     {
         if (_w.Players.Count == 0) return;
@@ -58,8 +65,6 @@ public sealed class MobSpawner
             int top = Math.Min(Chunk.Height, (c.GetHeight(lx, lz) + 1 + 15) & ~15);
             int x = cx * 16 + lx, y = r.Next(Math.Max(1, top)), z = cz * 16 + lz;
             if (Block.Get(_w.GetBlock(x, y, z)).Opaque) continue;
-            var list = BiomeSpawns.For(_w.GetBiome(x, z), kind);
-            if (list.Length == 0) continue;
             int inChunk = 0;
             for (int pack = 0; pack < 3; pack++)
             {
@@ -68,12 +73,18 @@ public sealed class MobSpawner
                 for (int i = 0; i < 4; i++)
                 {
                     px += r.Next(6) - r.Next(6); pz += r.Next(6) - r.Next(6);
+                    if (!_w.IsLoadedAt(px, pz)) continue;
                     double nearest = double.MaxValue;
                     foreach (var p in _w.Players) nearest = Math.Min(nearest, p.DistanceSq(px + 0.5, y, pz + 0.5));
                     double sx = _w.SpawnX - (px + 0.5), sz = _w.SpawnZ - (pz + 0.5);
                     if (nearest < 24 * 24 || sx * sx + sz * sz < 24 * 24) continue;
+                    var list = EntriesAt(kind, px, y, pz);
                     entry ??= BiomeSpawns.Pick(list, r);
-                    if (!PlacementOk(px, y, pz, kind == SpawnKind.Water)) continue;
+                    // Grupa może przekroczyć ścianę monumentu lub granicę chatki.
+                    // SpawnListEntry ma w MC tożsamość obiektu: wiedźma o wadze 1
+                    // z chatki nie jest tą samą ofertą co rzadka wiedźma z listy biomu.
+                    if (entry == null || !list.Any(e => ReferenceEquals(e, entry))) continue;
+                    if (!PlacementOk(px, y, pz, kind == SpawnKind.Water || entry.Key == "guardian")) continue;
                     if (Create(entry.Key, _w) is not Mob m) break;
                     m.SetPositionAndPrev(px + 0.5, y, pz + 0.5);
                     m.Yaw = m.PrevYaw = r.NextFloat() * 360f;

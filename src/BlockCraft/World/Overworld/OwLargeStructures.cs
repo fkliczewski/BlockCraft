@@ -112,10 +112,11 @@ public sealed partial class OwGenerator
         var clip = new Structures18.StructureBoundingBox(int.MinValue, 0, int.MinValue, int.MaxValue, 255, int.MaxValue);
         foreach (var piece in pieces) piece.addComponentParts(world, r, clip);
         var box = Bounds(pieces).ToBox();
+        var spawnBox = type == "Monument" ? Bounds(pieces).ToBox() : null;
         if (type == "Monument") { box.X0 -= 5; box.Z0 -= 5; box.X1 += 5; box.Z1 += 5; box.Y0 = 1; box.Y1 = 64; }
         if (type == "Village") { box.Y0 = 1; box.Y1 = Math.Min(255, box.Y1 + 8); }
         g.ReleaseReadCache();
-        return new(type, box, g);
+        return new(type, box, g) { MonsterSpawnBox = spawnBox, MonsterSpawnKey = spawnBox != null ? "guardian" : null };
     }
     partial void CollectOtherStructures(List<OwStructurePlan> plans, int cx, int cz)
     {

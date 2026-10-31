@@ -22,7 +22,12 @@ public sealed class OwBox
     public void MoveY(int y) { Y0 += y; Y1 += y; }
 }
 
-public sealed record OwStructurePlan(string Name, OwBox Box, OwGenRegion Region);
+public sealed record OwStructurePlan(string Name, OwBox Box, OwGenRegion Region)
+{
+    // Obszar spawnu nie obejmuje rozszerzonego obszaru fundamentów/karczowania.
+    public OwBox MonsterSpawnBox { get; init; }
+    public string MonsterSpawnKey { get; init; }
+}
 
 public sealed partial class OwGenerator
 {
@@ -84,7 +89,11 @@ public sealed partial class OwGenerator
         }
         else OwTemples.Jungle(s, r);
         g.ReleaseReadCache();
-        return new("Temple", new OwBox(cx * 16, y - (desert ? 14 : 4), cz * 16, cx * 16 + sx - 1, y + (desert ? 14 : hut ? 6 : 9), cz * 16 + sz - 1), g);
+        return new("Temple", new OwBox(cx * 16, y - (desert ? 14 : 4), cz * 16, cx * 16 + sx - 1, y + (desert ? 14 : hut ? 6 : 9), cz * 16 + sz - 1), g)
+        {
+            MonsterSpawnBox = hut ? new OwBox(cx * 16, y, cz * 16, cx * 16 + sx - 1, y + 6, cz * 16 + sz - 1) : null,
+            MonsterSpawnKey = hut ? "witch" : null
+        };
     });
 
     public bool IsMineshaftStart(int cx, int cz)

@@ -20,6 +20,9 @@ public static class BiomeSpawns
     };
 
     private static readonly Dictionary<(int, SpawnKind), SpawnEntry[]> Cache = new();
+    private static readonly SpawnEntry[] Guardians = { new("guardian", 1, 2, 4) };
+    private static readonly SpawnEntry[] HutWitches = { new("witch", 1, 1, 1) };
+    public static SpawnEntry[] ForStructure(string key) => key switch { "guardian" => Guardians, "witch" => HutWitches, _ => null };
 
     public static SpawnEntry[] For(int biome, SpawnKind kind)
     {

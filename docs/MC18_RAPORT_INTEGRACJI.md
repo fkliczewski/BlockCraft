@@ -367,3 +367,33 @@ CustomName przez typ LivingEntity zamiast Mob i został poprawiony.
 OW pozostaje otwarty: naturalny spawn guardianów w monumentach i wiedźm
 w chatkach, dokładniejsze tekstury opadów i test pogody w dwóch graficznych
 oknach przez relay. Wydanie BlockCraft_Gra nie jest jeszcze odświeżone.
+
+### OW: spawn w strukturach, kontynuacja 2026-10-31
+
+Podłączono `ChunkProviderGenerate.getPossibleCreatures` do naturalnego spawnera:
+wewnątrz monumentu lista potworów zawiera zwykłego guardiana (waga 1, grupa
+2–4), a w chatce wyłącznie wiedźmę (waga 1, grupa 1–1). Kategorie zwierząt,
+wodnych i nietoperzy zachowują listy biomów. Guardian należy do limitu
+potworów, mimo że jego umieszczenie wymaga wody, a nie podłoża lądowego.
+Istniejące zasady światła, kolizji, odległości od graczy i limitów pozostają.
+
+Do planów dodano odrębne obszary spawnu. Monument używa oryginalnego pudła
+58×23×58 (Y 39–61); rozszerzony obszar fundamentów i karczowania nie zwiększa
+zasięgu spawnu. Chatka pomija podpory poniżej bazowego Y. Lista jest ponownie
+sprawdzana przy każdym przesunięciu grupy, z tożsamością SpawnListEntry
+(wiedźma ze struktury nie przenosi wagi 1 do zwykłej listy biomu). Superflat
+i inne wymiary nie dostają tych reguł. Obszary są cache'owane osobno;
+próba spawnu nie wyszukuje kopalń, twierdz ani wiosek.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **556 OK, 0 FAIL**,
+w tym 13 nowych sprawdzeń granic, list, kategorii i pełnego przebiegu
+`World.Tick → MobSpawner → utworzenie moba`. Te ostatnie używają kontrolowanych
+komór w rzeczywistych obszarach struktur seeda 12345, bez ręcznego spawnowania
+guardianów/wiedźm. Pierwsza komora wiedźm miała otwarte boki i zbyt dużo
+światła w południe (0 mobów); dodano ściany do fixture, nie zmieniano reguł
+oświetlenia. Log: `.modus/ow-structure-spawns-selftest.log`.
+
+Nie wykonano pomiaru zgodności tempa spawnu 1:1. Dotychczasowy spawner
+wciąż ogranicza próby potworów do 1/4 ze względów wydajnościowych.
+Pozostałe zadania OW: dokładniejsze tekstury opadów i test pogody w dwóch
+graficznych oknach przez relay. Końcowe wydanie i integracja pozostają otwarte.
