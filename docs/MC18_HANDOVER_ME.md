@@ -1,4 +1,4 @@
-# Przekazanie pracy — ME, 2026-10-31
+# Przekazanie pracy - ME, 2026-10-31
 
 Użytkownik poprosił o zmianę agenta. Dotychczasowy agent zapisuje stan i kończy pracę.
 Plan źródłowy: `.modus/progress/Agent-1.md`, zarządzany przez `modus_plan/modus_step`.
@@ -18,7 +18,7 @@ Gałąź: `feature/mc18`. Nie ruszać cudzej lokalnej zmiany `.gitignore`.
 - Raport integracji i ograniczenia: `docs/MC18_RAPORT_INTEGRACJI.md`.
 - Raport problemów orkiestracji: `.modus/PROBLEMY_ORKIESTRACJI.md`.
 
-## Rozpoczęty krok 29 — nie jest gotowy
+## Rozpoczęty krok 29 - nie jest gotowy
 
 Przeczytano raport Goro `.modus/raporty/20261030-114753-Goro.md`.
 Jego moduł obejmował efekty i warzenie; zaklinanie/kowadło oraz większość
@@ -40,7 +40,7 @@ potwierdzono ich zgodności z oracle MC. Wynik 569/0 nie waliduje tego WIP.
    HashMap Java 8 (w kodzie założono kubełki 16/32/64), progi mocy i clue.
 2. Dodać testy reguł i biblioteczek; plik testowy jeszcze nie powstał.
 3. Wdrożyć działający stół: blok/receptura/GUI, XPSeed z zapisem gracza,
-   koszty 1–3 poziomy i lazuryt, wymagany poziom oferty, książki i host autorytatywny.
+   koszty 1-3 poziomy i lazuryt, wymagany poziom oferty, książki i host autorytatywny.
 4. Potem kowadło i pozostałe ME; nie odhaczać całego kroku 29 po samych regułach.
 
 Referencje MCP są w `%TEMP%/blockcraft-mc18-reference/enchanting/`:
@@ -55,4 +55,4 @@ Krok 30: m.in. dragon_part i pasażerowie w sieci, końcowe testy, README,
 CHECKLISTA, raport i wydanie. `BlockCraft_Gra` nadal jest z `00d3ee0`, bez OW.
 Main nie zmieniano; merge wymaga końcowej akceptacji użytkownika według planu.
 W logach są 4 stare braki tekstur: item_baked_potato, item_poisonous_potato,
-item_pumpkin_seeds, item_melon_seeds — do naprawy przy ME/integracji.
+item_pumpkin_seeds, item_melon_seeds - do naprawy przy ME/integracji.
