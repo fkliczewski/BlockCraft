@@ -105,6 +105,17 @@ public sealed partial class Game
             ac.Click(2, 0, ClickType.QuickMove, Player);
             MeCheck(Player.XpLevel == lvl - 5 && Player.Inventory.Main.Any(x => x != null && EnchantHelper.GetLevel(x, Ench.Sharpness) == 4), "kowadło: odbiór", $"{lvl} -> {Player.XpLevel}");
         });
+        Step(5, () =>
+        {
+            SetScreen(null);
+            for (int i = 0; i < 36; i++) Player.Inventory.Main[i] = null;
+            Player.Inventory.Main[0] = new ItemStack(I.Compass); Player.Inventory.Main[1] = new ItemStack(I.Clock); Player.Inventory.Main[2] = new ItemStack(B.Jukebox);
+            for (int i = 0; i < 12; i++) Player.Inventory.Main[9 + i] = new ItemStack(I.Record13 + i);
+            Player.Inventory.Main[3] = new ItemStack(B.Anvil, 1, 0); Player.Inventory.Main[4] = new ItemStack(B.Anvil, 1, 1); Player.Inventory.Main[5] = new ItemStack(B.Anvil, 1, 2);
+            World.SetBlock(tx, ty, tz - 3, B.Jukebox);
+            SetScreen(new Gui.ContainerScreen(Player, Player.InventoryContainer));
+        });
+        Step(15, () => Shot("me_07_kompas_zegar_plyty"));
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

@@ -41,6 +41,7 @@ public static class GuiDraw
         var it = s.Item; if (it == null) return "?";
         string t = s.Name;
         // rzadkość 1.8: zaklęty przedmiot RARE (aqua), zaklęta książka UNCOMMON (żółta)
+        if (it.LoreFn != null) t += "\n§7" + it.LoreFn(s);
         if ((s.Tag?.GetList("ench")?.Count ?? 0) > 0) t = "§b" + t;
         else if ((s.Tag?.GetList("StoredEnchantments")?.Count ?? 0) > 0) t = "§e" + t;
         foreach (var key in new[] { "ench", "StoredEnchantments" })

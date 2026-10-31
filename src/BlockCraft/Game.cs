@@ -80,7 +80,13 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         Sound.Init(Settings);
-        Renderer.SoundHook = (n, x, y, z, v, p) => { if (World != null && _sessionStarted) Sound.Play(n, x, y, z, v, p); };
+        Renderer.SoundHook = (n, x, y, z, v, p) =>
+        {
+            if (World == null || !_sessionStarted) return;
+            // szafa grająca: "record:cat" gra płytę w bloku x,y,z, "record:" ją zatrzymuje
+            if (n.StartsWith("record:")) { if (n.Length > 7) Sound.PlayRecord(n[7..], x, y, z); else Sound.StopRecord(x, y, z); return; }
+            Sound.Play(n, x, y, z, v, p);
+        };
         UpdateGuiScale();
         ApplySettings();
         StartMenuWorld();
@@ -526,6 +532,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (!p.Dead && p.Removed) { }
         UpdateDimensionChunks();
         Renderer.TickAnimations();
+        Items.ItemAnimations.Tick(World, Player);
         Renderer.TickParticles();
         // ekwipowanie
         _prevEquip = _equip;

@@ -102,7 +102,7 @@ public static partial class Registries
 {
     static partial void EntitiesMechanics()
     {
-        Tile(60, () => new BrewingStandTile()); Entity("me_potion", w => new AlchemyProjectile(w));
+        Tile(60, () => new BrewingStandTile()); Tile(61, () => new World.JukeboxTile()); Entity("me_potion", w => new AlchemyProjectile(w));
         EntityRenderer.Custom[typeof(AlchemyProjectile)] = (r, e, pt, pos, cam) =>
         {
             var p = (AlchemyProjectile)e; r.RenderBillboardSprite(p.Stack?.Item?.GetSprite(p.Stack) ?? TextureGen.Layer("item_potion"), pos, .25f, Vector4.One, cam);

@@ -61,6 +61,7 @@ public static partial class SelfTest
         try { TestEnchanting(); } catch (Exception e) { Check(false, "Zaklinanie", e.ToString()); }
         try { TestEnchantEffects(); } catch (Exception e) { Check(false, "Działanie zaklęć", e.ToString()); }
         try { TestAnvil(); } catch (Exception e) { Check(false, "Kowadło", e.ToString()); }
+        try { TestUtilityItems(); } catch (Exception e) { Check(false, "Kompas, zegar, płyty", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }
