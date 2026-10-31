@@ -295,3 +295,39 @@ akumulacja śniegu/lód, dalsze interakcje z pogodą oraz naturalny spawn
 strażników w monumentach i wiedźm w chatkach. Wydanie `BlockCraft_Gra`
 nie zostało odświeżone o częściową implementację pogody. Pełna zgodność 1:1
 nie została potwierdzona. Dalsze braki ME i końcowa integracja pozostają otwarte.
+
+### OW: opady i interakcje powierzchniowe, dalsza kontynuacja 2026-10-31
+
+Dodano ruchome kolumny deszczu/śniegu przy kamerze, z odcięciem na powierzchni
+terenu i dachów, wyborem opadów według temperatury biomu i brakiem opadów na
+pustyni, w Netherze i Endzie. Pogoda odbarwia niebo i mgłę, przygasza słońce,
+księżyc i gwiazdy. Tekstury opadów są proceduralne 16×16, zgodnie z aktualnym
+atlasem BlockCraft; nie są oryginalnymi teksturami MC. Pełna zgodność wizualna
+1:1 nadal wymaga dopracowania.
+
+Deszcz odtwarza asset `ambient.weather.rain` przez jeden zapętlony głos
+w kategorii `weather`. Aktualizacja głośności nie dodaje kopii próbki; limit
+wejściowy wynosi 0.25, typowy cel 0.2 przed dotychczasowym zapasem 6 dB.
+Głośność łagodnie maleje pod dachem i przy końcu deszczu; głęboka jaskinia,
+śnieg i suchy biom są ciche. Wyjście ze świata czyści ambient. Dekodowanie
+próbki odbywa się poza blokadą miksera. Nie wykonano odsłuchu głośników.
+
+Dodano próby powierzchniowe w aktywnych chunkach: zamarzanie źródeł wody od
+brzegu, pojedyncza warstwa śniegu podczas opadów (bez piętrzenia), bez śniegu
+na lodzie. Zamarzanie nie wymaga opadów. Deszcz nawadnia pole uprawne;
+dach odcina to nawadnianie.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest: **529 OK, 0 FAIL**,
+w tym test 1000 aktualizacji pojedynczego ambientu, suwaka kategorii, końca
+opadów i zmiany świata oraz 9 testów śniegu/lodu/pól. Autotest `--ow`:
+równiny (316 kolumn deszczu, 1 głos), śnieżny biom (316 kolumn śniegu,
+0 głosów), pustynia i clear (0 kolumn, 0 głosów); `OW-TEST KONIEC: OK`.
+Scena pogody jest kontrolowanym fixture, nie dowodem naturalnej generacji
+biomów. Zrzuty deszczu/śniegu obejrzano i zmniejszono zbyt dużą gęstość
+pierwszej wersji. Dowody: `.modus/ow-precipitation-*.log`
+i `.modus/ow-precipitation-final/`.
+
+Pozostały pioruny (encja, efekty, dźwięk i sieć), naturalny spawn guardianów
+i wiedźm w strukturach, dokładniejsze odwzorowanie grafiki pogody i test
+pogody w dwóch oknach przez relay. Krok OW pozostaje w toku; wydanie
+BlockCraft_Gra jeszcze nie zostało odświeżone.

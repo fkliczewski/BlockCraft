@@ -16,6 +16,19 @@ public static partial class TextureGen
         OwPlants();
         OwBuilding();
         OwItems();
+        OwWeatherTextures();
+    }
+
+    private static void OwWeatherTextures()
+    {
+        var rain = New(); var snow = New(); var r = new Rng(1809);
+        for (int i = 0; i < 6; i++)
+        {
+            int x = r.Next(16), y = r.Next(16);
+            for (int dy = 0; dy < 3; dy++) rain[((y + dy) & 15) * 16 + x] = Rgba(180, 200, 255, 60 + dy * 25);
+        }
+        for (int i = 0; i < 6; i++) snow[r.Next(256)] = Rgba(255, 255, 255, 180);
+        Add("weather_rain", rain); Add("weather_snow", snow);
     }
 
     // ---------------- pomocnicze ----------------

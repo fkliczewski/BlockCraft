@@ -53,5 +53,18 @@ public static partial class SelfTest
         for (int i = 0; i < 4; i++) split.Read(b, 1 + i * 512, 512);
         Check(a.SequenceEqual(b.Skip(1).Take(2048)) && b[0] == 123 && b[^1] == 123,
             "Limiter działa identycznie niezależnie od podziału i przesunięcia bufora");
+
+        var rain = new Mixer(); int created = 0;
+        Voice Rain() { created++; var v = Tone(.4f, .2f); v.Category = "weather"; return v; }
+        for (int i = 0; i < 1000; i++) rain.SetLoop("ambient:rain", .2f, Rain);
+        rain.Read(buffer, 0, buffer.Length);
+        Check(rain.Count == 1 && created == 1 && buffer.All(s => Math.Abs(s) <= .040001f),
+            "1000 ticków deszczu gra jednym cichym głosem bez sumowania kopii");
+        rain.CategoryVolume = cat => cat == "weather" ? 0 : 1; rain.Read(buffer, 0, buffer.Length);
+        Check(buffer.All(s => s == 0), "Suwak kategorii pogody wycisza deszcz");
+        rain.SetLoop("ambient:rain", 0, Rain); rain.Read(buffer, 0, buffer.Length);
+        Check(rain.Count == 0 && buffer.All(s => s == 0), "Koniec opadów zatrzymuje ambient deszczu");
+        rain.SetLoop("ambient:rain", .1f, Rain); rain.Clear(false); rain.SetLoop("ambient:rain", .1f, Rain);
+        Check(rain.Count == 1 && created == 3, "Zmiana świata usuwa deszcz, nowy świat tworzy pojedynczy głos");
     }
 }

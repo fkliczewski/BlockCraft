@@ -125,6 +125,27 @@ public sealed class Mixer : ISampleProvider
     }
 
     public void ForEach(Action<Voice> a) { lock (_lock) foreach (var v in _voices) a(v); }
+    /// <summary>Jeden zapętlony ambient na klucz. Aktualizacja nie tworzy kolejnych kopii próbki.</summary>
+    public void SetLoop(string tag, float volume, Func<Voice> create)
+    {
+        lock (_lock)
+        {
+            var voice = _voices.FirstOrDefault(v => !v.Done && v.Tag == tag);
+            if (volume <= .001f) { if (voice != null) voice.Done = true; return; }
+            if (voice != null) { voice.Volume = volume; return; }
+        }
+        // Dekodowanie OGG nie może zatrzymywać wątku miksera.
+        var candidate = create();
+        if (candidate == null) return;
+        lock (_lock)
+        {
+            var voice = _voices.FirstOrDefault(v => !v.Done && v.Tag == tag);
+            if (voice != null) { voice.Volume = volume; candidate.Dispose(); return; }
+            voice = candidate;
+            voice.Tag = tag; voice.Loop = true; voice.Volume = volume;
+            Add(voice);
+        }
+    }
     public int Count { get { lock (_lock) return _voices.Count; } }
 
     public int Read(float[] buffer, int offset, int count)

@@ -413,6 +413,15 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         }
         float sb = 1f - Math.Clamp(1f - (MathF.Cos(angle * MathF.PI * 2f) * 2f + 0.2f), 0, 1);
         SunBrightness = sb * 0.8f + 0.2f;
+        if (w.Dimension == DimensionId.Overworld)
+        {
+            float rain = w.RainAt(pt), thunder = w.ThunderAt(pt);
+            float gray = (SkyColor.X * .3f + SkyColor.Y * .59f + SkyColor.Z * .11f) * .6f;
+            SkyColor = Vector3.Lerp(SkyColor, new Vector3(gray), rain * .75f);
+            SkyColor *= 1 - thunder * .75f;
+            fog *= new Vector3(1 - rain * .5f, 1 - rain * .5f, 1 - rain * .4f) * (1 - thunder * .5f);
+            SunBrightness *= (1 - rain * 5f / 16f) * (1 - thunder * 5f / 16f);
+        }
         FogColor = fog; FogMode = 0;
         FogEnd = RenderDistance * 16; FogStart = FogEnd * 0.75f;
         if (w.Dimension == DimensionId.Nether) { SkyColor = FogColor = new Vector3(.2f,.03f,.03f); FogStart = 0; FogEnd *= .5f; SunBrightness = 1; }
@@ -467,13 +476,14 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             var inv = Matrix4.Invert(vp);
             _sky.Set("uInvViewProj", inv);
             _sky.Set("uSky", SkyColor); _sky.Set("uFog", FogColor);
-            _sky.Set("uSunset", SunsetColor(angle)); _sky.Set("uSunDir", sunDir);
+            _sky.Set("uSunset", SunsetColor(angle) * (1 - w.RainAt(pt))); _sky.Set("uSunDir", sunDir);
             Terrain.Bind(0); _sky.Set("uTex",0); _sky.Set("uDimension",(int)w.Dimension); _sky.Set("uEndLayer",(float)TextureGen.Layer("end_sky"));
             _skyQuad.DrawQuads();
             if (w.Dimension == DimensionId.Overworld)
             {
             // gwiazdy
             float starB = 1f - (MathF.Cos(angle * MathF.PI * 2f) * 2f + 0.25f); starB = Math.Clamp(starB, 0, 1); starB = starB * starB * 0.5f;
+            starB *= 1 - w.RainAt(pt);
             GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
             var rot = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90)) * Matrix4.CreateRotationX(angle * MathF.PI * 2f);
             rot = Matrix4.CreateRotationZ(angle * MathF.PI * 2f);
@@ -485,8 +495,8 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             // słońce i księżyc
             _sunSh.Use();
             var skyVp = view.ClearTranslation() * proj;
-            DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1));
-            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1));
+            DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
+            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             }
         }
@@ -578,6 +588,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
         // --- chmury ---
         if (CloudsEnabled && FogMode == 0 && w.Dimension == DimensionId.Overworld) RenderClouds(cam, vp, pt);
+        RenderWeather(cam, vp, pt);
 
         // --- obrys zaznaczenia ---
         if (sel.HasValue && sel.Value.Hit)

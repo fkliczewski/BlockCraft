@@ -553,7 +553,7 @@ public class FarmlandBlock : Block
         for (int dx = -4; dx <= 4 && !water; dx++) for (int dz = -4; dz <= 4 && !water; dz++) for (int dy = 0; dy <= 1; dy++)
                     if (w.GetBlock(x + dx, y + dy, z + dz) == B.Water) { water = true; break; }
         int m = w.GetMeta(x, y, z);
-        if (water) { if (m != 7) w.SetMeta(x, y, z, 7); }
+        if (water || w.IsRainingAt(x, y + 1, z)) { if (m != 7) w.SetMeta(x, y, z, 7); }
         else if (m > 0) w.SetMeta(x, y, z, m - 1);
         else if (w.GetBlock(x, y + 1, z) != B.Wheat) w.SetBlock(x, y, z, B.Dirt);
     }

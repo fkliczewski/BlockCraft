@@ -17,6 +17,10 @@ public static class Sound
 
     public static bool Enabled => _started && Mix.Running;
     public static int ActiveVoices => Mix.Count;
+    internal static int RainVoices
+    {
+        get { int count = 0; Mix.ForEach(v => { if (!v.Done && v.Tag == "ambient:rain") count++; }); return count; }
+    }
 
     /// <summary>Start systemu: otwiera urządzenie, uruchamia pobieranie assetów w tle.</summary>
     public static void Init(Settings settings)
@@ -72,7 +76,7 @@ public static class Sound
         catch (Exception ex) { Log.Error("Sound.PlayUi " + ev + ": " + ex.Message); }
     }
 
-    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0)
+    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0, bool enqueue = true)
     {
         SoundBank bank; lock (BankLock) bank = _bank;
         bank.Events.TryGetValue(ev, out var def);
@@ -108,8 +112,21 @@ public static class Sound
             v.Data = pcm.Data; v.Channels = pcm.Channels; v.Rate = pcm.Rate; v.Frames = pcm.Frames;
         }
         v.Step = p * v.Rate / 44100.0;
-        Mix.Add(v);
+        if (enqueue) Mix.Add(v);
         return v;
+    }
+
+    /// <summary>Lokalny deszcz: pojedyncza próbka w kategorii pogody, z ograniczoną głośnością.</summary>
+    public static void SetRain(float volume)
+    {
+        if (!Enabled) return;
+        volume = Math.Clamp(volume, 0, .25f);
+        try
+        {
+            Mix.SetLoop("ambient:rain", volume, () => BankReady && HasEvent("ambient.weather.rain")
+                ? Start(true, "ambient.weather.rain", 0, 0, 0, 1, 1, false, enqueue: false) : null);
+        }
+        catch (Exception ex) { Log.Error("Sound.SetRain: " + ex.Message); }
     }
 
     // ---- płyty (szafa grająca) ----

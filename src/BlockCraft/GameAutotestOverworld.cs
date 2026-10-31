@@ -69,6 +69,42 @@ public sealed partial class Game
                 Shot("ow_" + name.ToLowerInvariant());
             });
         }
+        Step(1, () => CreateWorld("AutoTestWeather " + DateTime.Now.ToString("HHmmss"), 12345, 3, false, WorldType.Superflat, true));
+        ticks = 0;
+        WaitUntil(() => _sessionStarted || ++ticks > 1800);
+        Step(1, () =>
+        {
+            World.Rules.DoMobSpawning = false; World.Rules.DoDaylightCycle = false; World.DayTime = 6000;
+            Renderer.RenderDistance = 3; World.ChunkManager.Radius = 3;
+            Player.SetPositionAndPrev(8, 5, 8); Player.Flying = true;
+            Player.Yaw = Player.PrevYaw = 30; Player.Pitch = Player.PrevPitch = 5;
+        });
+        int weatherWait = 0;
+        WaitUntil(() => ++weatherWait > 1200 || OwChunksReady(new OwBox(-16, 0, -16, 31, 10, 31)) && Renderer.PendingMeshes < 3);
+        foreach (var test in new[] { ("rain", Biome.Plains), ("snow", Biome.IcePlains), ("desert", Biome.Desert), ("clear", Biome.Plains) })
+        {
+            var fixture = test; int wait = 0;
+            Step(1, () =>
+            {
+                // Kontrolowana scena renderu, bez podróży do losowego biomu.
+                foreach (var c in World.Chunks.Values) Array.Fill(c.Biomes, (byte)fixture.Item2);
+                Cmds.Execute(Player, "/weather " + (fixture.Item1 == "clear" ? "clear" : "rain") + " 600");
+            });
+            WaitUntil(() => ++wait > 900 || (fixture.Item1 == "clear" ? World.RainStrength == 0 : World.RainStrength == 1));
+            Step(100, () =>
+            {
+                bool ok = fixture.Item1 switch
+                {
+                    "rain" => Renderer.RainColumns > 0 && Renderer.SnowColumns == 0,
+                    "snow" => Renderer.RainColumns == 0 && Renderer.SnowColumns > 0,
+                    _ => Renderer.RainColumns == 0 && Renderer.SnowColumns == 0
+                };
+                ok &= fixture.Item1 == "rain" ? Sound.RainVoices <= 1 : Sound.RainVoices == 0;
+                if (!ok) failures++;
+                Log.Info($"OW-TEST pogoda {fixture.Item1}: {(ok ? "OK" : "FAIL")} rain={Renderer.RainColumns} snow={Renderer.SnowColumns} rainVoices={Sound.RainVoices} audio={Sound.Enabled}");
+                Shot("ow_weather_" + fixture.Item1);
+            });
+        }
         Step(1, () => { Log.Info($"OW-TEST KONIEC: {(failures == 0 ? "OK" : failures + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 

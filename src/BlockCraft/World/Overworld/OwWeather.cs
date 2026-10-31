@@ -67,6 +67,12 @@ public sealed partial class World
             else if (--Weather.ThunderTime == 0) Weather.Thundering = !Weather.Thundering;
             if (Weather.RainTime <= 0) Weather.RainTime = Weather.Raining ? Rand.Next(12000) + 12000 : Rand.Next(168000) + 12000;
             else if (--Weather.RainTime == 0) Weather.Raining = !Weather.Raining;
+            foreach (var c in Chunks.Values)
+            {
+                if (!c.Merged || !Players.Any(p => Math.Abs((int)Math.Floor(p.X / 16) - c.Cx) <= 7
+                    && Math.Abs((int)Math.Floor(p.Z / 16) - c.Cz) <= 7) || Rand.Next(16) != 0) continue;
+                UpdateWeatherSurface(c.Cx * 16 + Rand.Next(16), c.Cz * 16 + Rand.Next(16));
+            }
         }
         _prevRainStrength = RainStrength; _prevThunderStrength = ThunderStrength;
         RainStrength = Math.Clamp(RainStrength + (Weather.Raining ? .01f : -.01f), 0, 1);
@@ -77,6 +83,21 @@ public sealed partial class World
     {
         Weather.RainTime = Weather.ThunderTime = 0;
         Weather.Raining = Weather.Thundering = false;
+    }
+
+    /// <summary>Jedna próba powierzchniowa WorldServer: zamarzanie brzegu wody i pojedyncza warstwa śniegu.</summary>
+    internal void UpdateWeatherSurface(int x, int z)
+    {
+        if (IsRemote || Dimension != DimensionId.Overworld || !IsLoadedAt(x, z)) return;
+        int y = GetHeight(x, z);
+        if (y < 1 || y >= Chunk.Height || !Biome.IsSnowyAt(GetBiome(x, z), x, y, z)) return;
+        if (GetBlockLight(x, y - 1, z) < 10 && GetBlock(x, y - 1, z) == B.Water && GetMeta(x, y - 1, z) == 0
+            && (GetBlock(x - 1, y - 1, z) != B.Water || GetBlock(x + 1, y - 1, z) != B.Water
+                || GetBlock(x, y - 1, z - 1) != B.Water || GetBlock(x, y - 1, z + 1) != B.Water))
+            SetBlock(x, y - 1, z, B.Ice);
+        if (Weather.Raining && GetBlockLight(x, y, z) < 10 && GetBlock(x, y, z) == B.Air
+            && GetBlock(x, y - 1, z) is not (B.Ice or B.PackedIce)
+            && Block.Get(B.SnowLayer).CanPlaceAt(this, x, y, z)) SetBlock(x, y, z, B.SnowLayer);
     }
 }
 
