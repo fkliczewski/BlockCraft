@@ -22,6 +22,7 @@ public static partial class SelfTest
     {
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         var w = new World.World(seed, type, false);
+        w.Rand.SetSeed(seed); // Powtarzalne AI i dropy w testach, niezależnie od czasu generowania terenu.
         var list = new List<Chunk>();
         for (int cx = -radius; cx <= radius; cx++)
             for (int cz = -radius; cz <= radius; cz++)
