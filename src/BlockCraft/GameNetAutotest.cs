@@ -90,6 +90,7 @@ public sealed partial class Game
         });
         WaitUntil(() => File.Exists(NetTestFile("verified")) && _chat.Any(c => c.text.Contains("NET-CLIENT-ACK")));
         Step(20, () => Shot("08_remote_player"));
+        SetupNetWeatherHostTest();
         SetupNetEntityHostTest();
         Step(1, () => Server.Kick(Server.Clients.Single(c => c.P != null), "Test wyrzucania przez hosta"));
         WaitUntil(() => File.Exists(NetTestFile("disconnected")));
@@ -114,6 +115,7 @@ public sealed partial class Game
             && _chat.Any(c => c.text.Contains("Witaj przez gry.fimson.pl!"))
             && _chat.Any(c => c.text.Contains("uprawnienia operatora")));
         Step(20, () => { Shot("04_synced"); SendChat("NET-CLIENT-ACK"); NetTestSignal("verified"); });
+        SetupNetWeatherJoinTest();
         SetupNetEntityJoinTest();
         WaitUntil(() => Client == null && _screen is DisconnectedScreen);
         Step(15, () => { Shot("05_kicked"); NetTestSignal("disconnected"); });
@@ -137,7 +139,7 @@ public sealed partial class Game
             horse = new Horse(p.World) { Tamed = true }; horse.SetPositionAndPrev(p.X + 1, p.Y, p.Z);
             p.World.AddEntityNow(horse); p.OpenEntityContainer(new HorseContainer(p.Inventory, horse));
         });
-        WaitUntil(() => File.Exists(NetTestFile("horse-window")));
+        WaitUntil(() => File.Exists(NetTestFile("horse-window")) && horse.Inv.Get(0)?.Id == I.Saddle);
         Step(1, () =>
         {
             if (horse.Inv.Get(0)?.Id != I.Saddle) throw new InvalidOperationException("Brak siodła u konia hosta");
@@ -145,7 +147,8 @@ public sealed partial class Game
             cart.SetPositionAndPrev(p.X + 1, p.Y, p.Z); p.World.AddEntityNow(cart);
             cart.Set(0, new ItemStack(I.Apple, 5)); cart.Interact(p);
         });
-        WaitUntil(() => File.Exists(NetTestFile("cart-window")));
+        // Plik gościa może wyprzedzić pakiet kliknięcia. Czekamy także na wynik u hosta.
+        WaitUntil(() => File.Exists(NetTestFile("cart-window")) && cart.Get(0) == null && Guest().Inventory.CountOf(I.Apple) == 5);
         Step(1, () =>
         {
             if (cart.Get(0) != null || Guest().Inventory.CountOf(I.Apple) != 5) throw new InvalidOperationException("Niezgodny ładunek wagonika");
@@ -155,7 +158,8 @@ public sealed partial class Game
             villager.Recipes.Add(new(new ItemStack(I.Wheat, 8), null, new ItemStack(I.Emerald, 2)) { MaxUses = 1 });
             p.Cursor = new ItemStack(I.Wheat, 8); p.OpenEntityContainer(new MerchantContainer(p.Inventory, villager));
         });
-        WaitUntil(() => File.Exists(NetTestFile("merchant-window")));
+        WaitUntil(() => File.Exists(NetTestFile("merchant-window")) && villager.Recipes[1].Uses == 1
+            && Guest().Cursor is { Id: I.Emerald, Count: 2 });
         Step(1, () =>
         {
             if (villager.Recipes[1].Uses != 1 || Guest().Cursor?.Id != I.Emerald || Guest().Cursor.Count != 2

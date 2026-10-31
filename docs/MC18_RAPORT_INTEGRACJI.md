@@ -432,3 +432,45 @@ niewczytanych chunków, RNG gry i kolejność HashSet nie są zgodne bitowo z JV
 nie porównano wszystkich warunków początkowego wyposażenia/grup. Nie deklaruje
 się całej symulacji mobów jako 1:1. Nadal otwarte są dokładniejsze tekstury opadów,
 test pogody w dwóch oknach przez relay, ME i końcowa integracja/wydanie.
+
+### OW: oryginalne tekstury opadów i dwa okna przez relay, 2026-10-31
+
+ClientAssets pobiera oficjalne metadane i klienta 1.8 z serwerów Mojang,
+weryfikuje SHA1 archiwum i wyciąga wyłącznie rain.png/snow.png. Cache jest
+w `%LOCALAPPDATA%/BlockCraft/assets/client-1.8`, poza repozytorium i wydaniem.
+Zapisy są atomowe, z osobnymi plikami tymczasowymi dla równoległych procesów.
+Pobieranie działa w tle; bez zasobów nadal działają proceduralne zamienniki.
+Dekoder PNG: StbImageSharp 2.30.16. Oryginalne obrazy mają rozmiar 64×256;
+tablica GPU ma 256×256, z powieleniem najbliższego texela w osi X, bez utraty
+szczegółów. Początkowe założenie kwadratowych PNG uruchomiło fallback;
+importer poprawiono dla prostokątnych tekstur i ponownie sprawdzono w grze.
+
+Przewijanie UV, Java Random per kolumna, orientację kolumn, przezroczystość
+i ruch śniegu dopasowano do `EntityRenderer.renderRainSnow` z referencji MCP.
+Opady używają osobnej tablicy GPU, bez ograniczenia do atlasu terenu 16×16.
+Zrzuty deszczu i śniegu obejrzano. `--autotest --ow`: wszystkie sceny OK,
+native=True, tex=256. SHA1 lokalnego klienta zgodny z metadanymi Mojang.
+Selftest: **569 OK, 0 FAIL**; Release: 0 błędów, 4 dotychczasowe ostrzeżenia.
+
+Uruchomiono dwa rzeczywiste procesy przez gry.fimson.pl. Gość potwierdził
+natężenie deszczu 1, 440 kolumn, dokładnie 1 głos deszczu, oryginalne tekstury,
+obecność pioruna od hosta, a następnie brak opadów i brak głosu po clear.
+Cały scenariusz host/join zakończył się OK, łącznie z kontenerami encji,
+handlem, wyrzuceniem, powrotem bez kodu i zamknięciem hosta. Obejrzano zrzuty
+gościa w deszczu i po clear (59/60 FPS w tych ujęciach, nie benchmark).
+
+Pierwszy przebieg zatrzymał się później na sprawdzeniu ładunku wagonika:
+plik sygnału gościa mógł wyprzedzić pakiet kliknięcia. Test czeka teraz także
+na rzeczywisty stan ekwipunku/kontenera hosta, z dotychczasowym limitem czasu.
+To naprawa synchronizacji testu, bez zmiany protokołu i mechanik kontenerów.
+Nieudany przebieg zachowany w `.modus/weather-relay-e2e-20261031-1`, udany
+w `.modus/weather-relay-e2e-20261031-2`. Inne dowody:
+`.modus/ow-native-weather-{build,selftest,autotest}.log`
+i `.modus/ow-native-weather-final/`.
+
+Etap funkcjonalnej integracji OW jest zakończony; nie oznacza to potwierdzenia
+całej gry jako 1:1. Pozostają wcześniejsze ograniczenia RNG/niezaładowanych
+chunków, testy wszystkich wariantów struktur i mobów, inne proceduralne
+tekstury oraz opisane odstępstwo audio grzmotu. BlockCraft_Gra nadal wymaga
+odświeżenia przy końcowej integracji. Następny etap: ME, potem finalne testy
+i raport wraz z problemami orkiestracji.

@@ -101,7 +101,7 @@ public sealed partial class Game
                 };
                 ok &= fixture.Item1 == "rain" ? Sound.RainVoices <= 1 : Sound.RainVoices == 0;
                 if (!ok) failures++;
-                Log.Info($"OW-TEST pogoda {fixture.Item1}: {(ok ? "OK" : "FAIL")} rain={Renderer.RainColumns} snow={Renderer.SnowColumns} rainVoices={Sound.RainVoices} audio={Sound.Enabled}");
+                Log.Info($"OW-TEST pogoda {fixture.Item1}: {(ok ? "OK" : "FAIL")} rain={Renderer.RainColumns} snow={Renderer.SnowColumns} rainVoices={Sound.RainVoices} audio={Sound.Enabled} native={Renderer.WeatherNativeTextures} tex={Renderer.WeatherTextureSize}");
                 Shot("ow_weather_" + fixture.Item1);
             });
         }

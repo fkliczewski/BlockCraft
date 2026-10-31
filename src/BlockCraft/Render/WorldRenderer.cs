@@ -860,5 +860,6 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         _chunk.Dispose(); _sky.Dispose(); _cloudSh.Dispose(); _line.Dispose(); _sunSh?.Dispose();
         _skyQuad.Dispose(); _sunMesh.Dispose(); _starMesh.Dispose(); _lineMesh.Dispose(); _cloudMesh?.Dispose();
         Entities.Dispose(); Terrain.Dispose(); _sunTex.Dispose(); _moonTex.Dispose();
+        _weatherTextures?.Dispose();
     }
 }

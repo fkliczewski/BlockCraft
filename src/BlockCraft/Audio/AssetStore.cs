@@ -56,6 +56,7 @@ public static class AssetStore
     /// <summary>Uruchamia pobieranie w tle. Nigdy nie rzuca wyjątku.</summary>
     public static void StartAsync()
     {
+        ClientAssets.StartAsync();
         var t = new Thread(() =>
         {
             try { Run().GetAwaiter().GetResult(); }
