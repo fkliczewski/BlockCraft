@@ -397,3 +397,38 @@ Nie wykonano pomiaru zgodności tempa spawnu 1:1. Dotychczasowy spawner
 wciąż ogranicza próby potworów do 1/4 ze względów wydajnościowych.
 Pozostałe zadania OW: dokładniejsze tekstury opadów i test pogody w dwóch
 graficznych oknach przez relay. Końcowe wydanie i integracja pozostają otwarte.
+
+### OW: cykl i limity naturalnego spawnu, kontynuacja 2026-10-31
+
+Porównano MobSpawner z lokalną referencją
+[SpawnerAnimals 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/world/SpawnerAnimals.java)
+i `World.countEntities/isAnyPlayerWithinRangeAt`. Usunięto wcześniejsze
+pomijanie 3/4 prób potworów. Dla pojedynczego gracza licznik limitu obejmuje
+17×17 chunków (289), natomiast próby odbywają się w wewnętrznych 15×15 (225).
+Zachowano nietypową regułę 1.8: pierścień nie trafia do zbioru prób, więc dla
+dwóch graczy w tym samym miejscu licznik rośnie do 353, choć obszar prób
+pozostaje 225. Limit przestaje zależeć od liczby wczytanych chunków.
+
+Zgodnie z referencją próby są dozwolone przy liczbie mobów równej limitowi
+(`<=`), zatem cała grupa może go przekroczyć. Nazwane i oznaczone jako trwałe
+moby nie zajmują limitu; zwykłe zwierzęta nadal są liczone. Widzowie nie
+tworzą regionów i nie blokują prób w odległości 24 bloków. Odległość od spawnu
+świata uwzględnia Y. Nowy mob trafia od razu do świata, więc następny z grupy
+widzi jego kolizję. Pusta lista kończy próbę grupy, zamiast kontynuować losowanie.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **569 OK, 0 FAIL**:
+11 nowych sprawdzeń regionów/liczenia/odległości oraz 2 testy pełnego spawnera
+przy dokładnie 70 potworach i po przekroczeniu limitu. Nadal przechodzą testy
+rzeczywistego naturalnego spawnu guardianów i wiedźm. Pełny `--autotest`
+zakończony `AUTOTEST DONE`; obejrzano ekran debug (54 FPS, 131 encji,
+97 wczytanych chunków w pojedynczym ujęciu — to nie jest benchmark wydajności).
+Log uruchomienia nadal zawiera 4 wcześniejsze braki tekstur przedmiotów:
+baked_potato, poisonous_potato, pumpkin_seeds i melon_seeds. Nie wynikają
+ze zmiany spawnera; pozostają do integracji itemów/ME.
+
+Dowody: `.modus/ow-spawn-cycle-selftest.log`, `.modus/ow-spawn-cycle-autotest.log`
+i `.modus/ow-spawn-cycle-final/`. Ograniczenia: próby nie wymuszają generacji
+niewczytanych chunków, RNG gry i kolejność HashSet nie są zgodne bitowo z JVM,
+nie porównano wszystkich warunków początkowego wyposażenia/grup. Nie deklaruje
+się całej symulacji mobów jako 1:1. Nadal otwarte są dokładniejsze tekstury opadów,
+test pogody w dwóch oknach przez relay, ME i końcowa integracja/wydanie.

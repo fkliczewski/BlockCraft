@@ -86,5 +86,6 @@ public static partial class SelfTest
         TestOwWeather();
         TestOwLightning();
         TestOwStructureSpawns();
+        TestOwSpawnCycle();
     }
 }

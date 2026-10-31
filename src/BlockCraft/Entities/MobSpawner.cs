@@ -27,28 +27,50 @@ public sealed class MobSpawner
         return BiomeSpawns.For(_w.GetBiome(x, z), kind);
     }
 
-    public void Tick()
+    internal (HashSet<long> Chunks, int CapChunks) SpawnRegion()
     {
-        if (_w.Players.Count == 0) return;
-        var chunks = new HashSet<long>();
+        var chunks = new HashSet<long>(); int count = 0;
         foreach (var p in _w.Players)
         {
             if (p.Spectator) continue;
             int pcx = MathUtil.FloorToInt(p.X) >> 4, pcz = MathUtil.FloorToInt(p.Z) >> 4;
-            for (int dx = -7; dx <= 7; dx++) for (int dz = -7; dz <= 7; dz++)
+            for (int dx = -8; dx <= 8; dx++) for (int dz = -8; dz <= 8; dz++)
                 {
-                    var c = _w.GetChunk(pcx + dx, pcz + dz);
-                    if (c != null && c.Merged) chunks.Add(MathUtil.ChunkKey(pcx + dx, pcz + dz));
+                    long key = MathUtil.ChunkKey(pcx + dx, pcz + dz);
+                    if (chunks.Contains(key)) continue;
+                    // Jak licznik i w SpawnerAnimals 1.8: pierścień zwiększa cap,
+                    // ale nie trafia do zbioru prób. Wspólny pierścień graczy liczy się ponownie.
+                    count++;
+                    if (Math.Abs(dx) != 8 && Math.Abs(dz) != 8) chunks.Add(key);
                 }
         }
+        return (chunks, count);
+    }
+
+    internal int CountForCap(SpawnKind kind) => _w.Entities.Count(e => !e.Removed
+        && !(e is Mob m && (m.PersistenceRequired || !string.IsNullOrEmpty(m.CustomName))) && BiomeSpawns.CountsAs(e, kind));
+
+    internal bool FarEnough(double x, int y, double z)
+    {
+        if (_w.Players.Any(p => !p.Spectator && p.DistanceSq(x, y, z) < 24 * 24)) return false;
+        double dx = _w.SpawnX - x, dy = _w.SpawnY - y, dz = _w.SpawnZ - z;
+        return dx * dx + dy * dy + dz * dz >= 24 * 24;
+    }
+
+    public void Tick()
+    {
+        if (_w.IsRemote || _w.Players.Count == 0) return;
+        var (region, capChunks) = SpawnRegion();
+        // Zasięg próby to 15×15. Nie wymuszaj generacji brakujących chunków.
+        var chunks = region.Where(k => _w.GetChunk((int)(k >> 32), (int)k)?.Merged == true).ToHashSet();
         if (chunks.Count == 0) return;
         foreach (var kind in Kinds)
         {
             if (kind == SpawnKind.Monster && _w.Difficulty == Difficulty.Peaceful) continue;
             if (kind == SpawnKind.Creature && _w.TotalTime % 400 != 0) continue; // EnumCreatureType.CREATURE.getAnimal()
-            int cap = BiomeSpawns.Cap(kind) * chunks.Count / 289, have = 0;
-            foreach (var e in _w.Entities) if (BiomeSpawns.CountsAs(e, kind)) have++;
-            if (have < cap) SpawnPass(chunks, kind);
+            int cap = BiomeSpawns.Cap(kind) * capChunks / 289;
+            // MC sprawdza <=, więc grupa może powstać także dokładnie na progu limitu.
+            if (CountForCap(kind) <= cap) SpawnPass(chunks, kind);
         }
     }
 
@@ -57,7 +79,6 @@ public sealed class MobSpawner
         var r = _w.Rand;
         foreach (long k in chunks)
         {
-            if (kind == SpawnKind.Monster && r.Next(4) != 0) continue; // ograniczenie prób (wydajność)
             int cx = (int)(k >> 32), cz = (int)k;
             var c = _w.GetChunk(cx, cz);
             if (c == null) continue;
@@ -74,12 +95,9 @@ public sealed class MobSpawner
                 {
                     px += r.Next(6) - r.Next(6); pz += r.Next(6) - r.Next(6);
                     if (!_w.IsLoadedAt(px, pz)) continue;
-                    double nearest = double.MaxValue;
-                    foreach (var p in _w.Players) nearest = Math.Min(nearest, p.DistanceSq(px + 0.5, y, pz + 0.5));
-                    double sx = _w.SpawnX - (px + 0.5), sz = _w.SpawnZ - (pz + 0.5);
-                    if (nearest < 24 * 24 || sx * sx + sz * sz < 24 * 24) continue;
+                    if (!FarEnough(px + 0.5, y, pz + 0.5)) continue;
                     var list = EntriesAt(kind, px, y, pz);
-                    entry ??= BiomeSpawns.Pick(list, r);
+                    if (entry == null && (entry = BiomeSpawns.Pick(list, r)) == null) break;
                     // Grupa może przekroczyć ścianę monumentu lub granicę chatki.
                     // SpawnListEntry ma w MC tożsamość obiektu: wiedźma o wadze 1
                     // z chatki nie jest tą samą ofertą co rzadka wiedźma z listy biomu.
@@ -89,7 +107,8 @@ public sealed class MobSpawner
                     m.SetPositionAndPrev(px + 0.5, y, pz + 0.5);
                     m.Yaw = m.PrevYaw = r.NextFloat() * 360f;
                     if (!m.CanSpawnHere()) continue;
-                    _w.SpawnEntity(m);
+                    // Następna próba w grupie musi już widzieć kolizję z tym mobem.
+                    _w.AddEntityNow(m);
                     if (++inChunk >= MaxInChunk(m)) goto nextChunk;
                 }
             }

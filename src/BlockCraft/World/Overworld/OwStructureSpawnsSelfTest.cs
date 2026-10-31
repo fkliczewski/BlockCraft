@@ -72,5 +72,19 @@ public static partial class SelfTest
         Check(mobs.All(e => (water ? e is Guardian : e is Witch)
             && area.Contains(MathUtil.FloorToInt(e.X), MathUtil.FloorToInt(e.Y), MathUtil.FloorToInt(e.Z))),
             water ? "Grupy guardianów nie wychodzą poza obszar spawnu" : "Grupy wiedźm nie wychodzą poza obszar chatki");
+        if (water)
+        {
+            foreach (var mob in mobs) w.RemoveEntity(mob);
+            for (int i = 0; i < 70; i++)
+            {
+                var filler = new Creeper(w); filler.SetPositionAndPrev(p.X, p.Y, p.Z); w.AddEntityNow(filler);
+            }
+            int attempts = 0;
+            while (w.Spawner.CountForCap(SpawnKind.Monster) == 70 && ++attempts <= 1000) w.Spawner.Tick();
+            int count = w.Spawner.CountForCap(SpawnKind.Monster);
+            Check(count > 70, "Przy dokładnie 70 potworach spawner 1.8 nadal może utworzyć grupę");
+            for (int i = 0; i < 5; i++) w.Spawner.Tick();
+            Check(w.Spawner.CountForCap(SpawnKind.Monster) == count, "Po przekroczeniu limitu kolejny przebieg nie dodaje potworów");
+        }
     }
 }
