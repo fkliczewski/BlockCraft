@@ -85,6 +85,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
 
     public void SetWorld(World.World w)
     {
+        if (World != w) Sound.StopWorldSounds();
         if (World != null) World.Listeners.Remove(this);
         World = w;
         lock (_jobLock) { _jobs.Clear(); _jobSet.Clear(); }

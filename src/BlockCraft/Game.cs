@@ -80,7 +80,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         Sound.Init(Settings);
-        Renderer.SoundHook = (n, x, y, z, v, p) => Sound.Play(n, x, y, z, v, p);
+        Renderer.SoundHook = (n, x, y, z, v, p) => { if (World != null && _sessionStarted) Sound.Play(n, x, y, z, v, p); };
         UpdateGuiScale();
         ApplySettings();
         StartMenuWorld();

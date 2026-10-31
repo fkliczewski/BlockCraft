@@ -1,5 +1,34 @@
 # Minecraft 1.8: raport integracji, 2026-10-30
 
+## Priorytet audio, 2026-10-31
+
+Zgłoszenie: odgłosy nakładały się i robiły bardzo głośne. Mikser sumował
+do 32 głosów, a przepełnienie obcinał niezależnie w kanałach do -1/+1,
+co powodowało przesterowanie. Nie ograniczał duplikatów zdarzenia.
+
+Poprawiono mikser: 6 dB zapasu na wyjściu, wspólny limiter stereo do 0.65
+z natychmiastowym atakiem i powrotem 150 ms zamiast obcinania fali.
+Zduplikowane zgłoszenia tego samego efektu i tonu w tym samym miejscu
+w ciągu 33 ms są odrzucane; maksymalnie dwie kopie efektu jednego źródła.
+Osobne źródła i różne efekty pozostają równoczesne, nuty są wyłączone
+z tego ograniczenia. Zachowano suwaki użytkownika; nie zmieniano options.json.
+
+Dźwięki poza zasięgiem nie zajmują głosów. Zmiana świata od razu usuwa jego
+odgłosy, zostawiając muzykę. Świat w tle menu nie emituje efektów do miksera.
+Iloczyn głośności zdarzenia i wariantu jest ograniczany do 1.
+
+Weryfikacja: 13 testów audio, w tym 32 jednoczesne źródła, panorama stereo,
+powrót limitera, cisza, duplikaty, nuty, cykl życia i granice buforów.
+Pełny selftest: **456 OK / 0 FAIL**, `.modus/audio-final-selftest.log`.
+Uruchomiona gra: audio enabled=True, odtwarzanie testowych efektów potwierdzone
+aktywnymi głosami, pełny autotest zakończony `AUTOTEST DONE`.
+To testy cyfrowego sygnału i działania gry; nie wykonano odsłuchu głośników.
+Zaktualizowano wydanie `BlockCraft_Gra`.
+
+Wstępna weryfikacja sprzed poprawek wykazała niestabilność wcześniejszego testu
+toru aktywacyjnego (`relay-wave1-selftest.log`, 442 OK/1 FAIL). Ostatni przebieg
+przeszedł, ale problem pozostaje do osobnej diagnozy po priorytecie audio.
+
 Gałąź: `feature/mc18`. Kod pozostaje w C#/.NET 10. Ten raport zastępuje nieaktualne
 statusy "gotowe do scalenia" w planie poprzedniej sesji. Cały zakres MC 1.8 1:1
 NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy integracji.

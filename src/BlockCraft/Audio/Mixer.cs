@@ -22,6 +22,9 @@ public sealed class Voice
     public bool Done; public bool Loop;
     public string Tag;                   // np. klucz płyty "x,y,z"
     public bool IsMusic;
+    public string EventKey;
+    public float EventPitch = 1f;
+    internal long StartedAtFrame;
     // strumień
     public VorbisReader Reader; float[] _tmp;
     public float Fade = 1f, FadeSpeed;   // FadeSpeed < 0: wyciszanie do 0 i koniec
@@ -45,11 +48,18 @@ public sealed class Voice
 public sealed class Mixer : ISampleProvider
 {
     public const int MaxVoices = 32;
+    public const float OutputGain = 0.5f; // 6 dB zapasu przy sumowaniu wielu źródeł
+    public const float PeakCeiling = 0.65f;
+    const int DuplicateFrames = 44100 / 30; // powtórne zgłoszenie w tej samej klatce audio
+    static readonly float LimiterRelease = 1f - MathF.Exp(-1f / (44100f * .15f));
     public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
 
     readonly List<Voice> _voices = new();
     readonly object _lock = new();
     WaveOutEvent _out;
+    long _mixedFrames;
+    float _limiterGain = 1f;
+    public long SuppressedDuplicates { get; private set; }
 
     // słuchacz
     public volatile float LX, LY, LZ, LYaw;
@@ -69,19 +79,47 @@ public sealed class Mixer : ISampleProvider
 
     public bool Running => _out != null;
 
-    public void Stop() { try { _out?.Stop(); _out?.Dispose(); } catch { } _out = null; }
+    public void Stop() { try { _out?.Stop(); _out?.Dispose(); } catch { } _out = null; Clear(); }
+
+    public void Clear(bool includeMusic = true)
+    {
+        lock (_lock)
+        {
+            for (int i = _voices.Count - 1; i >= 0; i--)
+                if (includeMusic || !_voices[i].IsMusic)
+                { _voices[i].Done = true; _voices[i].Dispose(); _voices.RemoveAt(i); }
+            if (_voices.Count == 0) _limiterGain = 1f;
+        }
+    }
 
     public void Add(Voice v)
     {
         lock (_lock)
         {
+            for (int i = _voices.Count - 1; i >= 0; i--)
+                if (_voices[i].Done) { _voices[i].Dispose(); _voices.RemoveAt(i); }
+            if (v.Positional && v.EventKey != null && !v.EventKey.StartsWith("note.") && v.Category != "record")
+            {
+                int overlaps = 0;
+                foreach (var other in _voices)
+                {
+                    if (other.EventKey != v.EventKey || !other.Positional) continue;
+                    double dx = other.X - v.X, dy = other.Y - v.Y, dz = other.Z - v.Z;
+                    if (dx * dx + dy * dy + dz * dz > .0625) continue;
+                    overlaps++;
+                    if (_mixedFrames - other.StartedAtFrame < DuplicateFrames && Math.Abs(other.EventPitch - v.EventPitch) < .01f)
+                    { SuppressedDuplicates++; v.Done = true; v.Dispose(); return; }
+                }
+                if (overlaps >= 2) { SuppressedDuplicates++; v.Done = true; v.Dispose(); return; }
+            }
             if (_voices.Count >= MaxVoices)
             {
                 // wyrzuć najstarszy nie-muzyczny głos
                 for (int i = 0; i < _voices.Count; i++)
                     if (!_voices[i].IsMusic && _voices[i].Tag == null) { _voices[i].Dispose(); _voices.RemoveAt(i); break; }
-                if (_voices.Count >= MaxVoices) { v.Dispose(); return; }
+                if (_voices.Count >= MaxVoices) { v.Done = true; v.Dispose(); return; }
             }
+            v.StartedAtFrame = _mixedFrames;
             _voices.Add(v);
         }
     }
@@ -102,12 +140,21 @@ public sealed class Mixer : ISampleProvider
                 try { MixVoice(v, buffer, offset, frames); } catch (Exception ex) { v.Done = true; Log.Error("Mixer voice: " + ex.Message); }
                 if (v.Done) { v.Dispose(); _voices.RemoveAt(vi); }
             }
-        }
-        for (int i = 0; i < count; i++)
-        {
-            float s = buffer[offset + i];
-            if (s > 1f) s = 1f; else if (s < -1f) s = -1f;
-            buffer[offset + i] = s;
+            // Wspólny poziom dla stereo: szczyt nie przesuwa panoramy.
+            // Atak natychmiastowy, powrót 150 ms; stan trwa pomiędzy buforami.
+            for (int i = 0; i < frames; i++)
+            {
+                int p = offset + i * 2;
+                float l = buffer[p] * OutputGain, r = buffer[p + 1] * OutputGain;
+                if (!float.IsFinite(l)) l = 0;
+                if (!float.IsFinite(r)) r = 0;
+                float peak = Math.Max(Math.Abs(l), Math.Abs(r));
+                float target = peak > PeakCeiling ? PeakCeiling / peak : 1f;
+                if (target < _limiterGain) _limiterGain = target;
+                else _limiterGain += (target - _limiterGain) * LimiterRelease;
+                buffer[p] = l * _limiterGain; buffer[p + 1] = r * _limiterGain;
+            }
+            _mixedFrames += frames;
         }
         return count;
     }

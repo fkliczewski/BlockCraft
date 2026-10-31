@@ -76,9 +76,14 @@ public static class Sound
     {
         SoundBank bank; lock (BankLock) bank = _bank;
         bank.Events.TryGetValue(ev, out var def);
-        var v = new Voice { Positional = positional, X = x, Y = y, Z = z };
+        var v = new Voice { Positional = positional, X = x, Y = y, Z = z, EventKey = ev, EventPitch = pitch };
         float att = 16f * Math.Max(1f, vol);
         v.AttDist = attOverride > 0 ? attOverride : att;
+        if (positional)
+        {
+            double dx = x - Mix.LX, dy = y - Mix.LY, dz = z - Mix.LZ;
+            if (dx * dx + dy * dy + dz * dz >= v.AttDist * v.AttDist) return null;
+        }
         float entryVol = 1f, entryPitch = 1f;
         PcmData pcm = null; bool stream = false; string name = null;
         if (def != null)
@@ -88,7 +93,7 @@ public static class Sound
             if (e != null) { entryVol = e.Volume; entryPitch = e.Pitch; stream = e.Stream || forceStream; name = e.Name; }
         }
         else if (bank.HasAssets) return null; // nieznane zdarzenie przy załadowanych assetach: cisza
-        v.Volume = Math.Clamp(vol, 0f, 1f) * entryVol;
+        v.Volume = Math.Clamp(vol * entryVol, 0f, 1f);
         float p = Math.Clamp(pitch * entryPitch, 0.5f, 2f);
         if (name != null && stream)
         {
@@ -150,4 +155,6 @@ public static class Sound
 
     /// <summary>Wstrzymanie wszystkiego (np. wyjście do menu): kasuje głosy nie-muzyczne.</summary>
     public static void StopAll() => Mix.ForEach(v => v.Done = true);
+
+    public static void StopWorldSounds() => Mix.Clear(includeMusic: false);
 }

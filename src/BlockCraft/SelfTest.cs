@@ -42,6 +42,7 @@ public static partial class SelfTest
         var sw = Stopwatch.StartNew();
         Console.WriteLine("=== BlockCraft self-test ===");
         try { TestRegistry(); } catch (Exception e) { Check(false, "Registry", e.ToString()); }
+        try { TestAudioMix(); } catch (Exception e) { Check(false, "Audio", e.ToString()); }
         try { TestWorldGen(); } catch (Exception e) { Check(false, "WorldGen", e.ToString()); }
         try { TestLighting(); } catch (Exception e) { Check(false, "Lighting", e.ToString()); }
         try { TestCrafting(); } catch (Exception e) { Check(false, "Crafting", e.ToString()); }
