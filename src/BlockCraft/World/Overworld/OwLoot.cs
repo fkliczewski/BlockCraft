@@ -71,14 +71,14 @@ public static class OwLoot
     };
     public static readonly Entry[] Library = { E(I.Book,1,3,20), E(I.Paper,2,7,20), E(I.EmptyMap,1,1,1), E(I.Compass,1,1,1), E(I.EnchantedBook,1,5,2) };
 
-    public static ItemStack[] Generate(JRandom r, Entry[] entries, int rolls, int size = 27)
+    public static ItemStack[] Generate(JRandom r, Entry[] entries, int rolls, int size = 27, Ench? preparedEnchantment = null, int preparedLevel = 0)
     {
         var slots = new ItemStack[size]; int weight = entries.Sum(e => e.Weight);
         // EnchantedBook.getRandom jest losowane raz przy budowie tabeli, przed wyborem łupów.
         var enchantments = Enum.GetValues<Ench>();
         bool books = entries.Any(e => e.Id == I.EnchantedBook);
-        Ench enchantment = books ? enchantments[r.NextInt(enchantments.Length)] : 0;
-        int enchantmentLevel = books ? 1 + r.NextInt(EnchantHelper.MaxLevel(enchantment)) : 0;
+        Ench enchantment = preparedEnchantment ?? (books ? enchantments[r.NextInt(enchantments.Length)] : 0);
+        int enchantmentLevel = preparedEnchantment != null ? preparedLevel : books ? 1 + r.NextInt(EnchantHelper.MaxLevel(enchantment)) : 0;
         for (int i = 0; i < rolls; i++)
         {
             int pick = r.NextInt(weight); Entry e = entries[0];

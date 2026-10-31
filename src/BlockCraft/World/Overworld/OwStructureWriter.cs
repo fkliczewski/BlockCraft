@@ -20,7 +20,14 @@ public sealed class OwStructureWriter
         _ => (X + x, Y + y, Z + z)
     };
     public int Get(int x, int y, int z) { var p = Point(x, y, z); return Region.Get(p.x, p.y, p.z); }
-    public void Set(OwState state, int x, int y, int z) { var p = Point(x, y, z); Region.Set(p.x, p.y, p.z, state.Id, state.Meta); }
+    public void Set(OwState state, int x, int y, int z)
+    {
+        var p = Point(x, y, z); int meta = state.Meta;
+        // Schody fundamentu używają kolejności S,W,N,E, MC przechowuje E,W,S,N.
+        if (state.Id is B.OakStairs or B.CobbleStairs or B.SandstoneStairs or B.StoneBrickStairs)
+            meta = (meta & ~3) | ((meta & 3) switch { 0 => 3, 1 => 1, 2 => 0, _ => 2 });
+        Region.Set(p.x, p.y, p.z, state.Id, meta);
+    }
     public void Fill(int x0, int y0, int z0, int x1, int y1, int z1, OwState edge, OwState inside, bool existing = false)
     {
         for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++) for (int z = z0; z <= z1; z++)

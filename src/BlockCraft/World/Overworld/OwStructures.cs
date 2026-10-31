@@ -4,7 +4,11 @@ using BlockCraft.Items;
 
 namespace BlockCraft.World;
 
-public sealed record OwEntityPlan(string Key, double X, double Y, double Z, ItemStack[] Slots = null);
+public sealed record OwEntityPlan(string Key, double X, double Y, double Z, ItemStack[] Slots = null)
+{
+    public int Profession { get; init; } = -1;
+    public bool Elder { get; init; }
+}
 
 public sealed class OwBox
 {

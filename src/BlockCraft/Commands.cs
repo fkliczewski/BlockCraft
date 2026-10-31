@@ -61,7 +61,7 @@ public sealed class Commands
                 case "weather": p.SendMessage("W tym świecie zawsze świeci słońce :) (pogoda nieobsługiwana)"); return true;
                 case "heal": p.Health = p.MaxHealth; p.SendMessage("Uleczono."); return true;
                 case "feed": p.FoodLevel = 20; p.Saturation = 20; p.SendMessage("Najedzono."); return true;
-                case "locate": p.SendMessage("Brak struktur do zlokalizowania."); return true;
+                case "locate": return OwLocators.Command(_w, p, a);
                 default: p.SendMessage("§cNieznana komenda. Wpisz /help aby zobaczyć listę komend."); return false;
             }
         }
