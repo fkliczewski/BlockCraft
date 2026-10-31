@@ -14,6 +14,7 @@ public sealed class EnchantingScreen : ContainerScreen
 
     public EnchantingScreen(Player p, EnchantingContainer c) : base(p, c) { _ec = c; }
 
+    private static uint Rgb(uint rgb) => BlockCraft.Render.SpriteBatch.Hex(rgb);
     private (int x, int y) ButtonPos(int i) => (Left + 60, Top + 14 + 19 * i);
     private static bool In(int mx, int my, int x, int y, int w, int h) => mx >= x && my >= y && mx < x + w && my < y + h;
 
@@ -47,27 +48,27 @@ public sealed class EnchantingScreen : ContainerScreen
             var (bx, by) = ButtonPos(i);
             int state = _ec.ButtonState(i);
             bool hover = state == 2 && In(mx, my, bx, by, 108, 19);
-            sb.Fill(bx, by, 108, 19, 0xFF2B2B2B);
-            sb.Fill(bx + 1, by + 1, 106, 17, state == 0 ? 0xFF8B8B8B : state == 1 ? 0xFF6E6070 : hover ? 0xFFB59AC8 : 0xFF9C7FB0);
+            sb.Fill(bx, by, 108, 19, Rgb(0x2B2B2B));
+            sb.Fill(bx + 1, by + 1, 106, 17, state == 0 ? Rgb(0x8B8B8B) : state == 1 ? Rgb(0x8E8574) : hover ? Rgb(0xE6DAC0) : Rgb(0xCDBE9F));
             if (state == 0) continue;
             // ikona kosztu: kafelek lazurytu z liczbą sztuk
-            sb.Fill(bx + 2, by + 2, 15, 15, state == 2 ? 0xFF2645A8 : 0xFF3A3F55);
-            sb.Text((i + 1).ToString(), bx + 7, by + 6, state == 2 ? 0xFFFFFFFF : 0xFF9C9C9C, true);
+            sb.Fill(bx + 2, by + 2, 15, 15, state == 2 ? Rgb(0x2645A8) : Rgb(0x55504A));
+            sb.Text((i + 1).ToString(), bx + 7, by + 6, state == 2 ? 0xFFFFFFFF : Rgb(0x9C9C9C), true);
             string level = offers[i].RequiredLevel.ToString();
-            uint lc = state == 2 ? 0xFF80FF20 : 0xFF407F10;
+            uint lc = state == 2 ? Rgb(0x80FF20) : Rgb(0x407F10);
             sb.Text(level, bx + 106 - sb.Measure(level), by + 6, lc, true);
             string name = _names[i]; int maxW = 104 - 20 - sb.Measure(level) - 2;
             while (name.Length > 0 && sb.Measure(name) > maxW) name = name[..^1];
-            sb.Text(name, bx + 20, by + 6, state == 2 ? 0xFF685E4A : 0xFF4A4238, false);
+            sb.Text(name, bx + 20, by + 6, state == 2 ? Rgb(0x685E4A) : Rgb(0x4A4238), false);
         }
     }
 
     private void DrawBook(int x, int y)
     {
         var sb = G.Sb;
-        sb.Fill(x, y, 30, 22, 0xFF3B2414); sb.Fill(x + 2, y + 2, 12, 18, 0xFFE9DDC0); sb.Fill(x + 16, y + 2, 12, 18, 0xFFE9DDC0);
-        for (int l = 0; l < 5; l++) { sb.Fill(x + 4, y + 5 + l * 3, 8, 1, 0xFF8C7C66); sb.Fill(x + 18, y + 5 + l * 3, 8, 1, 0xFF8C7C66); }
-        sb.Fill(x + 14, y + 1, 2, 20, 0xFF2A180C);
+        sb.Fill(x, y, 30, 22, Rgb(0x3B2414)); sb.Fill(x + 2, y + 2, 12, 18, Rgb(0xE9DDC0)); sb.Fill(x + 16, y + 2, 12, 18, Rgb(0xE9DDC0));
+        for (int l = 0; l < 5; l++) { sb.Fill(x + 4, y + 5 + l * 3, 8, 1, Rgb(0x8C7C66)); sb.Fill(x + 18, y + 5 + l * 3, 8, 1, Rgb(0x8C7C66)); }
+        sb.Fill(x + 14, y + 1, 2, 20, Rgb(0x2A180C));
     }
 
     public override void Render(int mx, int my, float pt)

@@ -241,6 +241,28 @@ public static partial class SelfTest
             host.Player.CloseContainer(); Step(4);
         }
 
+        // Stół do zaklinania: oferty liczone z tego samego ziarna po obu stronach, zaklinanie wykonuje host.
+        hw.SetBlock(6, gy + 1, 8, B.EnchantingTable); puppet.XpLevel = 30; Step(5);
+        puppet.OpenBlockGui(GuiKind.Enchanting, 6, gy + 1, 8); Step(4);
+        if (puppet.OpenContainer is EnchantingContainer serverTable && host.Player.OpenContainer is EnchantingContainer clientTable)
+        {
+            serverTable.Inv.Set(0, new ItemStack(I.DiamondSword)); serverTable.Inv.Set(1, new ItemStack(I.Lapis, 3)); Step(4);
+            Check(clientTable.Inv.Get(0)?.Id == I.DiamondSword && host.Player.EnchantmentSeed == puppet.EnchantmentSeed
+                && clientTable.Offers[0].RequiredLevel > 0 && clientTable.Offers[0].RequiredLevel == serverTable.Offers[0].RequiredLevel
+                && clientTable.Offers[0].Clue == serverTable.Offers[0].Clue, "Sieć: oferty zaklinania u gościa jak u hosta");
+            int seed = puppet.EnchantmentSeed;
+            client.EnchantItem(0); Step(4);
+            Check(EnchantHelper.IsEnchanted(serverTable.Inv.Get(0)) && EnchantHelper.IsEnchanted(clientTable.Inv.Get(0))
+                && puppet.XpLevel == 29 && host.Player.XpLevel == 29 && serverTable.Lapis == 2 && clientTable.Lapis == 2
+                && puppet.EnchantmentSeed != seed && host.Player.EnchantmentSeed == puppet.EnchantmentSeed, "Sieć: zaklinanie rozliczone przez hosta");
+            client.EnchantItem(0); Step(3);
+            Check(puppet.XpLevel == 29 && serverTable.Lapis == 2, "Sieć: ponowne zaklinanie zaklętego przedmiotu odrzucone");
+            host.Player.CloseContainer(); Step(4);
+            Check(puppet.Inventory.CountOf(I.DiamondSword) == 1 && puppet.Inventory.CountOf(I.Lapis) == 2 && puppet.OpenContainer == null,
+                "Sieć: zamknięcie stołu zwraca przedmioty gościowi");
+        }
+        else Check(false, "Sieć: GUI stołu do zaklinania", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
+
         // Kontenery encji: ekran klienta, akcje i rozliczenie po stronie hosta.
         var horse = new Horse(hw) { Tamed = true };
         horse.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(horse);

@@ -99,7 +99,7 @@ public class ContainerScreen : Screen
         }
         else if (C is ChestContainer cc) sb.Text(cc.Title, Left + 8, Top + 6, 0xFF404040, false);
         if (C is not ChestContainer && C is not PlayerContainer) sb.Text("Ekwipunek", Left + 8, Top + C.Height - 96 + 2, 0xFF404040, false);
-        else sb.Text("Ekwipunek", Left + 8, Top + 72, 0xFF404040, false);
+        else if (C is ChestContainer) sb.Text("Ekwipunek", Left + 8, Top + 72, 0xFF404040, false);
     }
 
     private void DrawArmorGhost(int x, int y, int slot)

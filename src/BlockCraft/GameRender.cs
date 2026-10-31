@@ -160,13 +160,22 @@ public sealed partial class Game
 
     // ================= przedmioty w GUI =================
     /// <summary>Połysk zaklęcia: fioletowa, pulsująca kopia kształtu przedmiotu (przybliżenie RenderItem.renderEffect).</summary>
+    /// <summary>Item.hasEffect z 1.8: zaklęcia, zaklęta książka, zaklęte złote jabłko, mikstury z efektami, flaga Glint.</summary>
+    public static bool HasGlint(ItemStack s) => s.Item.Glint || s.Id == I.EnchantedBook || EnchantHelper.IsEnchanted(s)
+        || s.Id == I.GoldenApple && s.Damage > 0 || s.Id == I.Potion && Potions.Effects(s).Any();
+
     private void DrawGlint(ItemStack s, float x, float y)
     {
+        // addytywnie (GL_SRC_ALPHA, GL_ONE) jak RenderItem.renderEffect: rozjaśnia, nie brudzi koloru przedmiotu
         float t = (Environment.TickCount64 % 3000) / 3000f;
-        int a = (int)(70 + 50 * Math.Sin(t * Math.PI * 2 + x * .05));
-        uint c = SpriteBatch.Col(150, 80, 255, a);
+        int a = (int)(90 + 45 * Math.Sin(t * Math.PI * 2 + x * .05));
+        uint c = SpriteBatch.Col(128, 64, 204, a);
+        Sb.Flush();
+        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
         if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, c, 0, 1, 1, 0);
         else Sb.DrawLayer(Renderer.Terrain, s.Item.GetSprite(s), x, y, 16, 16, c);
+        Sb.Flush();
+        GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
     }
 
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
@@ -181,7 +190,7 @@ public sealed partial class Game
             Sb.DrawLayer(Renderer.Terrain, sp, x, y, 16, 16, col);
             if (it.OverlayFn != null) { var (ol, oc) = it.OverlayFn(s); if (ol > 0) Sb.DrawLayer(Renderer.Terrain, ol, x, y, 16, 16, oc); }
         }
-        if (s.Item.Glint || s.Id == I.EnchantedBook || EnchantHelper.IsEnchanted(s)) DrawGlint(s, x, y);
+        if (HasGlint(s)) DrawGlint(s, x, y);
         if (count && s.Count > 1)
         {
             string t = s.Count.ToString();
