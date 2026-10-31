@@ -30,7 +30,7 @@ public sealed partial class Game : INetClientHost
         EnsureServer();
         if (HostLink != null) return;
         HostStarting = true;
-        HostStatus = "Łączenie z przekaźnikiem derp.fimson.pl...";
+        HostStatus = "Łączenie z przekaźnikiem " + RelayOptions.Default.Host + "...";
         try
         {
             var link = await LinkHostService.StartAsync(LinkSetup.Options("host"));
@@ -271,7 +271,7 @@ public static class NetErrors
             return "nieprawidłowy albo wygasły kod zaproszenia";
         if (m.Contains("refused", StringComparison.OrdinalIgnoreCase)) return "host odrzucił połączenie (kod wygasł albo brak miejsc)";
         if (e is System.Net.Sockets.SocketException || e is HttpRequestException || m.Contains("DNS", StringComparison.OrdinalIgnoreCase))
-            return "brak połączenia z przekaźnikiem derp.fimson.pl (" + m + ")";
+            return "brak połączenia z przekaźnikiem " + RelayOptions.Default.Host + " (" + m + ")";
         if (m.Contains("No stored", StringComparison.OrdinalIgnoreCase) || m.Contains("not paired", StringComparison.OrdinalIgnoreCase) || m.Contains("pair", StringComparison.OrdinalIgnoreCase))
             return "brak zapamiętanego hosta - dołącz kodem";
         return m.Length > 0 ? m : t;

@@ -7,7 +7,7 @@ using BlockCraft.World;
 
 namespace BlockCraft;
 
-/// <summary>Dwa rzeczywiste okna gry przez derp.fimson.pl, z ograniczonym czasem i zapisem wyniku.</summary>
+/// <summary>Dwa rzeczywiste okna gry przez gry.fimson.pl, z ograniczonym czasem i zapisem wyniku.</summary>
 public sealed partial class Game
 {
     private bool ArgsNetAutotest => _args.Contains("--autotest-host") || _args.Contains("--autotest-join");
@@ -85,7 +85,7 @@ public sealed partial class Game
             Server.SetOp(remote.Conn.PeerKey, true);
             World.SetBlock(10, 4, 10, B.GoldBlock);
             remote.P.Inventory.Add(new ItemStack(I.Diamond, 3));
-            SendChat("Witaj przez derp.fimson.pl!");
+            SendChat("Witaj przez gry.fimson.pl!");
             SetScreen(null);
         });
         WaitUntil(() => File.Exists(NetTestFile("verified")) && _chat.Any(c => c.text.Contains("NET-CLIENT-ACK")));
@@ -110,7 +110,7 @@ public sealed partial class Game
             NetTestSignal("joined");
         });
         WaitUntil(() => World.GetBlock(10, 4, 10) == B.GoldBlock && Player.Inventory.CountOf(I.Diamond) == 3
-            && _chat.Any(c => c.text.Contains("Witaj przez derp.fimson.pl!"))
+            && _chat.Any(c => c.text.Contains("Witaj przez gry.fimson.pl!"))
             && _chat.Any(c => c.text.Contains("uprawnienia operatora")));
         Step(20, () => { Shot("04_synced"); SendChat("NET-CLIENT-ACK"); NetTestSignal("verified"); });
         WaitUntil(() => Client == null && _screen is DisconnectedScreen);

@@ -8,7 +8,7 @@ Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_I
 - **StbImageWriteSharp** – zapis screenshotów PNG (F2 + autotesty wizualne)
 - **NAudio** (opcjonalnie) – proceduralnie syntezowane dźwięki
 - Wszystkie tekstury generowane proceduralnie w kodzie (16x16 pixel-art w stylu MC), font pixelowy ręcznie zdefiniowany (z polskimi znakami)
-- Sieć: Tailcat.Link 0.5.4 przez derp.fimson.pl:443, host w grze ("Otwórz w sieci") + dołączanie kodem lub zapamiętanym parowaniem; `--server` pozostaje atrapą
+- Sieć: Tailcat.Link 0.5.4 przez przekaźnik gier gry.fimson.pl:443 (region 304; do 2026-10-30 derp.fimson.pl), host w grze ("Otwórz w sieci") + dołączanie kodem lub zapamiętanym parowaniem; `--server` pozostaje atrapą
 - Testy: xUnit (logika) + tryb `--autotest` (uruchomienie gry, skrypt akcji, screenshoty do weryfikacji)
 
 ## Stan prac (2026-10-16)
@@ -66,7 +66,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 
 ## Etap 6 – Extra
 - [x] Redstone: pył, pochodnia, dźwignia, przycisk, blok, lampa, repeater, TNT, tłok i lepki tłok, drzwi
-- [x] Multiplayer Tailcat.Link: host w grze, kod i zapamiętane parowanie, klient, chunki/bloki/TE/encje, modele i nicki graczy, kontenery, czat, ekwipunek, śmierć i respawn; test dwóch procesów przez derp.fimson.pl i PNG z obu okien. Wymiary/pogoda wymagają integracji po scaleniu NE/OW; zbroja modelu i pęknięcia kopania innych graczy pozostają do dodania. Szczegóły: `docs/MC18_NET.md`.
+- [x] Multiplayer Tailcat.Link: host w grze, kod i zapamiętane parowanie, klient, chunki/bloki/TE/encje, modele i nicki graczy, kontenery, czat, ekwipunek, śmierć i respawn; test dwóch procesów przez prawdziwy przekaźnik (od 2026-10-31 gry.fimson.pl) i PNG z obu okien. Wymiary/pogoda wymagają integracji po scaleniu NE/OW; zbroja modelu i pęknięcia kopania innych graczy pozostają do dodania. Szczegóły: `docs/MC18_NET.md`.
 - [~] Dźwięki proceduralne  *(wywołania `PlaySound` są w całej grze, ale `Sound.Play` w `GameRender.cs` to pusty stub; folder `Audio/` pusty)*
 - [~] Testy jednostkowe + autotest wizualny, publish do pojedynczego folderu  *(zamiast xUnit: `--selftest` (`SelfTest.cs`) + `--autotest` (`GameAutotest.cs`); publish do `BlockCraft_Gra/` działa; brak projektu `BlockCraft.Tests`)*
 

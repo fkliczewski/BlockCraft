@@ -67,7 +67,7 @@ public sealed class NetHostScreen : Screen
         if (G.HostLink == null)
         {
             sb.TextCentered("Inni gracze dołączą do tego świata kodem zaproszenia,", W / 2f, H / 4f, 0xFFE0E0E0);
-            sb.TextCentered("bez serwera i bez przekierowania portów (przekaźnik derp.fimson.pl).", W / 2f, H / 4f + 12, 0xFFA0A0A0);
+            sb.TextCentered("bez serwera i bez przekierowania portów (przekaźnik " + RelayOptions.Default.Host + ").", W / 2f, H / 4f + 12, 0xFFA0A0A0);
             if (G.HostStatus != null) sb.TextCentered(G.HostStatus, W / 2f, H / 4f + 30, G.HostStatus.StartsWith("Nie") ? 0xFFFF6060 : 0xFFFFFF80);
         }
         else

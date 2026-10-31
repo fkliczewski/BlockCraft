@@ -6,9 +6,18 @@ Pełny stan i ograniczenia: [raport integracji](MC18_RAPORT_INTEGRACJI.md).
 Wyniki poniżej opisują wcześniejszy test samej gałęzi `mc18/net`.
 
 Stan 2026-10-30, gałąź `mc18/net`. Gra używa Tailcat.Link 0.5.4 i własnego
-przekaźnika `derp.fimson.pl:443` (region 303). Nie wymaga przekierowania portów,
+przekaźnika gier `gry.fimson.pl:443` (region 304, kod `fimson-gry`). Nie wymaga przekierowania portów,
 Hamachi ani osobnego procesu serwera. `--server` pozostaje starszą atrapą;
 obsługiwany tryb to host w oknie gry.
+
+Przekaźnik (od 2026-10-31): gra używa osobnego przekaźnika gier `gry.fimson.pl`.
+`derp.fimson.pl` jest zarezerwowany dla Centrum Domowego i Modus Operandi, gra
+nie może z niego korzystać. Kod zaproszenia niesie tylko numer regionu, a nazwę
+hosta bierze z mapy DERP w grze, dlatego `RelayGateway` ignoruje zapisany region
+(stare profile mają 303) i każdy peer jest łączony przez region 304. Starsze
+wydania gry (przed przełączeniem) łączą się przez `derp.fimson.pl` i nie
+spotkają się z nowymi: host i gracze muszą mieć wydanie z `gry.fimson.pl`.
+Zapamiętane parowania z kluczami działają dalej po aktualizacji.
 
 ## Uruchomienie
 
@@ -156,7 +165,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/dev/Test-Net.ps1
 ```
 
 Skrypt Windows uruchamia dwa prawdziwe okna z osobnymi profilami, używa
-`derp.fimson.pl`, zapisuje PNG, logi i `host.result` / `join.result` w nowym
+`gry.fimson.pl`, zapisuje PNG, logi i `host.result` / `join.result` w nowym
 folderze `.modus/net-e2e-*`. Nie wymaga ręcznego przekazywania kodu.
 Można wskazać nowy folder przez `-OutputDirectory`; istniejący jest odrzucany,
 aby stary sygnał nie zaliczył kolejnego testu. Procesy mają limit czasu.
