@@ -71,7 +71,7 @@ public sealed class RemoteClient : IPlayerHandler
         var w = Out.Begin(S2C.Settings);
         w.Write((byte)W.Difficulty); w.Write(W.Hardcore); w.Write(W.AllowCheats);
         var rules = new (string, bool)[] { ("doDaylightCycle", W.Rules.DoDaylightCycle), ("keepInventory", W.Rules.KeepInventory), ("doMobSpawning", W.Rules.DoMobSpawning),
-            ("mobGriefing", W.Rules.MobGriefing), ("naturalRegeneration", W.Rules.NaturalRegeneration) };
+            ("mobGriefing", W.Rules.MobGriefing), ("naturalRegeneration", W.Rules.NaturalRegeneration), ("doFireTick", W.Rules.DoFireTick) };
         w.Write((byte)rules.Length);
         foreach (var (n, v) in rules) { w.Write(n); w.Write(v); }
         Out.End();
@@ -79,7 +79,7 @@ public sealed class RemoteClient : IPlayerHandler
     }
 
     private long SettingsHash() => (long)W.Difficulty * 1000 + (W.Hardcore ? 100 : 0) + (W.AllowCheats ? 200 : 0)
-        + (W.Rules.DoDaylightCycle ? 1 : 0) + (W.Rules.KeepInventory ? 2 : 0) + (W.Rules.DoMobSpawning ? 4 : 0) + (W.Rules.MobGriefing ? 8 : 0) + (W.Rules.NaturalRegeneration ? 16 : 0);
+        + (W.Rules.DoDaylightCycle ? 1 : 0) + (W.Rules.KeepInventory ? 2 : 0) + (W.Rules.DoMobSpawning ? 4 : 0) + (W.Rules.MobGriefing ? 8 : 0) + (W.Rules.NaturalRegeneration ? 16 : 0) + (W.Rules.DoFireTick ? 32 : 0);
 
     // ================= wejście od klienta =================
 

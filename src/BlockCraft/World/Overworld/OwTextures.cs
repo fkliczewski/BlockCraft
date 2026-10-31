@@ -29,6 +29,7 @@ public static partial class TextureGen
         }
         for (int i = 0; i < 6; i++) snow[r.Next(256)] = Rgba(255, 255, 255, 180);
         Add("weather_rain", rain); Add("weather_snow", snow);
+        Add("weather_lightning", New(Rgba(255, 255, 255)));
     }
 
     // ---------------- pomocnicze ----------------

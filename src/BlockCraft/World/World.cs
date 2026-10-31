@@ -30,12 +30,13 @@ public sealed class GameRules
             case "keepinventory": KeepInventory = v; return true;
             case "domobspawning": DoMobSpawning = v; return true;
             case "mobgriefing": MobGriefing = v; return true;
+            case "dofiretick": DoFireTick = v; return true;
             case "naturalregeneration": NaturalRegeneration = v; return true;
             case "doentitydrops": DoEntityDrops = v; return true;
             default: error = "Nieznana reguła: " + name; return false;
         }
     }
-    public static readonly string[] Names = { "doDaylightCycle", "keepInventory", "doMobSpawning", "mobGriefing", "naturalRegeneration", "doEntityDrops" };
+    public static readonly string[] Names = { "doDaylightCycle", "keepInventory", "doMobSpawning", "mobGriefing", "doFireTick", "naturalRegeneration", "doEntityDrops" };
 }
 
 public enum Difficulty { Peaceful = 0, Easy = 1, Normal = 2, Hard = 3 }

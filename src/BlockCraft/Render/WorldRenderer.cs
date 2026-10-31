@@ -423,6 +423,11 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             SunBrightness *= (1 - rain * 5f / 16f) * (1 - thunder * 5f / 16f);
         }
         FogColor = fog; FogMode = 0;
+        if (w.Dimension == DimensionId.Overworld && w.Entities.OfType<LightningBolt>().Any(b => b.Flashing))
+        {
+            SkyColor = Vector3.Lerp(SkyColor, new Vector3(.8f, .8f, 1), .45f);
+            FogColor = Vector3.Lerp(FogColor, new Vector3(.8f, .8f, 1), .25f);
+        }
         FogEnd = RenderDistance * 16; FogStart = FogEnd * 0.75f;
         if (w.Dimension == DimensionId.Nether) { SkyColor = FogColor = new Vector3(.2f,.03f,.03f); FogStart = 0; FogEnd *= .5f; SunBrightness = 1; }
         else if (w.Dimension == DimensionId.End) { SkyColor = FogColor = new Vector3(.094f,.075f,.094f); SunBrightness = 1; }

@@ -167,6 +167,18 @@ public static partial class SelfTest
         Check(!hw.Weather.Raining && !cw.Weather.Raining && !cw.Weather.Thundering && cw.Weather.CleanTime > 0,
             "Sieć: koniec opadów i czas dobrej pogody docierają do klienta");
 
+        var lightning = new LightningBolt(hw) { RemainingFlashes = 0, VertexSeed = 1809 };
+        lightning.SetPositionAndPrev(1, gy + 1, 1); hw.AddEntityNow(lightning);
+        Step(1);
+        var clientBolt = cw.Entities.OfType<LightningBolt>().FirstOrDefault();
+        Check(clientBolt != null && clientBolt.Id == lightning.Id && clientBolt.VertexSeed == lightning.VertexSeed
+            && clientBolt.State == lightning.State, "Sieć: piorun ma ten sam stan i geometrię u hosta i gościa");
+        Step(5);
+        Check(!hw.Entities.Contains(lightning) && !cw.Entities.OfType<LightningBolt>().Any(), "Sieć: zakończenie błysku usuwa piorun u gościa");
+        client.SendChat("/gamerule doFireTick false"); Step(25);
+        Check(!hw.Rules.DoFireTick && !cw.Rules.DoFireTick, "Sieć: reguła doFireTick ustawiona przez operatora dociera do gościa");
+        hw.Rules.DoFireTick = true; Step(25);
+
         puppet.Inventory.Main[0] = new ItemStack(B.Stone, 10);
         puppet.Inventory.Main[1] = new ItemStack(I.Diamond, 5);
         Step(3);

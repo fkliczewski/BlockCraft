@@ -62,6 +62,9 @@ public static partial class Registries
     {
         OwLocators.Register();
         OwWeather.Register();
+        Entity("lightning_bolt", w => new LightningBolt(w));
+        Entity("lightningbolt", w => new LightningBolt(w));
+        EntityRenderer.Custom[typeof(LightningBolt)] = (r, e, pt, pos, cam) => r.RenderLightning((LightningBolt)e, pos);
         Entity("snowball", w => new SnowballEntity(w));
         EntityRenderer.Custom[typeof(SnowballEntity)] = (r, e, pt, pos, cam)
             => r.RenderBillboardSprite(TextureGen.Layer("item_snowball"), pos + new Vector3(0, 0.1f, 0), 0.25f, Vector4.One, cam);

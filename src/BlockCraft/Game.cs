@@ -276,7 +276,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             _level.Rules = new Dictionary<string, bool>
             {
                 ["doDaylightCycle"] = World.Rules.DoDaylightCycle, ["keepInventory"] = World.Rules.KeepInventory, ["doMobSpawning"] = World.Rules.DoMobSpawning,
-                ["mobGriefing"] = World.Rules.MobGriefing, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
+                ["mobGriefing"] = World.Rules.MobGriefing, ["doFireTick"] = World.Rules.DoFireTick, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
             };
             _storage.SaveLevel(_level);
             Dimensions.SaveAll();

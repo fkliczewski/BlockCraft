@@ -105,7 +105,29 @@ public sealed partial class Game
                 Shot("ow_weather_" + fixture.Item1);
             });
         }
-        Step(1, () => { Log.Info($"OW-TEST KONIEC: {(failures == 0 ? "OK" : failures + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
+        Step(1, () =>
+        {
+            Player.SetPositionAndPrev(8, 28, 65); Player.Yaw = Player.PrevYaw = 180; Player.Pitch = Player.PrevPitch = -35;
+            Renderer.RenderDistance = 6; World.ChunkManager.Radius = 6;
+        });
+        int lightningWait = 0;
+        WaitUntil(() => ++lightningWait > 1800 || World.GetChunk(0, 0)?.Merged == true && Renderer.PendingMeshes < 3);
+        BlockCraft.Entities.LightningBolt visualBolt = null;
+        Step(1, () =>
+        {
+            visualBolt = new BlockCraft.Entities.LightningBolt(World) { RemainingFlashes = 0, VertexSeed = 1809 };
+            visualBolt.SetPositionAndPrev(8, 4, 8); World.AddEntityNow(visualBolt);
+        });
+        Step(1, () =>
+        {
+            if (!visualBolt.Flashing) { failures++; Log.Error("OW-TEST piorun niewidoczny"); }
+            Shot("ow_lightning");
+        });
+        Step(20, () =>
+        {
+            if (World.Entities.Contains(visualBolt)) { failures++; Log.Error("OW-TEST piorun nie zniknął"); }
+            Log.Info($"OW-TEST KONIEC: {(failures == 0 ? "OK" : failures + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close();
+        });
     }
 
     private bool OwChunksReady(OwBox box)

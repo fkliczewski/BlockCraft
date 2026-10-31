@@ -70,8 +70,10 @@ public sealed partial class World
             foreach (var c in Chunks.Values)
             {
                 if (!c.Merged || !Players.Any(p => Math.Abs((int)Math.Floor(p.X / 16) - c.Cx) <= 7
-                    && Math.Abs((int)Math.Floor(p.Z / 16) - c.Cz) <= 7) || Rand.Next(16) != 0) continue;
-                UpdateWeatherSurface(c.Cx * 16 + Rand.Next(16), c.Cz * 16 + Rand.Next(16));
+                    && Math.Abs((int)Math.Floor(p.Z / 16) - c.Cz) <= 7)) continue;
+                if (IsRaining && ThunderAt(1) > .9f && Rand.Next(100000) == 0)
+                    TryNaturalLightning(c.Cx * 16 + Rand.Next(16), c.Cz * 16 + Rand.Next(16));
+                if (Rand.Next(16) == 0) UpdateWeatherSurface(c.Cx * 16 + Rand.Next(16), c.Cz * 16 + Rand.Next(16));
             }
         }
         _prevRainStrength = RainStrength; _prevThunderStrength = ThunderStrength;
@@ -98,6 +100,22 @@ public sealed partial class World
         if (Weather.Raining && GetBlockLight(x, y, z) < 10 && GetBlock(x, y, z) == B.Air
             && GetBlock(x, y - 1, z) is not (B.Ice or B.PackedIce)
             && Block.Get(B.SnowLayer).CanPlaceAt(this, x, y, z)) SetBlock(x, y, z, B.SnowLayer);
+    }
+
+    internal bool TryNaturalLightning(int x, int z)
+    {
+        if (IsRemote || Dimension != DimensionId.Overworld || !IsRaining || ThunderAt(1) <= .9f || !IsLoadedAt(x, z)) return false;
+        int y = GetHeight(x, z);
+        var targets = GetEntitiesInBox(new BlockCraft.Core.AABB(x - 3, y - 3, z - 3, x + 4, Chunk.Height, z + 4))
+            .OfType<BlockCraft.Entities.LivingEntity>().Where(e => !e.Dead && CanSeeSky((int)Math.Floor(e.X), (int)Math.Floor(e.Y), (int)Math.Floor(e.Z))).ToArray();
+        if (targets.Length > 0)
+        {
+            var target = targets[Rand.Next(targets.Length)];
+            x = (int)Math.Floor(target.X); y = (int)Math.Floor(target.Y); z = (int)Math.Floor(target.Z);
+        }
+        if (!IsRainingAt(x, y, z)) return false;
+        var bolt = new BlockCraft.Entities.LightningBolt(this); bolt.SetPositionAndPrev(x, y, z); SpawnEntity(bolt);
+        return true;
     }
 }
 

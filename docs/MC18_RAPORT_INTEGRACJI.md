@@ -331,3 +331,39 @@ Pozostały pioruny (encja, efekty, dźwięk i sieć), naturalny spawn guardianó
 i wiedźm w strukturach, dokładniejsze odwzorowanie grafiki pogody i test
 pogody w dwóch oknach przez relay. Krok OW pozostaje w toku; wydanie
 BlockCraft_Gra jeszcze nie zostało odświeżone.
+
+### OW: pioruny, kontynuacja 2026-10-31
+
+Dodano encję `lightning_bolt` i alias `/summon LightningBolt`, naturalne
+uderzenia w aktywnych chunkach podczas burzy, kolejne błyski, ogień oraz
+obszar rażenia. Działają dotychczasowe reakcje MO: naładowanie creepera,
+świnia → zombie pigman i wieśniak → wiedźma. Steruje nimi wyłącznie host.
+Stan, liczba pozostałych błysków i ziarno geometrii przechodzą przez zapis
+encji i istniejący protokół. Klient nie losuje błysków ani nie nalicza obrażeń.
+Piorun jest chwilową encją, nie trafia do trwałego zapisu chunków.
+
+Cykl, obszar rażenia i cztery otoczki geometrii z dwiema gałęziami oparto na
+[EntityLightningBolt 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/entity/effect/EntityLightningBolt.java)
+i [RenderLightningBolt 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/client/renderer/entity/RenderLightningBolt.java).
+Zachowano Java Random dla geometrii. Sky/fog reagują na aktywny błysk.
+Świadoma różnica audio ze względu na priorytet użytkownika: grzmot ma zasięg
+64 bloków zamiast wartości głośności 10000 z referencji. Grzmot i cichy trzask
+grają raz na piorun, bez ponawiania przy kolejnych błyskach; obowiązuje
+dotychczasowy limiter miksera. Odsłuch głośników nadal niewykonany.
+
+Naprawiono brak `doFireTick` w parserze reguł, liście reguł, zapisie sesji
+i komunikatach ustawień hosta. Wyłączenie reguły blokuje rozpalanie bloków;
+nie wyłącza obrażeń ani podpalenia encji od uderzenia.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **543 OK, 0 FAIL**:
+11 nowych testów logiki oraz 3 sieciowe. `--autotest --ow` zakończony OK;
+obejrzano `ow_lightning.png` z widocznym pniem i gałęziami. Dowody w
+`.modus/ow-lightning-selftest.log`, `.modus/ow-lightning-autotest.log`
+i `.modus/ow-lightning-final/`. Jeden test początkowo zawiódł, bo creeper
+w scenie bez gracza znikał przed uderzeniem; nadano mu trwałość w fixture,
+bez zmiany zasad despawnu. Początkowy błąd kompilacji testu wynikał z użycia
+CustomName przez typ LivingEntity zamiast Mob i został poprawiony.
+
+OW pozostaje otwarty: naturalny spawn guardianów w monumentach i wiedźm
+w chatkach, dokładniejsze tekstury opadów i test pogody w dwóch graficznych
+oknach przez relay. Wydanie BlockCraft_Gra nie jest jeszcze odświeżone.
