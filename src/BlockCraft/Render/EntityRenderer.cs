@@ -333,7 +333,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
     private static float[] Full() { var u = new float[24]; for (int f = 0; f < 6; f++) { u[f * 4 + 2] = 1; u[f * 4 + 3] = 1; } return u; }
     public static Vector4 HexColor(uint c) => new(((c >> 16) & 255) / 255f, ((c >> 8) & 255) / 255f, (c & 255) / 255f, 1);
 
-    private void EmitModelBox(ModelBox mb, Matrix4 m)
+    internal void EmitModelBox(ModelBox mb, Matrix4 m)
     {
         float x0 = mb.X0, y0 = mb.Y0, z0 = mb.Z0, x1 = mb.X1, y1 = mb.Y1, z1 = mb.Z1;
         void Face(int f, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float u0, float v0, float u1, float v1)

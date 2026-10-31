@@ -241,7 +241,7 @@ public static partial class SelfTest
         Craft("Receptura: lampa z jasnogłazem", B.RedstoneLamp, 1, 0, I.Redstone, 0, I.Redstone, B.Glowstone, I.Redstone, 0, I.Redstone, 0);
         Craft("Receptura: odzyskanie 9 kulek szlamu", I.Slimeball, 9, 0, 0, 0, 0, B.SlimeBlock, 0, 0, 0, 0);
         var transport = ItemRegistry.CreativeItems(Blocks.TabTransport);
-        Check(transport.Count == 9 && transport.Select(s => s.Id).Contains(I.HopperMinecart) && transport.All(s => s.Id is >= B.Rail and <= B.ActivatorRail || s.Item.MaxStack == 1),
-            "Transport zawiera 4 tory i 5 niełączących się w stos wagoników", transport.Count.ToString());
+        Check(transport.Count == 10 && transport.Any(s => s.Id == I.Boat) && transport.Select(s => s.Id).Contains(I.HopperMinecart) && transport.All(s => s.Id is >= B.Rail and <= B.ActivatorRail || s.Item.MaxStack == 1),
+            "Transport zawiera 4 tory, 5 wagoników i łódkę (nie łączą się w stos)", transport.Count.ToString());
     }
 }

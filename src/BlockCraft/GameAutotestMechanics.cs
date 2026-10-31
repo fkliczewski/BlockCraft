@@ -116,6 +116,15 @@ public sealed partial class Game
             SetScreen(new Gui.ContainerScreen(Player, Player.InventoryContainer));
         });
         Step(15, () => Shot("me_07_kompas_zegar_plyty"));
+        Step(5, () =>
+        {
+            SetScreen(null); HideGui = true;
+            int wx = tx + 10, wz = tz;
+            for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) { World.SetBlock(wx + x, ty - 1, wz + z, B.Water); World.SetBlock(wx + x, ty, wz + z, B.Air); }
+            var b = new BoatEntity(World); b.SetPositionAndPrev(wx + .5, ty, wz + .5); b.Yaw = b.PrevYaw = 30; World.SpawnEntity(b);
+            Player.SetPositionAndPrev(wx + .5, ty + 1, wz - 3.5); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 35;
+        });
+        Step(60, () => Shot("me_08_lodka"));
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }
