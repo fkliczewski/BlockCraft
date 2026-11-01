@@ -148,6 +148,44 @@ public sealed partial class Game
             SetScreen(null);
             MeCheck(World.GetTileEntity(tx - 10, ty, tz) is SignTile e && e.Lines[0] == "ObrótEdycja", "tabliczka: zapis po zamknięciu edytora", (World.GetTileEntity(tx - 10, ty, tz) as SignTile)?.Lines[0]);
         });
+        // ME-g: obrazy, ramki, stojak na zbroję, zbroja na graczu
+        Step(5, () =>
+        {
+            HideGui = true;
+            int wx = tx, wz = tz + 16;
+            for (int x = -8; x <= 8; x++) for (int z = -10; z <= 0; z++) for (int y = 0; y <= 5; y++) World.SetBlock(wx + x, ty + y, wz + z, B.Air);
+            for (int x = -7; x <= 7; x++) for (int y = 0; y <= 4; y++) World.SetBlock(wx + x, ty + y, wz, B.Stone);
+            foreach (var e in World.Entities.Where(e => e is HangingEntity or ArmorStandEntity).ToList()) e.Kill();
+            void Hang(string art, int x, int y)
+            {
+                var pe = new PaintingEntity(World) { HangX = x, HangY = y, HangZ = wz - 1, Art = PaintingArt.IndexOf(art) }; pe.SetFacing(2);
+                MeCheck(pe.OnValidSurface(), "obraz " + art + " mieści się"); World.SpawnEntity(pe);
+            }
+            Hang("Pointer", wx - 4, ty + 1); Hang("Sunset", wx, ty + 3); Hang("Kebab", wx + 2, ty + 1); Hang("Wanderer", wx + 4, ty + 1);
+            void Frame(int x, int y, ItemStack it, int rot)
+            {
+                var f = ItemFrameEntity.Create(World, x, y, wz - 1, 2); f.Item = it; f.Rotation = rot;
+                MeCheck(f.OnValidSurface(), "ramka mieści się"); World.SpawnEntity(f);
+            }
+            Frame(wx + 2, ty + 3, new ItemStack(I.DiamondSword), 1); Frame(wx + 6, ty + 1, new ItemStack(B.Stone), 0); Frame(wx - 1, ty + 1, null, 0);
+            var st = new ArmorStandEntity(World); st.SetPositionAndPrev(wx + 1.5, ty, wz - 3.5); st.Yaw = st.PrevYaw = 180;
+            st.Armor[0] = new ItemStack(I.DiamondHelmet); st.Armor[1] = new ItemStack(I.IronChest); st.Armor[2] = new ItemStack(I.GoldLegs); st.Armor[3] = new ItemStack(I.LeatherBoots);
+            World.SpawnEntity(st);
+            var bare = new ArmorStandEntity(World); bare.SetPositionAndPrev(wx - 1.5, ty, wz - 3.5); bare.Yaw = bare.PrevYaw = 200; World.SpawnEntity(bare);
+            World.DayTime = 6000;
+            Player.SetPositionAndPrev(wx + .5, ty, wz - 10); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 8;
+        });
+        Step(40, () => Shot("me_11_obrazy_ramki_stojak"));
+        Step(5, () => { Player.SetPositionAndPrev(tx + .5, ty + .6, tz + 16 - 6.5); Player.Pitch = Player.PrevPitch = -5; Player.Yaw = Player.PrevYaw = 15; });
+        Step(20, () => Shot("me_11b_zblizenie"));
+        Step(5, () =>
+        {
+            Player.Inventory.Armor[0] = new ItemStack(I.DiamondHelmet); Player.Inventory.Armor[1] = new ItemStack(I.IronChest);
+            Player.Inventory.Armor[2] = new ItemStack(I.ChainLegs); Player.Inventory.Armor[3] = new ItemStack(I.GoldBoots);
+            CameraMode = 2;
+        });
+        Step(20, () => Shot("me_12_gracz_w_zbroi"));
+        Step(5, () => { CameraMode = 0; for (int i = 0; i < 4; i++) Player.Inventory.Armor[i] = null; HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

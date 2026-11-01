@@ -505,6 +505,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
                     Biped(e, pt, limb, amt, age, headYaw, pitch, _head, _body, _rArm, _lArm, _rLeg, _lLeg, false, 4);
                     if (pl.ItemInUse?.Id == I.Bow) { _rArm.RY = -0.1f + _head.RY; _lArm.RY = 0.1f + _head.RY + 0.4f; _rArm.RX = -MathF.PI / 2f + _head.RX; _lArm.RX = -MathF.PI / 2f + _head.RX; }
                     foreach (var part in new[] { _head, _body, _rArm, _lArm, _rLeg, _lLeg }) RenderPart(Skin, part, root);
+                    RenderArmorLayers(pl.Inventory.Armor, _head, _body, _rArm, _lArm, _rLeg, _lLeg, root);
                     var held = pl.Inventory.Selected;
                     if (held != null) RenderHeld(held, _rArm, root);
                     break;

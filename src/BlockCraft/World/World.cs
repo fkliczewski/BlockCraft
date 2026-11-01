@@ -382,7 +382,7 @@ public sealed partial class World : IBlockAccess
     }
     public int NextEntityId() => _nextEntityId++;
 
-    private void FlushAdds()
+    internal void FlushAdds()
     {
         if (_toAdd.Count == 0) return;
         var list = _toAdd.ToArray(); _toAdd.Clear();

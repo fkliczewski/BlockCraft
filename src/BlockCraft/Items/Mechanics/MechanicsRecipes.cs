@@ -14,7 +14,7 @@ public static partial class Recipes
         Shaped(new ItemStack(I.GlisteringMelon), "###", "#X#", "###", '#', I.GoldNugget, 'X', I.MelonSlice);
         Shaped(new ItemStack(I.GoldenCarrot), "###", "#X#", "###", '#', I.GoldNugget, 'X', I.Carrot);
         Shapeless(new ItemStack(I.FermentedSpiderEye), I.SpiderEye, B.BrownMushroom, I.Sugar);
-        RecipesUtility(); RecipesBoat(); RecipesSigns();
+        RecipesUtility(); RecipesBoat(); RecipesSigns(); RecipesHanging();
         Shaped(new ItemStack(B.Anvil), "III", " i ", "iii", 'I', B.IronBlock, 'i', I.IronIngot);
         Shaped(new ItemStack(I.FishingRod), "  #", " #X", "# X", '#', I.Stick, 'X', I.String);
     }

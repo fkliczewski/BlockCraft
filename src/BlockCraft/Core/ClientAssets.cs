@@ -60,6 +60,28 @@ public static class ClientAssets
         }
     }
 
+    /// <summary>Synchronicznie czyta obraz RGBA z pobranego wcześniej client.jar (np. "painting/paintings_kristoffer_zetterstrand.png").
+    /// Null, gdy klienta jeszcze nie ma (pierwsze uruchomienie): wtedy wołający rysuje teksturę zastępczą.</summary>
+    public static uint[] TryReadTexture(string path, out int width, out int height)
+    {
+        width = height = 0;
+        try
+        {
+            string jar = Path.Combine(Root, "client.jar");
+            if (!File.Exists(jar)) return null;
+            using var zip = ZipFile.OpenRead(jar);
+            var entry = zip.GetEntry("assets/minecraft/textures/" + path);
+            if (entry == null) return null;
+            using var input = entry.Open(); using var bytes = new MemoryStream(); input.CopyTo(bytes); bytes.Position = 0;
+            var img = StbImageSharp.ImageResult.FromStream(bytes, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+            width = img.Width; height = img.Height;
+            var px = new uint[width * height];
+            Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
+            return px;
+        }
+        catch (Exception ex) { Log.Error("ClientAssets: " + path + ": " + ex.Message); return null; }
+    }
+
     private static async Task AtomicWrite(string path, byte[] bytes)
     {
         // Host i gość mogą pobierać równocześnie; nie współdzielą pliku częściowego.

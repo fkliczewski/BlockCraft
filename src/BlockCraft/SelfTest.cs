@@ -63,6 +63,7 @@ public static partial class SelfTest
         try { TestAnvil(); } catch (Exception e) { Check(false, "Kowadło", e.ToString()); }
         try { TestUtilityItems(); } catch (Exception e) { Check(false, "Kompas, zegar, płyty", e.ToString()); }
         try { TestMobSpeed(); } catch (Exception e) { Check(false, "Prędkość mobów", e.ToString()); }
+        try { TestHanging(); } catch (Exception e) { Check(false, "Obrazy, ramki, stojaki", e.ToString()); }
         try { TestBoat(); } catch (Exception e) { Check(false, "Łódka", e.ToString()); }
         try { TestSigns(); } catch (Exception e) { Check(false, "Tabliczki", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }

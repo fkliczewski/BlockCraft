@@ -116,7 +116,7 @@ public abstract class Entity
     public virtual bool CanBeCollidedWith => false;
     public virtual bool CanBeAttacked => false;
 
-    public AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
+    public virtual AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
 
     public void SetPosition(double x, double y, double z) { X = x; Y = y; Z = z; }
     public void SetPositionAndPrev(double x, double y, double z) { X = PrevX = x; Y = PrevY = y; Z = PrevZ = z; }
