@@ -66,8 +66,12 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
         _showcase = args.Contains("--showcase");
         Settings = Settings.Load();
-        VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
+        int fps = Array.IndexOf(args, "--fps");
+        if (fps >= 0 && fps + 1 < args.Length && int.TryParse(args[fps + 1], out int f) && f > 0) _fpsOverride = f;
+        VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
     }
+    /// <summary>--fps N (testy): VSync wyłączony i limit N klatek, bez zapisu do ustawień.</summary>
+    private readonly int _fpsOverride;
 
     protected override void OnLoad()
     {
@@ -100,7 +104,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= ustawienia / GUI =================
     public void ApplySettings()
     {
-        VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
+        VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
         ChunkMesher.SmoothLighting = Settings.SmoothLighting;
         bool fancyChanged = ChunkMesher.FancyLeaves != Settings.FancyGraphics;
         ChunkMesher.FancyLeaves = Settings.FancyGraphics;
@@ -465,9 +469,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         else if (_showcase) ShowcaseFrame();
         if (_screenshotRequested) { _screenshotRequested = false; TakeScreenshot(null); }
         SwapBuffers();
-        if (!Settings.VSync && Settings.MaxFps < 1000)
+        int maxFps = _fpsOverride > 0 ? _fpsOverride : Settings.MaxFps;
+        if ((!Settings.VSync || _fpsOverride > 0) && maxFps < 1000)
         {
-            double target = 1.0 / Settings.MaxFps;
+            double target = 1.0 / maxFps;
             double spent = _clock.Elapsed.TotalSeconds - now;
             if (spent < target) Thread.Sleep((int)((target - spent) * 1000));
         }

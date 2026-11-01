@@ -11,6 +11,9 @@ public sealed partial class Game
 {
     private readonly Queue<(int frames, Func<bool> action)> _steps = new();
     private int _waitFrames;
+    /// <summary>Krok czeka też na ticki gry (klatki/3, czyli tyle, ile przy 60 FPS): przy VSync 144 Hz albo bez limitu
+    /// sama liczba klatek dawała za mało ticków i testy redstone/lejów padały losowo.</summary>
+    private long _waitTick;
     private string _shotDir;
 
     private void Shot(string name) => TakeScreenshot(Path.Combine(_shotDir, name + ".png"));
@@ -197,6 +200,7 @@ public sealed partial class Game
         }
         if (_steps.Count == 0) return;
         if (_waitFrames > 0) { _waitFrames--; return; }
+        if (_tickCount < _waitTick) return;
         var (frames, act) = _steps.Peek();
         bool ok;
         try { ok = act(); }
@@ -207,6 +211,6 @@ public sealed partial class Game
             ok = true;
         }
         if (_steps.Count == 0) return;
-        if (ok) { _steps.Dequeue(); if (_steps.Count > 0) _waitFrames = _steps.Peek().frames; }
+        if (ok) { _steps.Dequeue(); if (_steps.Count > 0) { _waitFrames = _steps.Peek().frames; _waitTick = _tickCount + (_waitFrames + 2) / 3; } }
     }
 }

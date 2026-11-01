@@ -26,7 +26,9 @@ public abstract partial class Mob : LivingEntity
         IdleTime++;
         MoveForward = 0; MoveStrafe = 0; IsJumping = false;
         if (InWater && World.Rand.NextFloat() < 0.8f) IsJumping = true;
-        if (LivingSound != null && World.Rand.Next(1000) < LivingSoundTimer++) { LivingSoundTimer = -LivingSoundInterval; World.PlaySound(LivingSound, X, Y + EyeHeight, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
+        // LivingSound bywa losowe (nietoperz, wilk): jeden odczyt, inaczej drugi mógł dać null i przerwać tick świata
+        string living = LivingSound;
+        if (living != null && World.Rand.Next(1000) < LivingSoundTimer++) { LivingSoundTimer = -LivingSoundInterval; World.PlaySound(living, X, Y + EyeHeight, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
         if (!TickMobControl()) Think();
         Nav.Tick();
         if (InWater && !Nav.HasPath) IsJumping = true;

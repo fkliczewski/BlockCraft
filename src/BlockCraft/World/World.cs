@@ -452,6 +452,7 @@ public sealed partial class World : IBlockAccess
     // ---------- efekty ----------
     public void PlaySound(string name, double x, double y, double z, float volume = 1f, float pitch = 1f)
     {
+        if (name == null) return;
         foreach (var l in Listeners) l.PlaySound(name, x, y, z, volume, pitch);
     }
     public void SpawnParticles(ParticleKind k, double x, double y, double z, int count, int data = 0)
