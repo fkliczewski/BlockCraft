@@ -137,10 +137,13 @@ public sealed class CraftResultSlot : Slot
     {
         // zużyj składniki
         var grid = _c.CraftGrid;
+        var snapshot = new ItemStack[grid.Size];
+        for (int i = 0; i < grid.Size; i++) snapshot[i] = grid.Get(i);
+        int keep = Recipes.KeepSlotHook?.Invoke(snapshot, taken) ?? -1;
         for (int i = 0; i < grid.Size; i++)
         {
             var s = grid.Get(i);
-            if (s == null) continue;
+            if (s == null || i == keep) continue;
             int id = s.Id;
             s.Count--;
             if (s.Count <= 0) grid.Set(i, null);

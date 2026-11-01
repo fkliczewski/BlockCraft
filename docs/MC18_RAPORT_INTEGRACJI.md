@@ -474,3 +474,33 @@ chunków, testy wszystkich wariantów struktur i mobów, inne proceduralne
 tekstury oraz opisane odstępstwo audio grzmotu. BlockCraft_Gra nadal wymaga
 odświeżenia przy końcowej integracji. Następny etap: ME, potem finalne testy
 i raport wraz z problemami orkiestracji.
+
+### 2026-11-01 — ME-h 39c, sztandary
+
+Dokończono WIP poprzedniej sesji: 16 kolorów, stojące sztandary (16 obrotów),
+ścienne (4 kierunki), 38 wzorów plus baza. Crafting dodaje do 6 warstw;
+kopiowanie zachowuje wzorzec w siatce. Kocioł zdejmuje ostatnią warstwę,
+zachowując inne dane przedmiotu; tryb kreatywny daje wypraną kopię.
+Utrata podparcia upuszcza sztandar ze wzorami. Dane mają rejestr TE 63,
+zapisują się ze światem i przesyłają istniejącym protokołem tile entities.
+
+Model ModelBanner, falowanie, składanie masek banner_base/banner/* z lokalnego
+client.jar 1.8, cache tekstur LRU. Wzory widoczne również w ekwipunku i na
+modelu trzymanym w ręce. Obsłużono NBT BlockEntityTag.Base i Patterns.
+Reguły specjalnych receptur (w tym czarny wzór bez barwnika), Base NBT i prania
+sprawdzono bezpośrednio przez javap na klasach aoe, ajs, bci i aui oryginalnego
+klienta 1.8 z cache assetów. Nie dołączono żadnych assetów Mojang do repo.
+
+Walidacja: Release bez błędów (4 wcześniejsze ostrzeżenia); selftest zawiera
+testy wszystkich kolorów, receptur, kopiowania przez slot wyniku, limitu warstw,
+podparcia, kotła, zapisu/odczytu TE, kompozycji masek oraz stawiania przez gościa
+i aktualizacji wzorów na drugim końcu połączenia w pamięci. Autotest --me:
+ME-TEST KONIEC OK i AUTOTEST DONE, obejrzane me_16_sztandary.png oraz
+me_17_sztandar_w_rece.png w bin/Release/net10.0/autotest.
+
+Ograniczenia: ikona GUI jest płaskim odwzorowaniem płachty z drzewcem,
+nie pełnym portem transformacji perspektywy GUI Minecrafta. Bez client.jar
+wygląd masek jest proceduralnym przybliżeniem. Brak opisów poszczególnych
+warstw w podpowiedzi przedmiotu. Nie deklaruję pełnej zgodności grafiki 1:1.
+Nowego przebiegu dwóch okien przez publiczny relay dla samych sztandarów nie
+wykonano. Alfa 1.0 w BlockCraft_Gra i komputer brata pozostały nietknięte.

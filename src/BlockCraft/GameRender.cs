@@ -130,6 +130,7 @@ public sealed partial class Game
             er.Flush(er.Skin, er.SkinTex);
             er.Flush(er.Terrain, Renderer.Terrain);
             er.FlushMaps();
+            er.FlushBanners();
         }
         GL.Disable(EnableCap.DepthTest);
     }
@@ -183,7 +184,16 @@ public sealed partial class Game
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
     {
         if (s == null || s.Item == null) return;
-        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
+        if (s.Id == I.Banner)
+        {
+            // Finish queued GUI vertices before the texture LRU may replace their layer.
+            Sb.Flush();
+            var tex = Renderer.Entities.BannerTextures;
+            int bannerLayer = tex.LayerFor(Banners.BaseOf(s), Banners.PatternsOf(s));
+            Sb.Fill(x + 4, y + 1, 1, 15, 0xFF406080);
+            Sb.DrawLayer(tex.Array, bannerLayer, x + 5, y + 1, 7, 13, 0xFFFFFFFF, 1 / 64f, 1 / 64f, 21 / 64f, 41 / 64f);
+        }
+        else if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
         else
         {
             var it = s.Item;

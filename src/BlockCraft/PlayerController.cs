@@ -354,6 +354,7 @@ public sealed partial class PlayerController
         if (!Hit.Hit) return;
         var b = Block.Get(W.GetBlock(Hit.X, Hit.Y, Hit.Z));
         var s = b.PickStack(W.GetMeta(Hit.X, Hit.Y, Hit.Z));
+        if (Banners.IsBanner(b.Id) && W.GetTileEntity(Hit.X, Hit.Y, Hit.Z) is BannerTile banner) s = banner.ToItem();
         if (s == null || s.Item == null) return;
         var inv = P.Inventory;
         int slot = inv.FindSlot(s.Id, s.Item.MaxDamage > 0 ? -1 : s.Damage);

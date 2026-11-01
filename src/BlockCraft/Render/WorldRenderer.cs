@@ -558,6 +558,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         er.Flush(er.Skin, er.SkinTex);
         er.Flush(er.Terrain, Terrain);
         er.FlushMaps();
+        er.FlushBanners();
 
         // --- cząsteczki ---
         RenderParticles(pt, cam);

@@ -231,7 +231,40 @@ public sealed partial class Game
         });
         WaitUntil(() => _tickCount >= fwUntil);
         Step(1, () => { MeCheck(Renderer.FireworkSparkCount > 300, "iskry fajerwerków", Renderer.FireworkSparkCount.ToString()); Shot("me_15_fajerwerki"); });
-        Step(5, () => { World.DayTime = 6000; HideGui = false; });
+        Step(5, () =>
+        {
+            World.DayTime = 6000; HideGui = true;
+            int bx = tx, bz = tz - 20;
+            for (int x = -6; x <= 6; x++) for (int z = -2; z <= 4; z++) for (int y = 0; y <= 5; y++) World.SetBlock(bx + x, ty + y, bz + z, B.Air);
+            for (int i = 0; i < 5; i++)
+            {
+                int x = bx - 4 + i * 2;
+                World.SetBlock(x, ty - 1, bz, B.Stone);
+                World.SetBlock(x, ty, bz, B.StandingBanner, i == 4 ? 2 : 0);
+                if (World.GetTileEntity(x, ty, bz) is BannerTile b)
+                    b.SetFromItem(Banners.MakeItem(15 - i * 3, new[] { (new[] { "cre", "gra", "sc", "moj", "flo" }[i], i), ("bo", 0) }));
+            }
+            for (int face = 2; face <= 5; face++)
+            {
+                int x = bx - 4 + (face - 2) * 3, z = bz + 4;
+                World.SetBlock(x, ty + 2, z, B.Stone);
+                World.SetBlock(x + Dir.X[face], ty + 2, z + Dir.Z[face], B.WallBanner, face);
+                if (World.GetTileEntity(x + Dir.X[face], ty + 2, z + Dir.Z[face]) is BannerTile b)
+                    b.SetFromItem(Banners.MakeItem(4, new[] { ("bri", 1) }));
+            }
+            Player.Inventory.Selected = null;
+            Player.SetPositionAndPrev(bx + .5, ty, bz - 7); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = -4;
+            MeCheck(World.GetTileEntity(bx, ty, bz) is BannerTile test && test.Patterns.Count == 2, "sztandar: warstwy w świecie");
+        });
+        Step(30, () => Shot("me_16_sztandary"));
+        Step(5, () =>
+        {
+            HideGui = false;
+            for (int i = 0; i < 9; i++) Player.Inventory.Main[i] = Banners.MakeItem(15 - i, new[] { ("cre", 1), ("bo", 4) });
+            Player.Inventory.SelectedSlot = 0;
+        });
+        Step(20, () => Shot("me_17_sztandar_w_rece"));
+        Step(5, () => { HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

@@ -8,7 +8,7 @@ public static partial class Blocks
 {
     static partial void BlocksMechanics()
     {
-        new BrewingStandBlock(); new CauldronBlock(); new EnchantingTableBlock(); new AnvilBlock(); new JukeboxBlock(); new StandingSignBlock(); new WallSignBlock();
+        new BrewingStandBlock(); new CauldronBlock(); new EnchantingTableBlock(); new AnvilBlock(); new JukeboxBlock(); new StandingSignBlock(); new WallSignBlock(); new StandingBannerBlock(); new WallBannerBlock();
     }
 }
 
@@ -62,6 +62,7 @@ public sealed class CauldronBlock : Block
         {
             if (!p.Creative) { PlayerAlchemy.ExchangeOne(p, stack, new ItemStack(I.Potion)); w.SetMeta(x, y, z, level - 1); }
         }
+        else if (stack?.Id == I.Banner && Banners.Wash(w, x, y, z, p, stack)) return true;
         else if (level > 0 && stack?.Item?.ArmorMaterial == 0 && stack.Tag?.GetCompound("display") is { } display && display.ContainsKey("color"))
         { display.Remove("color"); w.SetMeta(x, y, z, level - 1); }
         p.Inventory.Dirty = true; return true;

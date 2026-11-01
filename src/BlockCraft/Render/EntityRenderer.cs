@@ -294,7 +294,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
     {
         var it = s.Item;
         if (it == null) return;
-        if (IsBlockModel(it)) RenderBlockAt(it.BlockId, s.Damage, m);
+        if (s.Id == I.Banner) RenderBannerItem(s, m);
+        else if (IsBlockModel(it)) RenderBlockAt(it.BlockId, s.Damage, m);
         else RenderSpriteExtruded(it.GetSprite(s), m);
     }
 
@@ -730,11 +731,12 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             gs.Rotate(-135f, 0, 1, 0);
             gs.Rotate(25f, 0, 0, 1);
             gs.Scale(1.05f, 1.05f, 1.05f);
-            RenderSpriteExtruded(it.GetSprite(held), gs.M);
+            if (held.Id == I.Banner) RenderBannerItem(held, gs.M);
+            else RenderSpriteExtruded(it.GetSprite(held), gs.M);
         }
     }
 
-    public void Dispose() { _mesh.Dispose(); Shader.Dispose(); SkinTex.Dispose(); }
+    public void Dispose() { _mapTex?.Dispose(); _bannerTex?.Dispose(); _mesh.Dispose(); Shader.Dispose(); SkinTex.Dispose(); }
 }
 
 /// <summary>Stos macierzy z semantyką OpenGL (M = M * X).</summary>

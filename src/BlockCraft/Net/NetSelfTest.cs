@@ -301,6 +301,19 @@ public static partial class SelfTest
         Check(((SignTile)hw.GetTileEntity(6, gy + 1, 8)).Lines[0] == "Witaj", "Sieć: ponowna edycja bez otwartego edytora odrzucona");
         hw.SetBlock(6, gy + 1, 8, B.Air); Step(2);
 
+        // Sztandar stawiany przez gościa: wzory i późniejsze zmiany TE wracają od hosta.
+        puppet.Inventory.Main[2] = Banners.MakeItem(1, new[] { ("cre", 4), ("bo", 15) }); Step(3);
+        client.SendInput(new NetInput { X = p0.X, Y = p0.Y, Z = p0.Z, OnGround = true, Selected = 2, RightPressed = true, HitKind = 1, HitX = 6, HitY = gy, HitZ = 8, HitFace = Dir.Up, HitFx = .5f, HitFy = 1f, HitFz = .5f });
+        Step(8);
+        Check(hw.GetTileEntity(6, gy + 1, 8) is BannerTile hb && cw.GetTileEntity(6, gy + 1, 8) is BannerTile cb
+            && hb.Base == 1 && hb.Patterns.Count == 2 && hb.Design == cb.Design,
+            "Sieć: sztandar gościa zachowuje tło i wzory na obu komputerach");
+        if (hw.GetTileEntity(6, gy + 1, 8) is BannerTile changed) changed.Patterns.RemoveAt(1);
+        Step(8);
+        Check(cw.GetTileEntity(6, gy + 1, 8) is BannerTile updated && updated.Patterns.Count == 1,
+            "Sieć: zmiana wzorów sztandaru dociera do klienta");
+        hw.SetBlock(6, gy + 1, 8, B.Air); Step(2);
+
         // kowadło: nazwa od gościa, rozliczenie poziomów na hoście
         hw.SetBlock(6, gy + 1, 8, B.Anvil); puppet.XpLevel = 5; Step(5);
         puppet.OpenBlockGui(GuiKind.Anvil, 6, gy + 1, 8); Step(4);
