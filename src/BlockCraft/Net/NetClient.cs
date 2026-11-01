@@ -193,6 +193,11 @@ public sealed class NetClient
         if (_window is not MerchantContainer) return;
         var writer = Out.Begin(C2S.SelectRecipe); writer.Write(_windowId); writer.Write(index); Out.End();
     }
+    public void SetBeacon(Effect primary,Effect secondary)
+    {
+        if(_window is not BeaconContainer)return;
+        var writer=Out.Begin(C2S.Beacon);writer.Write(_windowId);writer.Write((int)primary);writer.Write((int)secondary);Out.End();
+    }
     public void EnchantItem(int button)
     {
         if (_window is not EnchantingContainer) return;

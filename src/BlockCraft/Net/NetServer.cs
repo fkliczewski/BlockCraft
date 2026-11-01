@@ -157,6 +157,7 @@ public sealed partial class NetServer
                 }
             case C2S.CloseWindow: c.CloseWindow(r.ReadByte()); break;
             case C2S.SelectRecipe: c.SelectRecipe(r.ReadByte(), r.ReadInt32()); break;
+            case C2S.Beacon: c.SetBeacon(r.ReadByte(), (Effect)r.ReadInt32(), (Effect)r.ReadInt32()); break;
             case C2S.EnchantItem: c.EnchantItem(r.ReadByte(), r.ReadByte()); break;
             case C2S.AnvilName: c.AnvilName(r.ReadByte(), r.ReadString()); break;
             case C2S.UpdateSign: c.UpdateSign(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), new[] { r.ReadString(), r.ReadString(), r.ReadString(), r.ReadString() }); break;

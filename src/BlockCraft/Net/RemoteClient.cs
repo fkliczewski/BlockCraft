@@ -286,6 +286,11 @@ public sealed partial class RemoteClient : IPlayerHandler
         Out.End();
     }
 
+    public void SetBeacon(byte window,Effect primary,Effect secondary)
+    {
+        if(P.Dead||WindowById(window) is not BeaconContainer c||!c.StillValid(P))return;
+        if(c.Confirm(P,primary,secondary))ForceSync();
+    }
     public void EnchantItem(byte window, int button)
     {
         if (P.Dead || WindowById(window) is not EnchantingContainer c || !c.StillValid(P)) return;
@@ -560,7 +565,8 @@ public sealed partial class RemoteClient : IPlayerHandler
     private void SyncWindow()
     {
         var current = P.OpenContainer;
-        if (current is HorseContainer hc && !hc.StillValid(P)
+        if (current is BeaconContainer bc && !bc.StillValid(P)
+            || current is HorseContainer hc && !hc.StillValid(P)
             || current is MerchantContainer mc && !mc.StillValid(P)
             || current is RsContainer rc && rc.Inv is Entity e && (e.Removed || e.Dead || e.World != W || e.DistanceSq(P) > 64))
             P.CloseContainer();

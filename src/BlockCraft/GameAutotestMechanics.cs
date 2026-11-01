@@ -337,7 +337,24 @@ public sealed partial class Game
         Step(5, () => {CameraMode=2;Player.Pitch=Player.PrevPitch=0;});
         Step(15, () => Shot("me_25_czaszka_na_glowie"));
         Step(5, () => {CameraMode=0;Player.Inventory.Armor[0]=null;});
-        Step(5, () => { HideGui = false; });
+        Step(5, () =>
+        {
+            int bx=tx+20,bz=tz;HideGui=false;
+            for(int l=1;l<=4;l++)for(int dx=-l;dx<=l;dx++)for(int dz=-l;dz<=l;dz++)World.SetBlock(bx+dx,ty+5-l,bz+dz,B.IronBlock);
+            for(int yy=ty+6;yy<Chunk.Height;yy++)World.SetBlock(bx,yy,bz,B.Air);
+            World.SetBlock(bx,ty+5,bz,B.Beacon);
+            World.SetBlock(bx,ty+9,bz,B.StainedGlass,14);World.SetBlock(bx,ty+14,bz,B.StainedGlass,11);
+            Player.SetPositionAndPrev(bx+.5,ty+5,bz-3);Player.Yaw=Player.PrevYaw=0;Player.Pitch=Player.PrevPitch=-18;
+            var tile=(BeaconTile)World.GetTileEntity(bx,ty+5,bz);tile.Update(World);
+            var c=new BeaconContainer(Player,World,tile);tile.Payment.Set(0,new ItemStack(I.Diamond));
+            MeCheck(c.Confirm(Player,Effect.Haste,Effect.Regeneration),"latarnia: płatność i dwa efekty");tile.Update(World);
+            MeCheck(tile.Levels==4&&Player.HasEffect(Effect.Haste)&&Player.HasEffect(Effect.Regeneration),"latarnia: pełna piramida działa");
+        });
+        Step(5,()=>{HideGui=true;Player.Flying=true;Player.SetPositionAndPrev(tx+20.5,ty+8,tz-18);Player.Pitch=Player.PrevPitch=-12;});
+        Step(30,()=>Shot("me_26_latarnia"));
+        Step(5,()=>{HideGui=false;Player.SetPositionAndPrev(tx+20.5,ty+5,tz-3);Player.OpenBlockGui(GuiKind.Beacon,tx+20,ty+5,tz);});
+        Step(20,()=>Shot("me_27_latarnia_gui"));
+        Step(5,()=>{SetScreen(null);HideGui=false;});
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

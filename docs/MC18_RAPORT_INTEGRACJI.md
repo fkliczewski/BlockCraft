@@ -658,3 +658,42 @@ Porównanie przy --fps60: cały --autotest --ne zakończony 0 błędów, łączn
 z portalami, okiem Endu, smokiem, przywołaniem i walką z Witherem. Obejrzano
 ne_18_wither_spawn, dowody w .modus/skulls-ne60-evidence. Potwierdza to
 zależność testowych limitów od FPS; krok58 pozostaje do usunięcia tej zależności.
+
+### 2026-11-01 — ME-53d: latarnia (pauza na prośbę użytkownika)
+
+Zarejestrowano blok B.Beacon i TE65 BeaconTile, przedmiot blokowy oraz recepturę
+5 szkła + gwiazda Netheru + 3 obsydianu. Piramidy z mieszanych bloków żelaza,
+złota, diamentów i szmaragdów, poziomy 1–4, kontrola przesłonięcia kolumny.
+Reguły sprawdzone przez javap oryginalnego client.jar 1.8 (bck i acl;
+bytecode w .modus/beacon-18-bytecode.txt i beacon-dyes-18-bytecode.txt).
+Efekty Speed/Haste, Resistance/JumpBoost, Strength i dodatkowa Regeneration
+albo poziom II przy pełnej piramidzie. Czas 180 ticków, odświeżanie co 80,
+ambient, zasięg levels*10+10 i rozszerzenie pionowe w górę o wysokość świata.
+Osiągnięcie fullBeacon przy przejściu do czterech warstw, obszar
+x/z ±10, y od -9 do +5 względem latarni (AABB oryginalnego bck).
+Usunięto wcześniejsze skanowanie 41x41x41 wokół każdego gracza.
+
+GUI wyboru mocy, współdzielony slot opłaty z limitem jednej sztuki
+(szmaragd/diament/sztabka złota lub żelaza, także w creative), zwrot przez
+wyrzucenie niewykorzystanej opłaty po zamknięciu. Host weryfikuje okno,
+odległość, blok, piramidę, wybrane efekty i płatność. Nowy C2S.Beacon,
+protokół 8. TE zapisuje poziom i moce; nie zapisuje tymczasowego slotu opłaty,
+jak TileEntityBeacon 1.8. Render bloku z obsydianową podstawą i szklaną
+obudową, promień z sekcjami barwionymi szkłem/panelami i mieszaniem kolorów
+według tabeli owiec acl, obracany rdzeń i zewnętrzna warstwa.
+
+Walidacja: Release 0 błędów/4 wcześniejsze ostrzeżenia; selftest 926 OK/0 FAIL
+(.modus/beacon-selftest-final.txt). Obejmuje pełną wymianę host/klient w pamięci:
+GUI, opłatę, wybór, odrzucanie wyższego poziomu i ponownej zmiany bez opłaty.
+--autotest --me --fps 60: ME-TEST KONIEC: OK i AUTOTEST DONE.
+Obejrzane końcowe me_26_latarnia (piramida i kolory) i me_27_latarnia_gui
+(wszystkie przyciski i sloty, bez nakładania tekstu). Dowody i log zachowane
+w .modus/beacon-me-evidence. Brak testu nowego GUI przez publiczny relay.
+GUI używa polskich etykiet zamiast oryginalnego atlasu przycisków;
+render promienia korzysta z oświetlenia/mgły i mieszania BlockCraft,
+nie odtwarza oddzielnego additive pass vanilla. Bez deklaracji pełnej
+zgodności graficznej 1:1. Alfa 1.0, instalacje i komputer brata nietknięte.
+
+Użytkownik polecił: „zapisz stan prac i na teraz pauza”. Nie rozpoczęto kroku58.
+Następne: naprawić limity oczekiwania NE zależne od FPS (58), domknąć zbiorcze
+53/39/40 i przeprowadzić integrację41 wraz z aktualizacją README/CHECKLISTA.

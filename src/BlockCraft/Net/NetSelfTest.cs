@@ -299,6 +299,26 @@ public static partial class SelfTest
             host.Player.CloseContainer(); Step(4);
         }
 
+        // Latarnia: gość wybiera moc, płatność i walidacja należą do hosta.
+        hw.SetBlock(6,gy+1,8,B.Beacon);
+        for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)hw.SetBlock(6+dx,gy,8+dz,B.IronBlock);
+        for(int yy=gy+2;yy<Chunk.Height;yy++)hw.SetBlock(6,yy,8,B.Air);
+        ((BeaconTile)hw.GetTileEntity(6,gy+1,8)).Update(hw);Step(5);
+        puppet.OpenBlockGui(GuiKind.Beacon,6,gy+1,8);Step(4);
+        if(puppet.OpenContainer is BeaconContainer serverBeacon && host.Player.OpenContainer is BeaconContainer clientBeacon)
+        {
+            serverBeacon.Beacon.Payment.Set(0,new ItemStack(I.Emerald));Step(4);
+            Check(clientBeacon.Beacon.Payment.Get(0)?.Id==I.Emerald,"Sieć: płatność latarni widoczna u gościa");
+            client.SetBeacon(Effect.Strength,Effect.None);Step(4);
+            Check(serverBeacon.Beacon.Primary==Effect.None&&serverBeacon.Beacon.Payment.Get(0)!=null,"Sieć: zablokowana moc z wyższego poziomu piramidy");
+            client.SetBeacon(Effect.Speed,Effect.None);Step(4);
+            Check(serverBeacon.Beacon.Primary==Effect.Speed&&serverBeacon.Beacon.Payment.Get(0)==null
+                &&clientBeacon.Beacon.Primary==Effect.Speed&&clientBeacon.Beacon.Payment.Get(0)==null,"Sieć: host rozlicza wybór mocy i jedną opłatę");
+            client.SetBeacon(Effect.Haste,Effect.None);Step(3);
+            Check(serverBeacon.Beacon.Primary==Effect.Speed,"Sieć: druga zmiana bez opłaty odrzucona");
+            host.Player.CloseContainer();Step(4);
+        }
+        else Check(false,"Sieć: GUI latarni");
         // Stół do zaklinania: oferty liczone z tego samego ziarna po obu stronach, zaklinanie wykonuje host.
         hw.SetBlock(6, gy + 1, 8, B.EnchantingTable); puppet.XpLevel = 30; Step(5);
         puppet.OpenBlockGui(GuiKind.Enchanting, 6, gy + 1, 8); Step(4);

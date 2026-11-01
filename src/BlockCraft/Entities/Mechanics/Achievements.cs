@@ -81,12 +81,8 @@ public static class AchievementList
     }
     public static bool FullBeacon(World.World w, int x, int y, int z)
     {
-        if (w.GetBlock(x,y,z) != B.Beacon || y < 4) return false;
-        for(int yy=y+1;yy<Chunk.Height;yy++) if(Block.Get(w.GetBlock(x,yy,z)).LightOpacity>0) return false;
-        for(int layer=1;layer<=4;layer++)
-            for(int dx=-layer;dx<=layer;dx++) for(int dz=-layer;dz<=layer;dz++)
-                if(w.GetBlock(x+dx,y-layer,z+dz) is not (B.IronBlock or B.GoldBlock or B.DiamondBlock or B.EmeraldBlock)) return false;
-        return true;
+        if(w.GetBlock(x,y,z)!=B.Beacon)return false;
+        var t=new BeaconTile{X=x,Y=y,Z=z};t.Rebuild(w);return t.Levels==4;
     }
 }
 
@@ -124,12 +120,6 @@ public partial class Player
         }
         else _railVehicle = null;
         if (Age % 20 != 0) return;
-        if(Age%80==0&&!Achievements.Contains("fullBeacon")&&Achievements.Contains("killWither"))
-        {
-            int bx=Core.MathUtil.FloorToInt(X),by=Core.MathUtil.FloorToInt(Y),bz=Core.MathUtil.FloorToInt(Z);
-            for(int x=bx-20;x<=bx+20;x++) for(int z=bz-20;z<=bz+20;z++) for(int y=Math.Max(4,by-20);y<=Math.Min(Chunk.Height-1,by+20);y++)
-                if(World.GetBlock(x,y,z)==B.Beacon&&AchievementList.FullBeacon(World,x,y,z)) AwardAchievement("fullBeacon");
-        }
         if(World.Dimension != DimensionId.Overworld) return;
         int biome = World.GetBiome(Core.MathUtil.FloorToInt(X), Core.MathUtil.FloorToInt(Z));
         Statistics["achievement.biome." + biome] = 1;
