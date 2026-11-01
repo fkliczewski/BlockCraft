@@ -68,6 +68,7 @@ public static partial class SelfTest
         try { TestFireworks(); } catch (Exception e) { Check(false, "Fajerwerki", e.ToString()); }
         try { TestBanners(); } catch (Exception e) { Check(false, "Sztandary", e.ToString()); }
         try { TestAchievements(); } catch (Exception e) { Check(false, "Osiągnięcia", e.ToString()); }
+        try { TestFood18(); } catch (Exception e) { Check(false, "Ciasto i ryby", e.ToString()); }
         try { TestBoat(); } catch (Exception e) { Check(false, "Łódka", e.ToString()); }
         try { TestSigns(); } catch (Exception e) { Check(false, "Tabliczki", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }

@@ -7,6 +7,7 @@ public static partial class Recipes
     /// <summary>Receptury modułu ME z 1.8 (RecipesCrafting/RecipesFood/RecipeBookCloning bez wariantów NBT).</summary>
     static partial void RecipesMechanics()
     {
+        RecipesFood18();
         Shaped(new ItemStack(B.EnchantingTable), " B ", "D#D", "###", 'B', I.Book, 'D', I.Diamond, '#', B.Obsidian);
         Shaped(new ItemStack(I.BrewingStandItem), " B ", "###", 'B', I.BlazeRod, '#', B.Cobblestone);
         Shaped(new ItemStack(I.CauldronItem), "# #", "# #", "###", '#', I.IronIngot);

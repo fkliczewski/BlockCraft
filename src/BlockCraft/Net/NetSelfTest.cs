@@ -155,6 +155,12 @@ public static partial class SelfTest
         host.Player.Achievements.Add("diamonds"); Step(42);
         Check(!host.Player.Achievements.Contains("diamonds")&&puppet.AchievementBits==hostAchievementBits,
             "Sieć: lokalne sfałszowanie osiągnięcia jest nadpisane przez hosta");
+        hw.SetBlock(6,gy+1,8,B.Cake);puppet.FoodLevel=10;puppet.Saturation=0;Step(4);
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true,HitKind=1,HitX=6,HitY=gy+1,HitZ=8,HitFace=Dir.Up,HitFx=.5f,HitFy=.5f,HitFz=.5f });
+        Step(6);
+        Check(hw.GetMeta(6,gy+1,8)==1&&cw.GetMeta(6,gy+1,8)==1&&puppet.FoodLevel==12&&host.Player.FoodLevel==12,
+            "Sieć: gość zjada jeden kęs, host rozlicza głód i synchronizuje bryłę");
+        hw.SetBlock(6,gy+1,8,B.Air);Step(3);
         for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
         client.Flush(); Thread.Sleep(5);
         server.Tick();

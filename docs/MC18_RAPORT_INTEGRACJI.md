@@ -542,3 +542,31 @@ i zgodny z 1.8 obszar przyznawania nagrody wymagają tego kroku. Darczyńca
 diamentu jest obecnie śledzony w pamięci; nie utrzymuje się w upuszczonej encji
 po zapisie i ponownym wczytaniu świata. Te ograniczenia wykluczają deklarację
 pełnej zgodności osiągnięć 1:1. Wersji zainstalowanej u graczy nie podmieniano.
+
+### 2026-11-01 — ME-53a, ciasto i ryby
+
+Zarejestrowano I.CakeItem i B.Cake: receptura mleko/cukier/jajko/pszenica,
+stos 1, zwrot trzech wiader przy odbiorze, stawianie na litym podłożu,
+7 kęsów (+2 głodu, +0.4 nasycenia), zmniejszająca się bryła i kolizja,
+brak dropu przy zniszczeniu i utracie podparcia. Komparator daje 14,12,...,2.
+Zachowanie sprawdzone w bytecode BlockCake (aug) oryginalnego klienta 1.8.
+
+Zarejestrowano I.RawFish (dorsz/łosoś/błazenek/rozdymka) i I.CookedFish
+(dorsz/łosoś). Dorsz i łosoś zachowują meta w piecu, dają 0.35 XP; pozostałych
+dwóch ryb nie można piec. Wartości pokarmu i nasycenia wg FishType (ali)
+klienta 1.8; rozdymka uruchamia już istniejące efekty Trucizny IV (1200 ticków),
+Głodu III i Mdłości II (300 ticków). Warzenie rozdymki było już obsłużone.
+Tekstury cake_* i sześciu ryb z lokalnego client.jar, proceduralne zastępcze
+przy braku cache. Nie dodano assetów Mojang do repozytorium.
+
+Release OK (4 wcześniejsze ostrzeżenia), selftest 856 OK/0 FAIL, w tym receptura
+i zwrot wiader przez rzeczywisty slot wyniku, wszystkie kęsy/komparator,
+podparcie/drop, warianty ryb, wartości jedzenia, efekty i rzeczywisty piec.
+Test host/klient w pamięci: jeden kęs gościa rozliczony przez hosta, głód i meta
+zgodne po obu stronach. --autotest --me OK; obejrzano me_20_ciasto_7_kesow
+i me_21_ryby_ciasto_ikony. Nowego testu przez publiczny relay nie wykonywano.
+Osiągnięcia bakeCake i cookFish mają teraz dostępne zależności.
+
+Krok 53 podzielony na 54 (ten podetap), 55 wędkowanie, 56 czaszki i 57 latarnia.
+Krok zbiorczy pozostaje otwarty. Wędkowanie nadal nie jest podłączone do wędki;
+czaszek i latarni nie rejestrowano w ramach tego podetapu. Alfa 1.0 nietknięta.

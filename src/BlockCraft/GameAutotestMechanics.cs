@@ -276,6 +276,25 @@ public sealed partial class Game
         Step(5, () => { CurrentScreen.Scroll(0,0,-4); CurrentScreen.MouseDown(30,100,0);CurrentScreen.MouseMove(30,130);CurrentScreen.MouseUp(30,130,0); });
         Step(5, () => Shot("me_19_drzewo_osiagniec"));
         Step(5, () => SetScreen(null));
+        Step(5, () =>
+        {
+            HideGui=true;Player.AchievementNotices.Clear();
+            for(int i=0;i<7;i++)
+            {
+                int x=tx-6+i*2,z=tz-28;
+                World.SetBlock(x,ty-1,z,B.Stone);World.SetBlock(x,ty,z,B.Cake,i);
+            }
+            Player.SetPositionAndPrev(tx+.5,ty+1,tz-34);Player.Yaw=Player.PrevYaw=0;Player.Pitch=Player.PrevPitch=20;
+        });
+        Step(20, () => Shot("me_20_ciasto_7_kesow"));
+        Step(5, () =>
+        {
+            HideGui=false;
+            for(int i=0;i<4;i++)Player.Inventory.Main[i]=new ItemStack(I.RawFish,1,i);
+            for(int i=0;i<2;i++)Player.Inventory.Main[4+i]=new ItemStack(I.CookedFish,1,i);
+            Player.Inventory.Main[6]=new ItemStack(I.CakeItem);Player.Inventory.SelectedSlot=1;
+        });
+        Step(15, () => Shot("me_21_ryby_ciasto_ikony"));
         Step(5, () => { HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }

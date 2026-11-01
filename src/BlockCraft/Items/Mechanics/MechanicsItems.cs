@@ -19,6 +19,7 @@ public static partial class ItemRegistry
         BlockItem(I.BrewingStandItem, "brewing_stand", "Statyw alchemiczny", B.BrewingStand, Blocks.TabBrewing);
         BlockItem(I.CauldronItem, "cauldron", "Kocioł", B.Cauldron, Blocks.TabBrewing);
         Item.ById[I.GoldenApple].Variants = new[] { 0, 1 };
+        ItemsFood18();
         var rod = Simple(I.FishingRod, "fishing_rod", "Wędka", Blocks.TabTools, 1); rod.MaxDamage = 64; rod.Handheld = true;
         ItemsUtility(); ItemsBoat(); ItemsSigns(); ItemsHanging(); ItemsMaps(); ItemsFireworks(); ItemsBanners();
         Simple(I.EnchantedBook, "enchanted_book", "Zaklęta książka", Blocks.TabMisc, 1);
