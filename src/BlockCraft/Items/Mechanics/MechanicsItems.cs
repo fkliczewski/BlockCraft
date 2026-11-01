@@ -20,7 +20,7 @@ public static partial class ItemRegistry
         BlockItem(I.CauldronItem, "cauldron", "Kocioł", B.Cauldron, Blocks.TabBrewing);
         Item.ById[I.GoldenApple].Variants = new[] { 0, 1 };
         var rod = Simple(I.FishingRod, "fishing_rod", "Wędka", Blocks.TabTools, 1); rod.MaxDamage = 64; rod.Handheld = true;
-        ItemsUtility(); ItemsBoat(); ItemsSigns(); ItemsHanging(); ItemsMaps();
+        ItemsUtility(); ItemsBoat(); ItemsSigns(); ItemsHanging(); ItemsMaps(); ItemsFireworks();
         Simple(I.EnchantedBook, "enchanted_book", "Zaklęta książka", Blocks.TabMisc, 1);
         string[] keys = { "helmet", "chestplate", "leggings", "boots" }, names = { "Kolczy hełm", "Kolczy napierśnik", "Kolcze spodnie", "Kolcze buty" };
         int[] points = { 2, 5, 4, 1 }, baseDur = { 11, 16, 15, 13 };

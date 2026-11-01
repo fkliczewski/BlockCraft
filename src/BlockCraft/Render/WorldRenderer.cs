@@ -700,6 +700,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     private readonly Rng _pr = new(5);
     public void TickParticles()
     {
+        TickFireworks();
         var w = World;
         for (int i = Particles.Count - 1; i >= 0; i--)
         {
@@ -744,6 +745,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             b.Quad(rel - r + u, rel - r - u, rel + r - u, rel + r + u, p.U0, p.V0, p.U1, p.V1, 1f);
         }
         b.Color = Vector4.One;
+        RenderFireworks(pt, cam);
     }
 
     public void AddParticle(Vector3 pos, Vector3 vel, int layer, float size, int life, float gravity, Vector4 color, bool collide = true, bool emissive = false, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, bool grow = false)

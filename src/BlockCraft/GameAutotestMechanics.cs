@@ -212,6 +212,26 @@ public sealed partial class Game
             Player.SetPositionAndPrev(tx - .5, ty, tz + 16 - 3.2); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 0;
         });
         Step(25, () => Shot("me_14_mapa_w_ramce"));
+        // ME-h 39b: fajerwerki nocą (5 kształtów)
+        long fwUntil = 0;
+        Step(5, () =>
+        {
+            World.DayTime = 18000; HideGui = true;
+            Player.SetPositionAndPrev(tx + .5, ty, tz - 20); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = -35;
+            int[][] cols = { new[] { 11743532 }, new[] { 2437522, 15790320 }, new[] { 14602026 }, new[] { 3887386 }, new[] { 14188952, 6719955 } };
+            for (int t = 0; t < 5; t++)
+            {
+                var e = new Nbt { ["Type"] = t, ["Colors"] = cols[t], ["Trail"] = t == 1 };
+                if (t == 4) e["FadeColors"] = new[] { 15790320 };
+                var st = new ItemStack(I.FireworkRocket); st.GetOrCreateTag()["Fireworks"] = new Nbt { ["Flight"] = 1, ["Explosions"] = new List<object> { e } };
+                var r = new FireworkRocketEntity(World, tx - 12 + t * 6 + .5, ty + 1, tz + 8, st) { Lifetime = 22 };
+                World.SpawnEntity(r);
+            }
+            fwUntil = _tickCount + 27;
+        });
+        WaitUntil(() => _tickCount >= fwUntil);
+        Step(1, () => { MeCheck(Renderer.FireworkSparkCount > 300, "iskry fajerwerków", Renderer.FireworkSparkCount.ToString()); Shot("me_15_fajerwerki"); });
+        Step(5, () => { World.DayTime = 6000; HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }
