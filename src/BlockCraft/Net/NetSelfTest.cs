@@ -148,6 +148,13 @@ public static partial class SelfTest
             $"krok {maxStep:F2}, droga {puppet.X - startX:F2}, nogi {puppet.LimbSwing:F2}");
         host.Player.SetPosition(startX, host.Player.Y, host.Player.Z); Step(6);
         var rc = server.Clients[0];
+        client.Out.Begin(C2S.OpenInventory); client.Out.End(); Step(4);
+        Check(puppet.Achievements.Contains("openInventory")&&host.Player.Achievements.Contains("openInventory"),
+            "Sieć: otwarcie ekwipunku przyznaje osiągnięcie na hoście i odsyła stan");
+        var hostAchievementBits=puppet.AchievementBits;
+        host.Player.Achievements.Add("diamonds"); Step(42);
+        Check(!host.Player.Achievements.Contains("diamonds")&&puppet.AchievementBits==hostAchievementBits,
+            "Sieć: lokalne sfałszowanie osiągnięcia jest nadpisane przez hosta");
         for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
         client.Flush(); Thread.Sleep(5);
         server.Tick();

@@ -7,6 +7,7 @@ namespace BlockCraft.Entities;
 public sealed class ItemEntity : Entity
 {
     public ItemStack Stack;
+    public Player Thrower;
     public int PickupDelay;
     public int Lifetime;
     public float Bob;
@@ -52,11 +53,18 @@ public sealed class ItemEntity : Entity
         int before = Stack.Count;
         if (p.Inventory.Add(Stack))
         {
+            AchievementList.PickedUp(p, Stack);
+            if (Stack.Id == I.Diamond && Thrower != null && Thrower != p) Thrower.AwardAchievement("diamondsToYou");
             p.Handler?.OnPickup(this, p);
             World.PlaySound("pop", X, Y, Z, 0.2f, ((World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.7f + 1f) * 2f);
             Kill();
         }
-        else if (Stack.Count != before) p.Handler?.OnPickup(this, p);
+        else if (Stack.Count != before)
+        {
+            AchievementList.PickedUp(p, Stack);
+            if (Stack.Id == I.Diamond && Thrower != null && Thrower != p) Thrower.AwardAchievement("diamondsToYou");
+            p.Handler?.OnPickup(this, p);
+        }
     }
 
     public override void Save(BinaryWriter bw) { base.Save(bw); bw.WriteStack(Stack); bw.Write(Lifetime); bw.Write(PickupDelay); }

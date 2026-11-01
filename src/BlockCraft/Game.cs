@@ -415,6 +415,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             case Keys.Escape: SetScreen(new PauseScreen()); break;
             case Keys.E:
                 if (p.Spectator) break;
+                if (Client != null) { Client.Out.Begin(Net.C2S.OpenInventory); Client.Out.End(); }
+                else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
                 break;
             case Keys.T: _ignoreNextChar = true; SetScreen(new ChatScreen("")); break;

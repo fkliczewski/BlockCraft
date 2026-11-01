@@ -85,7 +85,7 @@ public partial class Player : LivingEntity
         else if (SleepTimer > 0) { SleepTimer++; if (SleepTimer >= 110) SleepTimer = 0; }
         base.Tick();
         if (Dead) return;
-        if (!World.IsRemote) { FoodTick(); MapLogic.TickPlayer(this); }
+        if (!World.IsRemote) { FoodTick(); MapLogic.TickPlayer(this); TickAchievements(); }
         UseItemTick();
         if (OnGround || InWater) PortalCooldown = 0;
         // podnoszenie przedmiotów
@@ -335,7 +335,7 @@ public partial class Player : LivingEntity
         }
     }
 
-    public void OnCrafted(ItemStack s) => Recipes.OnCraftedHook?.Invoke(this, s);
+    public void OnCrafted(ItemStack s) { Recipes.OnCraftedHook?.Invoke(this, s); AchievementList.Crafted(this, s); }
 
     // ---------- interakcje ----------
     public void SendMessage(string msg) => Handler?.OnMessage(msg);
@@ -354,6 +354,7 @@ public partial class Player : LivingEntity
         if (s == null || s.Count <= 0) return;
         if (World.IsRemote) { NetDropHook?.Invoke(s); return; }
         var e = new ItemEntity(World, X, Y + EyeHeight - 0.3, Z, s.Copy());
+        e.Thrower = this;
         e.PickupDelay = 40;
         float yr = Yaw * MathUtil.Deg2Rad, pr = Pitch * MathUtil.Deg2Rad;
         float f = 0.3f;
@@ -472,6 +473,7 @@ public partial class Player : LivingEntity
         if (!hit && tempFire) le.FireTicks = 0;
         if (hit)
         {
+            if (dmg >= 18) AwardAchievement("overkill");
             if (bonus > 0) World.SpawnParticles(ParticleKind.Crit, le.X, le.Y + le.Height / 2, le.Z, 10);
             EnchantEffects.ApplyArthropod(this, le);
             if (fireAspect > 0) le.SetFire(fireAspect * 4);

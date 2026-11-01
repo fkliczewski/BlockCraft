@@ -101,6 +101,7 @@ public abstract class Animal : Mob
 {
     public int GrowingAge; // <0 młode
     public int InLove;
+    public Player LoveCause;
     protected int PanicTicks;
     protected Animal Mate; protected int MateTicks;
     public override bool Persistent => true;
@@ -169,6 +170,7 @@ public abstract class Animal : Mob
                     child.SetPositionAndPrev(X, Y, Z);
                     child.Yaw = Yaw;
                     World.SpawnEntity(child);
+                    if(this is Cow) (LoveCause ?? Mate.LoveCause)?.AwardAchievement("breedCow");
                     GrowingAge = 6000; Mate.GrowingAge = 6000; InLove = 0; Mate.InLove = 0; MateTicks = 0; Mate.MateTicks = 0;
                     World.SpawnParticles(ParticleKind.Heart, X, Y + Height, Z, 7);
                     World.SpawnXp(X, Y, Z, 1 + World.Rand.Next(7));
@@ -210,7 +212,7 @@ public abstract class Animal : Mob
         if (IsBreedingItem(held))
         {
             if (IsBaby) { GrowingAge = Math.Min(0, GrowingAge + (-GrowingAge) / 10); }
-            else if (GrowingAge == 0 && InLove <= 0) { InLove = 600; }
+            else if (GrowingAge == 0 && InLove <= 0) { InLove = 600; LoveCause = p; }
             else return false;
             if (!p.Creative) { held.Count--; if (held.Count <= 0) p.Inventory.Selected = null; p.Inventory.Dirty = true; }
             World.SpawnParticles(ParticleKind.Heart, X, Y + Height, Z, 3);
@@ -259,6 +261,11 @@ public class Cow : Animal
 
 public sealed partial class Pig : Animal
 {
+    protected override void OnFall(float distance)
+    {
+        if(distance>5) Rider?.AwardAchievement("flyPig");
+        base.OnFall(distance);
+    }
     public Pig(World.World w) : base(w) { Width = 0.9f; Height = 0.9f; MaxHealth = 10; Health = 10; MoveSpeed = 0.25; }
     public override string TypeKey => "pig";
     public override string DisplayName => "Świnia";

@@ -554,6 +554,7 @@ public sealed class NetClient
         int ne = r.ReadByte();
         var effects = new Dictionary<Effect, EffectInstance>();
         for (int i = 0; i < ne; i++) { var id = (Effect)r.ReadInt32(); int dur = r.ReadInt32() * 20, amp = r.ReadInt32(); effects[id] = new EffectInstance(id, dur, amp); }
+        p.ReceiveAchievements(r.ReadUInt64());
         foreach (var id in p.Effects.Keys.ToList()) if (!effects.ContainsKey(id)) p.RemoveEffect(id);
         foreach (var (id, ef) in effects)
         {

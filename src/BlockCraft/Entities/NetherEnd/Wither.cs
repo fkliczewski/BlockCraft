@@ -264,6 +264,7 @@ public sealed class Wither : Mob
                 wither.BodyYaw = wither.PrevBodyYaw = wither.Yaw;
                 wither.StartSpawn();
                 w.SpawnEntity(wither);
+                foreach(var player in w.Players) if(player.DistanceSq(wither)<2500) player.AwardAchievement("spawnWither");
                 for (int i = 0; i < 120; i++) w.SpawnParticles(ParticleKind.Poof, cx + w.Rand.NextDouble(), y - 2 + w.Rand.NextDouble() * 3.9, cz + w.Rand.NextDouble(), 1);
                 return wither;
             }

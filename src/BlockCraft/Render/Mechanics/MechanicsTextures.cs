@@ -24,11 +24,22 @@ public static partial class TextureGen
         TexMaps();
         TexFireworks();
         TexBanners();
+        TexAchievementIcons();
         var liquid = New(); for (int y = 9; y < 14; y++) for (int x = 5; x < 11; x++) liquid[y * 16 + x] = Hex(0xFFFFFF); Add("me_potion_liquid", liquid);
         foreach (var (key, color) in new[] { ("fermented_spider_eye", 0x6E382Fu), ("speckled_melon", 0xECA32Bu), ("golden_carrot", 0xF6C33Bu), ("brewing_stand", 0xA48A55u), ("cauldron", 0x555761u) })
         {
             var px = New(); for (int y = 2; y < 14; y++) for (int x = 2; x < 14; x++) if (Math.Abs(x - 8) + Math.Abs(y - 8) < 9) px[y * 16 + x] = Hex(color);
             Add("item_" + key, px);
+        }
+    }
+    private static void TexAchievementIcons()
+    {
+        foreach(var (name,path) in new[] {("cake","items/cake.png"),("fish","items/fish_cooked.png"),("skull","items/skull_wither.png"),("beacon","blocks/beacon.png")})
+        {
+            var original=BlockCraft.Core.ClientAssets.TryReadTexture(path,out int w,out int h);
+            var px=New();
+            for(int y=0;y<16;y++)for(int x=0;x<16;x++)px[y*16+x]=original!=null&&w>0&&h>0?original[y*h/16*w+x*w/16]:Hex(0xB0B0B0);
+            Add("achievement_"+name,px);
         }
     }
     private static void TexEnchanting()

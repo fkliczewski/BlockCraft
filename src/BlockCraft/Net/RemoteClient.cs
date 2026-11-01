@@ -522,6 +522,7 @@ public sealed partial class RemoteClient : IPlayerHandler
             bw.Write(P.HasSpawn); bw.Write(P.SpawnX); bw.Write(P.SpawnY); bw.Write(P.SpawnZ);
             bw.Write((byte)P.Effects.Count);
             foreach (var ef in P.Effects.Values) { bw.Write((int)ef.Id); bw.Write(ef.Duration / 20); bw.Write(ef.Amplifier); }
+            bw.Write(P.AchievementBits);
         }
         var bytes = ms.ToArray();
         if (_lastStats != null && bytes.AsSpan().SequenceEqual(_lastStats) && _ticks % 40 != 0) return;

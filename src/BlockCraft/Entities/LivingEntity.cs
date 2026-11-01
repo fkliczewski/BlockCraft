@@ -383,6 +383,7 @@ public abstract partial class LivingEntity : Entity
     {
         if (Dead) return;
         Dead = true;
+        AchievementList.Killed(this, src);
         Health = 0;
         UnpredictedSound = true;
         try { World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f); }

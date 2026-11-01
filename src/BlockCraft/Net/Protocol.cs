@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 6;
+    public const int Version = 7;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -33,6 +33,7 @@ public enum C2S : byte
     EnchantItem = 13,   // byte okno, byte przycisk (0-2)
     AnvilName = 14,     // byte okno, string nazwa (MC|ItemName, maks. 30 znaków)
     UpdateSign = 15,    // int x,y,z, 4 x string
+    OpenInventory = 16, // otwarcie lokalnego ekwipunku; wyłącznie wyzwalacz openInventory
 }
 
 /// <summary>Pakiety host -> klient.</summary>

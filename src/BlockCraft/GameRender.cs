@@ -33,6 +33,7 @@ public sealed partial class Game
         {
             try { _screen.Render(MouseGuiX, MouseGuiY, pt); } catch (Exception ex) { Log.Error("Screen: " + ex); }
         }
+        DrawAchievementNotice();
         Sb.End();
     }
 

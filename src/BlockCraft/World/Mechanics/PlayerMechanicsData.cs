@@ -45,6 +45,7 @@ namespace BlockCraft.Entities
             foreach (var s in data.EnderItems ?? new()) if (s.Slot >= 0 && s.Slot < 27) EnderInventory.Set(s.Slot, s.ToStack());
             Statistics.Clear(); foreach (var kv in data.Statistics ?? new()) Statistics[kv.Key] = kv.Value;
             Achievements.Clear(); foreach (var a in data.Achievements ?? new()) Achievements.Add(a);
+            AchievementNotices.Clear();
         }
     }
 }

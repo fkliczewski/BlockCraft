@@ -282,6 +282,7 @@ public sealed class PauseScreen : Screen
     {
         int y = H / 4 + 8;
         Add(new Button(W / 2 - 100, y + 24 - 16, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
+        Add(new Button(W / 2 - 100, y + 72 - 16, 200, 20, "Osiągnięcia", () => G.SetScreen(new AchievementsScreen(this))));
         Add(new Button(W / 2 - 100, y + 96 - 16, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 96 - 16, 98, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
         if (G.Client == null) Add(new Button(W / 2 - 100, y + 48 - 16, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));

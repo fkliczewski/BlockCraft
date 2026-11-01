@@ -101,6 +101,12 @@ public sealed class DimensionSet : IDisposable
         if (old == next) return;
         next.EnsureDimensionArea(MathUtil.FloorToInt(x),MathUtil.FloorToInt(z),32);
         if (entity is Player player) player.CloseContainer();
+        if (entity is Player achiever)
+        {
+            if (target == DimensionId.Nether) achiever.AwardAchievement("portal");
+            if (target == DimensionId.End) achiever.AwardAchievement("theEnd");
+            if (old.Dimension == DimensionId.End && target == DimensionId.Overworld) achiever.AwardAchievement("theEnd2");
+        }
         old.RemoveEntity(entity); entity.World = next; entity.Id = 0; entity.Removed = false;
         entity.MotionX = entity.MotionY = entity.MotionZ = 0; entity.FallDistance = 0;
         entity.SetPositionAndPrev(x,y,z); next.AddEntityNow(entity);

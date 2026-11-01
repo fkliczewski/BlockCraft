@@ -164,6 +164,7 @@ public sealed partial class NetServer
             case C2S.CreativeDrop: { var s = r.ReadStack(); if (c.P.Creative && s != null) c.P.DropStack(s, false); break; }
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;
             case C2S.Respawn: c.Respawn(); break;
+            case C2S.OpenInventory: c.P.AwardAchievement("openInventory"); break;
             case C2S.KeepAlive: c.P.Ping = (int)Math.Clamp(Environment.TickCount64 - r.ReadInt64(), 0, 99999); break;
         }
     }

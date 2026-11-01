@@ -264,6 +264,18 @@ public sealed partial class Game
             Player.Inventory.SelectedSlot = 0;
         });
         Step(20, () => Shot("me_17_sztandar_w_rece"));
+        Step(5, () =>
+        {
+            Player.AchievementNotices.Clear(); Player.AwardAchievement("openInventory");
+            AchievementList.PickedUp(Player,new ItemStack(B.OakLog));
+            Player.OnCrafted(new ItemStack(B.CraftingTable));
+            Player.OnCrafted(new ItemStack(I.StonePickaxe));
+            SetScreen(new Gui.AchievementsScreen(new Gui.PauseScreen()));
+        });
+        Step(5, () => Shot("me_18_osiagniecia"));
+        Step(5, () => { CurrentScreen.Scroll(0,0,-4); CurrentScreen.MouseDown(30,100,0);CurrentScreen.MouseMove(30,130);CurrentScreen.MouseUp(30,130,0); });
+        Step(5, () => Shot("me_19_drzewo_osiagniec"));
+        Step(5, () => SetScreen(null));
         Step(5, () => { HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }

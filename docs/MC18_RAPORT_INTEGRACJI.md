@@ -504,3 +504,41 @@ wygląd masek jest proceduralnym przybliżeniem. Brak opisów poszczególnych
 warstw w podpowiedzi przedmiotu. Nie deklaruję pełnej zgodności grafiki 1:1.
 Nowego przebiegu dwóch okien przez publiczny relay dla samych sztandarów nie
 wykonano. Alfa 1.0 w BlockCraft_Gra i komputer brata pozostały nietknięte.
+
+### 2026-11-01 — ME-h 39d, system osiągnięć
+
+Dodano drzewo 34 osiągnięć z zależnościami i współrzędnymi AchievementList
+klienta 1.8 (javap tl). Reguła przyznawania wymaga odblokowanego rodzica;
+nie odkłada nagrody na później. Osobna kolejka powiadomień, zapis do istniejącego
+PlayerData.Achievements, odczyt bez ponownego pokazywania starych nagród.
+Menu pauzy zawiera ekran drzewa, przeciąganie i skalowanie kółkiem myszy.
+Ikony brakujących jeszcze przedmiotów pochodzą z client.jar, bez fikcyjnych
+rejestracji ich mechanik rozgrywki. Układ i wygląd tła/ramek nie są portem GUI 1:1.
+
+Wyzwalacze: otwarcie ekwipunku, podnoszenie drewna/skóry/diamentu/różdżki,
+crafting, piec, odbiór mikstury, zabicie potwora/Withera/ghasta odbitą kulą,
+snajper (50 bloków w poziomie), cios 18 obrażeń, jazda wagonikiem kilometr,
+upadek świni z jeźdźcem, rozmnażanie krów, przywołanie Withera, portale,
+darowanie diamentu, eksploracja biomów i sprawdzenie pełnej piramidy latarni.
+Lista wymaganych biomów odpowiada bazowym ID 0-39 bez 8,9,10,20 (arm.n).
+
+Protokół 7: S2C.Stats przenosi maskę 34 bitów; C2S.OpenInventory może zgłosić
+wyłącznie otwarcie ekwipunku. Nagrody rozgrywki przyznaje host. Pierwszy pakiet
+nie odtwarza historycznych popupów, kolejne informują tylko o nowych nagrodach.
+Klient nie może przesłać dowolnego identyfikatora nagrody do przyznania.
+
+Walidacja: Release bez błędów (4 wcześniejsze ostrzeżenia), 820 OK/0 FAIL;
+testy obejmują drzewo, zależności, rzeczywiste podnoszenie przedmiotów, crafting,
+odbiór pieca, zabójstwa, snajpera, darczyńcę diamentu, zapis JSON, synchronizację,
+brak podwójnych popupów i piramidę. Połączenie w pamięci sprawdza otwarcie
+ekwipunku gościa i nadpisanie sfałszowanego lokalnie stanu przez hosta.
+Autotest --me zakończony OK, obejrzane me_18_osiagniecia i me_19_drzewo_osiagniec.
+
+Wykryto zależności nieukończone w dotychczasowych modułach: ciasto, ryby,
+stawiane czaszki (typ + wywołanie Wither.TrySummon), pełna latarnia. Brak ich
+rejestracji uniemożliwia zwykłe zdobycie części nagród; to osobny krok 53 planu.
+Sprawdzenie piramidy jest przygotowane, ale pełna latarnia, jej GUI, efekty
+i zgodny z 1.8 obszar przyznawania nagrody wymagają tego kroku. Darczyńca
+diamentu jest obecnie śledzony w pamięci; nie utrzymuje się w upuszczonej encji
+po zapisie i ponownym wczytaniu świata. Te ograniczenia wykluczają deklarację
+pełnej zgodności osiągnięć 1:1. Wersji zainstalowanej u graczy nie podmieniano.
