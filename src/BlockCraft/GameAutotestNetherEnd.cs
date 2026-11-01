@@ -407,7 +407,7 @@ public sealed partial class Game
             Shot("ne_17_credits");
             SetScreen(null);
         });
-        // Wither: wzór z piasku dusz; w teście czaszki zastępuje znacznik (blok czaszki dodaje moduł ME)
+        // Wither: rzeczywiste czaszki z typem1 w encji bloku, bez zastępczego znacznika.
         Wither wither = null; int wx = 0, wy = 0, wz = 0;
         Step(10, () =>
         {
@@ -416,11 +416,12 @@ public sealed partial class Game
             wx = MathUtil.FloorToInt(Player.X) + 8; wz = MathUtil.FloorToInt(Player.Z); wy = MathUtil.FloorToInt(Player.Y);
             for (int dx = -6; dx <= 6; dx++) for (int dz = -6; dz <= 6; dz++) for (int dy = -1; dy < 8; dy++) World.SetBlock(wx + dx, wy + dy, wz + dz, dy < 0 ? B.Stone : B.Air, 0);
             World.SetBlock(wx, wy, wz, B.SoulSand);
-            for (int i = -1; i <= 1; i++) { World.SetBlock(wx, wy + 1, wz + i, B.SoulSand); World.SetBlock(wx, wy + 2, wz + i, B.Glowstone); }
-            var old = Wither.IsWitherSkullAt;
-            Wither.IsWitherSkullAt = (w, x, y, z) => w.GetBlock(x, y, z) == B.Glowstone;
+            for (int i = -1; i <= 1; i++)
+            {
+                World.SetBlock(wx,wy+1,wz+i,B.SoulSand);World.SetBlock(wx,wy+2,wz+i,B.Skull,Dir.Up);
+                if(World.GetTileEntity(wx,wy+2,wz+i) is SkullTile skull)skull.SetFromItem(new ItemStack(I.SkullItem,1,1),0);
+            }
             wither = Wither.TrySummon(World, wx, wy + 2, wz + 1);
-            Wither.IsWitherSkullAt = old;
             NeCheck("przywołanie Withera ze wzoru T", wither != null && World.GetBlock(wx, wy + 1, wz) == B.Air, wither == null ? "" : $"hp {wither.Health}, nietykalny {wither.InvulTime}");
             NeFly(wx - 7, wy + 2, wz + 0.5); NeLookAt(wx + .5, wy + 2, wz + .5);
             var cr = new EnderCrystal(World); cr.SetPositionAndPrev(wx - 3.5, wy, wz - 2.5); World.SpawnEntity(cr);

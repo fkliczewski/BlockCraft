@@ -135,6 +135,11 @@ public sealed partial class EntityRenderer
     {
         if (armor == null) return;
         var b = Skin; var color = b.Color;
+        if(armor[0]?.Id==I.SkullItem)
+        {
+            b.Layer=SkinGen.Get("skull_"+Skulls.Type(armor[0]));b.Color=Vector4.One;
+            Copy(WornSkull,head);RenderPart(b,WornSkull,root);b.Color=color;
+        }
         for (int slot = 0; slot < 4; slot++)
         {
             var it = armor[slot]?.Item;
@@ -157,6 +162,7 @@ public static partial class SkinGen
 {
     static partial void SkinsMechanics()
     {
+        SkinsSkulls();
         // obrazy: oryginalny arkusz z client.jar 1.8, gdy jest w cache; inaczej proceduralne płótna
         var sheet = ClientAssets.TryReadTexture("painting/paintings_kristoffer_zetterstrand.png", out int sw, out int sh);
         if (sheet != null && (sw != 256 || sh != 256)) sheet = null;

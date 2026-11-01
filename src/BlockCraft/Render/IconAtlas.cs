@@ -22,7 +22,7 @@ public sealed class IconAtlas : IDisposable
         var keys = new List<(int id, int meta)>();
         foreach (var it in Item.All)
         {
-            if (!EntityRenderer.IsBlockModel(it)) continue;
+            if (!EntityRenderer.IsBlockModel(it)&&it.Id!=I.SkullItem) continue;
             foreach (int m in it.GetVariants()) keys.Add((it.Id, m));
         }
         var empty = new List<uint[]>();
@@ -47,7 +47,12 @@ public sealed class IconAtlas : IDisposable
             // MC: rotate X 30, Y 225(45), skala ~0.625
             var m = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(45)) * Matrix4.CreateRotationX(MathHelper.DegreesToRadians(30)) * Matrix4.CreateScale(1.12f);
             b.FlatShade = true;
-            er.RenderBlockAt(keys[i].id, keys[i].meta, m);
+            if(keys[i].id==I.SkullItem)
+            {
+                er.RenderSkullItem(new ItemStack(I.SkullItem,1,keys[i].meta),Matrix4.CreateScale(2)*m);
+                er.Flush(er.Skin,er.SkinTex);
+            }
+            else er.RenderBlockAt(keys[i].id, keys[i].meta, m);
             // ręczne cieniowanie ścian: góra jasna, boki ciemniejsze (jak GUI MC)
             ShadeFaces(b);
             b.FlatShade = false;

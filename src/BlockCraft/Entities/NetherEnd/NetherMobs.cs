@@ -381,7 +381,7 @@ public sealed class WitherSkeleton : Monster
         int looting = NetherMobUtil.Looting(this);
         Drop(I.Coal, World.Rand.Next(3 + looting) - 1);
         Drop(I.Bone, World.Rand.Next(3 + looting));
-        if (byPlayer && World.Rand.Next(200) - looting < 5 && Item.ById[I.SkullItem] != null) Drop(I.SkullItem, 1, 1);
+        if (byPlayer && World.Rand.NextFloat() - looting * .01f < .025f) Drop(I.SkullItem, 1, 1);
         if (byPlayer && World.Rand.NextFloat() - looting * .01f < .085f) Drop(I.StoneSword, 1);
     }
 }

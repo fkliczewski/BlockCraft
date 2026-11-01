@@ -310,6 +310,33 @@ public sealed partial class Game
         });
         Step(90, () => { MeCheck(Player.FishHook is {Removed:false},"wędka: aktywny spławik w stawie"); Shot("me_22_wedkowanie"); });
         Step(5, () => { if(Player.FishHook!=null) FishingHook.Use(Player,Player.Inventory.Selected); });
+        Step(5, () =>
+        {
+            HideGui=true;int sx=tx-20,sz=tz-30;
+            Player.Yaw=Player.PrevYaw=180;
+            for(int type=0;type<5;type++)
+            {
+                int x=sx-4+type*2;World.SetBlock(x,ty-1,sz,B.Stone);
+                World.SetBlock(x,ty,sz,B.Air);
+                Skulls.Place(Player,new ItemStack(I.SkullItem,1,type),x,ty-1,sz,Dir.Up);
+                World.SetBlock(x,ty+1,sz+2,B.Stone);World.SetBlock(x,ty+1,sz+1,B.Air);
+                Skulls.Place(Player,new ItemStack(I.SkullItem,1,type),x,ty+1,sz+2,Dir.North);
+            }
+            Player.SetPositionAndPrev(sx+.5,ty,sz-5);Player.Yaw=Player.PrevYaw=0;Player.Pitch=Player.PrevPitch=12;
+        });
+        Step(20, () => Shot("me_23_czaszki"));
+        Step(5, () =>
+        {
+            HideGui=false;
+            for(int type=0;type<5;type++)Player.Inventory.Main[type]=new ItemStack(I.SkullItem,1,type);
+            MeCheck(Enumerable.Range(0,5).All(type=>Icons.TryGet(new ItemStack(I.SkullItem,1,type),out _)),"czaszki: pięć ikon modeli 3D");
+            Player.Inventory.SelectedSlot=3;
+            Player.Inventory.Armor[0]=new ItemStack(I.SkullItem,1,4);
+        });
+        Step(15, () => Shot("me_24_czaszka_w_rece"));
+        Step(5, () => {CameraMode=2;Player.Pitch=Player.PrevPitch=0;});
+        Step(15, () => Shot("me_25_czaszka_na_glowie"));
+        Step(5, () => {CameraMode=0;Player.Inventory.Armor[0]=null;});
         Step(5, () => { HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }

@@ -606,3 +606,55 @@ punkt mocowania żyłki przy ręce przybliżony, brak zmiany modelu wędki u inn
 graczy. Generator losowy świata pozostaje BlockCraft.Rng; nie potwierdzono
 identycznej sekwencji RNG Minecrafta ani kompletnego porównania trajektorii.
 Spławik nie jest utrwalany w zapisie świata. Czaszki i latarnia: nadal kroki56/57.
+
+### 2026-11-01 — ME-53c, czaszki
+
+Zarejestrowano B.Skull, I.SkullItem (5 wariantów) i TE64 SkullTile.
+Stawianie na podłodze (16 obrotów, yaw bez przesunięcia o 180 stopni), czterech
+ścianach i zamiana roślinnego bloku zastępowalnego według ItemSkull (anh).
+Nie można stawiać pod sufitem. Jak w 1.8, po postawieniu czaszki mogą wisieć
+bez podparcia. Kształty kolizji/zaznaczenia z BlockSkull (baj).
+Zniszczenie zachowuje typ i profil właściciela, respektuje bit bez dropu;
+środkowy przycisk wybiera właściwy wariant. TE usuwana wraz z blokiem.
+
+Profile SkullOwner (tekst albo compound z Name/Id/Properties) kopiowane,
+utrwalane ze światem i przesyłane istniejącym formatem tile entities.
+Modele głów, ikony i pięć natywnych tekstur mobów/gracza z client.jar.
+Ikony w GUI są renderowane do IconAtlas z tych samych modeli 3D (pięć
+warstw według typu), z korekcją osi Y istniejącego FBO.
+Głowy można nosić w slocie hełmu, widać je także na stojaku i w ręce.
+Nie dodawano pobierania skinów kont Mojang: profil gracza zachowuje dane,
+ale renderuje domyślną twarz Steve'a. To jawne ograniczenie odwzorowania.
+Transformacje modeli w GUI i ręce są dopasowane do renderera BlockCraft;
+nie są pełnym portem wszystkich pól display modeli Minecrafta 1.8.
+
+Wither.TrySummon sprawdza teraz rzeczywisty typ1 w SkullTile, zamiast każdego
+bloku B.Skull; użycie ostatniej właściwej czaszki automatycznie sprawdza wzór T.
+Test NE używa rzeczywistych bloków i typów zamiast zastępczych znaczników
+z jasnogłazu. Z naładowanego creepera może wypaść także czaszka Witherowego
+szkieleta, z limitem jednej dodatkowej głowy na creepera. Zwykły rzadki drop
+jest rozliczany osobno, więc może dać drugą czaszkę (tak samo jak afw.a(wh) w 1.8).
+Poprawiono szansę rzadkiego dropu przy Grabieży z 2.5%+0.5%/poziom na
+2.5%+1%/poziom (xm, afw oryginalnego klienta 1.8, zweryfikowane javap).
+
+Release OK, 896 selftest OK/0 FAIL. Testy: pięć typów, obrót, montaż,
+brak podparcia, profil z Properties i stare SkullOwner, zapis/odczyt TE,
+drop i usuwanie TE, bit bez dropu, zły środkowy typ blokuje Withera,
+automatyczne przywołanie w obu osiach i zużycie struktury, limit głów
+naładowanego creepera. Host/klient w pamięci: głowa gracza postawiona przez
+gościa ma zgodny typ i profil oraz koszt jednego przedmiotu.
+Autotest --me zakończony OK.
+Obejrzano me_23_czaszki, me_24_czaszka_w_rece i me_25_czaszka_na_glowie;
+ostateczne miniatury modeli mają widoczne twarze. Dowody z ostatniego
+przebiegu --me --fps60 zachowane w .modus/skulls-me-evidence.
+
+Dodatkowy szeroki --autotest --ne przy nieograniczonym FPS zgłosił 12 FAIL,
+choć przywołanie Withera z nowych czaszek przeszło. Oczekiwania w tym teście
+mają limity liczone w klatkach i przy ok.1500 FPS kończą się za wcześnie
+(np. Wither ma nadal nietykalność i 110 HP). Dowody zachowane w
+.modus/skulls-ne-evidence; osobny krok58 wymaga porównania i naprawy testu.
+Nie przedstawiać tego przebiegu jako zaliczenia całego modułu NE.
+Porównanie przy --fps60: cały --autotest --ne zakończony 0 błędów, łącznie
+z portalami, okiem Endu, smokiem, przywołaniem i walką z Witherem. Obejrzano
+ne_18_wither_spawn, dowody w .modus/skulls-ne60-evidence. Potwierdza to
+zależność testowych limitów od FPS; krok58 pozostaje do usunięcia tej zależności.

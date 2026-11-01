@@ -295,6 +295,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         var it = s.Item;
         if (it == null) return;
         if (s.Id == I.Banner) RenderBannerItem(s, m);
+        else if(s.Id==I.SkullItem)RenderSkullItem(s,m);
         else if (IsBlockModel(it)) RenderBlockAt(it.BlockId, s.Damage, m);
         else RenderSpriteExtruded(it.GetSprite(s), m);
     }
@@ -732,6 +733,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             gs.Rotate(25f, 0, 0, 1);
             gs.Scale(1.05f, 1.05f, 1.05f);
             if (held.Id == I.Banner) RenderBannerItem(held, gs.M);
+            else if(held.Id==I.SkullItem)RenderSkullItem(held,gs.M);
             else RenderSpriteExtruded(held.Id==I.FishingRod&&p.FishHook is {Removed:false}&&TextureGen.Has("item_fishing_rod_cast")?TextureGen.Layer("item_fishing_rod_cast"):it.GetSprite(held), gs.M);
         }
     }

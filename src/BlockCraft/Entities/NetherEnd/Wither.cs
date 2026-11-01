@@ -229,9 +229,8 @@ public sealed class Wither : Mob
     public override void Load(BinaryReader br) { base.Load(br); InvulTime = br.ReadInt32(); }
 
     // ---------- przywołanie ----------
-    /// <summary>Czy w danym miejscu stoi czaszka witherowego szkieleta. Domyślnie każdy blok czaszki;
-    /// moduł z blokiem czaszki może podmienić na sprawdzenie typu czaszki (1 = wither).</summary>
-    public static Func<World.World, int, int, int, bool> IsWitherSkullAt = (w, x, y, z) => w.GetBlock(x, y, z) == B.Skull;
+    /// <summary>Czy w danym miejscu stoi blok czaszki z typem 1 (Witherowy szkielet) w encji bloku.</summary>
+    public static Func<World.World, int, int, int, bool> IsWitherSkullAt = Skulls.IsWither;
 
     /// <summary>BlockSkull.checkWitherSpawn: wołać po postawieniu czaszki witherowej na (x,y,z).
     /// Wzór "^^^ / ### / ~#~" (czaszki, piasek dusz, puste) w osi X albo Z. Zwraca przywołanego Withera albo null.</summary>

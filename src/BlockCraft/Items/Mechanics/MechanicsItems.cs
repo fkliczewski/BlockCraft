@@ -21,6 +21,10 @@ public static partial class ItemRegistry
         Item.ById[I.GoldenApple].Variants = new[] { 0, 1 };
         ItemsFood18();
         Simple(I.Bowl,"bowl","Miska",Blocks.TabMaterials);
+        var skull=Simple(I.SkullItem,"skull_skeleton","Czaszka",Blocks.TabDecoration);
+        skull.Variants=new[]{0,1,2,3,4};skull.ArmorSlot=0;skull.NameFn=Skulls.Name;
+        skull.SpriteFn=s=>TextureGen.Layer("item_"+Skulls.Icons[Skulls.Type(s)]);
+        skull.UseOnBlock=(p,s,x,y,z,face,hx,hy,hz)=>Skulls.Place(p,s,x,y,z,face);
         var rod = Simple(I.FishingRod, "fishing_rod", "Wędka", Blocks.TabTools, 1); rod.MaxDamage = 64; rod.Handheld = true;
         rod.UseInAir=BlockCraft.Entities.FishingHook.Use;
         ItemsUtility(); ItemsBoat(); ItemsSigns(); ItemsHanging(); ItemsMaps(); ItemsFireworks(); ItemsBanners();

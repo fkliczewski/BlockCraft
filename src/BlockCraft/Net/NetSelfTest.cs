@@ -172,6 +172,15 @@ public static partial class SelfTest
         Check(puppet.FishHook==null&&!cw.Entities.OfType<FishingHook>().Any(h=>h.Angler?.Id==puppet.Id&&!h.Removed),
             "Sieć: zwinięcie gościa usuwa spławik po obu stronach");
         host.Player.Inventory.SelectedSlot=0;Step(3);
+        puppet.Inventory.Main[2]=new ItemStack(I.SkullItem,2,3);
+        puppet.Inventory.Main[2].GetOrCreateTag()["SkullOwner"]="Tester";
+        host.Player.Inventory.SelectedSlot=2;Step(3);
+        client.SendInput(new NetInput {X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true,HitKind=1,HitX=6,HitY=gy,HitZ=8,HitFace=Dir.Up,HitFx=.5f,HitFy=1,HitFz=.5f});
+        Step(6);
+        Check(hw.GetTileEntity(6,gy+1,8) is SkullTile{SkullType:3} hsHead&&cw.GetTileEntity(6,gy+1,8) is SkullTile{SkullType:3} csHead
+            &&hsHead.Owner.GetString("Name")=="Tester"&&Nbt.Same(hsHead.Owner,csHead.Owner)&&puppet.Inventory.Main[2]?.Count==1,
+            "Sieć: głowa gracza postawiona przez gościa zachowuje typ, właściciela i koszt");
+        hw.SetBlock(6,gy+1,8,B.Air);host.Player.Inventory.SelectedSlot=0;Step(3);
         for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
         client.Flush(); Thread.Sleep(5);
         server.Tick();
