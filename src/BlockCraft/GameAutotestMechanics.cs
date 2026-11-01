@@ -125,6 +125,29 @@ public sealed partial class Game
             Player.SetPositionAndPrev(wx + .5, ty + 1, wz - 3.5); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 35;
         });
         Step(60, () => Shot("me_08_lodka"));
+        Step(5, () =>
+        {
+            int sx = tx - 10, sz = tz;
+            for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) for (int y = 0; y <= 3; y++) World.SetBlock(sx + x, ty + y, sz + z, B.Air);
+            int[] metas = { 0, 2, 14 };
+            for (int i = 0; i < 3; i++)
+            {
+                World.SetBlock(sx - 2 + i * 2, ty, sz, B.StandingSign, metas[i]);
+                if (World.GetTileEntity(sx - 2 + i * 2, ty, sz) is SignTile st) { st.Lines[0] = "Obrót"; st.Lines[1] = metas[i].ToString(); st.Lines[3] = "BlockCraft"; }
+            }
+            World.SetBlock(sx, ty + 1, sz - 2, B.Stone); World.SetBlock(sx, ty + 2, sz - 2, B.Stone);
+            World.SetBlock(sx, ty + 2, sz - 1, B.WallSign, 3);
+            if (World.GetTileEntity(sx, ty + 2, sz - 1) is SignTile ws) { ws.Lines[1] = "Ścienna"; ws.Lines[2] = "tabliczka"; }
+            Player.SetPositionAndPrev(sx + .5, ty, sz + 3.5); Player.Yaw = Player.PrevYaw = 180; Player.Pitch = Player.PrevPitch = 10;
+        });
+        Step(30, () => Shot("me_09_tabliczki"));
+        Step(5, () => { HideGui = false; OpenBlockGui(GuiKind.SignEdit, tx - 10, ty, tz); foreach (char ch in "Edycja") CurrentScreen.CharTyped(ch); });
+        Step(10, () => Shot("me_10_tabliczka_edycja"));
+        Step(5, () =>
+        {
+            SetScreen(null);
+            MeCheck(World.GetTileEntity(tx - 10, ty, tz) is SignTile e && e.Lines[0] == "ObrótEdycja", "tabliczka: zapis po zamknięciu edytora", (World.GetTileEntity(tx - 10, ty, tz) as SignTile)?.Lines[0]);
+        });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

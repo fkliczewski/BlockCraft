@@ -229,5 +229,19 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
 
     public void End() => Flush();
 
+    /// <summary>Tekst w świecie (tabliczki): współrzędne 2D czcionki przechodzą przez macierz płaszczyzny i kamery.
+    /// Test głębi włączony, bez zapisu głębi (jak TileEntitySignRenderer z depthMask(false)).</summary>
+    public void Begin3D(Matrix4 mvp)
+    {
+        Flush();
+        _proj = mvp; _curTex = -1;
+        _xf.Clear(); _cur = Matrix3.Identity; _hasXf = false;
+        GL.Enable(EnableCap.DepthTest); GL.DepthMask(false);
+        GL.Disable(EnableCap.CullFace);
+        GL.Enable(EnableCap.Blend);
+        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+    }
+    public void End3D() { Flush(); GL.DepthMask(true); }
+
     public void Dispose() { _mesh.Dispose(); _shader.Dispose(); White.Dispose(); FontTex.Dispose(); }
 }

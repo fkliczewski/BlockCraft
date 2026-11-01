@@ -282,6 +282,19 @@ public static partial class SelfTest
         }
         else Check(false, "Sieć: GUI stołu do zaklinania", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
 
+        // tabliczka: host otwiera edytor gościowi, tekst wraca pakietem i trafia do wszystkich
+        hw.SetBlock(6, gy + 1, 8, B.Air); hw.SetBlock(7, gy + 1, 8, B.Air);
+        puppet.Inventory.Main[2] = new ItemStack(I.SignItem, 4); Step(3);
+        client.SendInput(new NetInput { X = p0.X, Y = p0.Y, Z = p0.Z, OnGround = true, Selected = 2, RightPressed = true, HitKind = 1, HitX = 6, HitY = gy, HitZ = 8, HitFace = Dir.Up, HitFx = .5f, HitFy = 1f, HitFz = .5f });
+        Step(4);
+        Check(hw.GetBlock(6, gy + 1, 8) == B.StandingSign && client.SignEditorOpened == (6, gy + 1, 8), "Sieć: postawienie tabliczki otwiera edytor u gościa");
+        client.UpdateSign(6, gy + 1, 8, new[] { "Witaj", "§cbrat", "", "!" }); Step(8);
+        Check(hw.GetTileEntity(6, gy + 1, 8) is SignTile hs && hs.Lines[0] == "Witaj" && hs.Lines[1] == "cbrat" && cw.GetTileEntity(6, gy + 1, 8) is SignTile cs && cs.Lines[3] == "!",
+            "Sieć: tekst tabliczki od gościa zapisany na hoście i odesłany");
+        client.UpdateSign(6, gy + 1, 8, new[] { "hack", "", "", "" }); Step(3);
+        Check(((SignTile)hw.GetTileEntity(6, gy + 1, 8)).Lines[0] == "Witaj", "Sieć: ponowna edycja bez otwartego edytora odrzucona");
+        hw.SetBlock(6, gy + 1, 8, B.Air); Step(2);
+
         // kowadło: nazwa od gościa, rozliczenie poziomów na hoście
         hw.SetBlock(6, gy + 1, 8, B.Anvil); puppet.XpLevel = 5; Step(5);
         puppet.OpenBlockGui(GuiKind.Anvil, 6, gy + 1, 8); Step(4);

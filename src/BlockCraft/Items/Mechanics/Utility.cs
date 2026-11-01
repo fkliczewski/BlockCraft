@@ -235,6 +235,12 @@ namespace BlockCraft.Render
                 if (y is 7 or 8 && x is >= 3 and <= 12) top[i] = Hex(0x1A120Au);
             }
             Add("me_jukebox_side", side); Add("me_jukebox_top", top);
+            Add("item_sign", Sprite(new[]
+            {
+                "................", "..oooooooooooo..", "..ollllllllllo..", "..oldldddldldo..", "..ollllllllllo..", "..olddldldddlo..",
+                "..ollllllllllo..", "..oooooooooooo..", "......oddo......", "......oddo......", "......oddo......", "......oddo......",
+                "......oddo......", "......oddo......", "......oooo......", "................",
+            }, Pal(('o', 0x4A3219), ('l', 0xB08F5A), ('d', 0x6B5331))));
             Add("item_boat", Sprite(new[]
             {
                 "................", "................", "................", "................", "................", "................",

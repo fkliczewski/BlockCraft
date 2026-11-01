@@ -109,6 +109,7 @@ public sealed partial class Game
         World.World.HitResult? sel = Ctrl.Hit.Hit && !p.Spectator && !HideGui ? Ctrl.Hit : null;
         Renderer.Render(cam, view, _proj, pt, p, third, sel, Ctrl.BreakStage);
         NetCaptureCamera(cam, view);
+        DrawSignTexts(cam, view * _proj);
 
         // ręka
         if (!third && !p.Spectator && !p.Sleeping && !HideGui)

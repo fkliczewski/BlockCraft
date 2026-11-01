@@ -8,7 +8,7 @@ public static partial class Blocks
 {
     static partial void BlocksMechanics()
     {
-        new BrewingStandBlock(); new CauldronBlock(); new EnchantingTableBlock(); new AnvilBlock(); new JukeboxBlock();
+        new BrewingStandBlock(); new CauldronBlock(); new EnchantingTableBlock(); new AnvilBlock(); new JukeboxBlock(); new StandingSignBlock(); new WallSignBlock();
     }
 }
 

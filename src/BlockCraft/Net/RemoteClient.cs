@@ -225,6 +225,12 @@ public sealed class RemoteClient : IPlayerHandler
 
     public void OpenBlockGui(GuiKind kind, int x, int y, int z)
     {
+        if (kind == GuiKind.SignEdit)
+        {
+            _signEdit = (x, y, z);
+            var sw = Out.Begin(S2C.OpenSignEditor); sw.Write(x); sw.Write(y); sw.Write(z); Out.End();
+            return;
+        }
         var c = ContainerFactory.Create(W, P, kind, x, y, z);
         if (c == null) return;
         if (P.OpenContainer != null) P.CloseContainer();
@@ -272,6 +278,17 @@ public sealed class RemoteClient : IPlayerHandler
     {
         if (P.Dead || WindowById(window) is not EnchantingContainer c || !c.StillValid(P)) return;
         if (c.Enchant(P, button)) ForceSync();
+    }
+
+    private (int x, int y, int z)? _signEdit;
+
+    /// <summary>C12PacketUpdateSign: tylko tabliczka otwarta temu graczowi, w zasięgu.</summary>
+    public void UpdateSign(int x, int y, int z, string[] lines)
+    {
+        if (P.Dead || _signEdit != (x, y, z) || P.DistanceSq(x + .5, y + .5, z + .5) > 64 * 64) return;
+        _signEdit = null;
+        if (W.GetTileEntity(x, y, z) is not SignTile t) return;
+        for (int i = 0; i < 4; i++) t.Lines[i] = Signs.Filter(i < lines.Length ? lines[i] : "");
     }
 
     public void AnvilName(byte window, string name)

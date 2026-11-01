@@ -32,6 +32,7 @@ public enum C2S : byte
     SelectRecipe = 12,  // byte okno, int indeks oferty
     EnchantItem = 13,   // byte okno, byte przycisk (0-2)
     AnvilName = 14,     // byte okno, string nazwa (MC|ItemName, maks. 30 znaków)
+    UpdateSign = 15,    // int x,y,z, 4 x string
 }
 
 /// <summary>Pakiety host -> klient.</summary>
@@ -68,6 +69,7 @@ public enum S2C : byte
     KeepAlive = 29,     // long czas klienta (echo)
     Settings = 30,      // byte trudność, bool hardcore, bool komendy, gamerules (byte n, n x (string, bool))
     MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
+    OpenSignEditor = 32,// int x,y,z
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>

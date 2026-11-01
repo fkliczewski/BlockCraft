@@ -50,6 +50,8 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private Texture2D _sunTex, _moonTex;
     public readonly List<Particle> Particles = new();
     public Action<string, double, double, double, float, float> SoundHook;
+    /// <summary>Modele bloków z tile entity rysowane co klatkę (np. tabliczki w 16 obrotach), w przebiegu encji.</summary>
+    public static Action<EntityRenderer, World.World, float, Vector3d> TileRenderHook;
     public int RenderedSections, TotalSections;
     public int RenderDistance = 8;
     public bool CloudsEnabled = true;
@@ -552,6 +554,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
             er.RenderEntity(e, pt, cam_(cam), w, false);
         }
+        TileRenderHook?.Invoke(er, w, pt, cam);
         er.Flush(er.Skin, er.SkinTex);
         er.Flush(er.Terrain, Terrain);
 

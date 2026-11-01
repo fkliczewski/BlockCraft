@@ -42,6 +42,8 @@ public sealed class NetClient
     public LoginInfo Login;
     public string Error;
     public INetClientHost G;
+    /// <summary>Ostatnia tabliczka otwarta do edycji przez hosta (testy).</summary>
+    public (int x, int y, int z)? SignEditorOpened;
     private World.World W => G?.World;
     private Player P => G?.Player;
     private readonly Queue<(byte type, byte[] frame, int off, int len)> _packets = new();
@@ -195,6 +197,12 @@ public sealed class NetClient
     {
         if (_window is not EnchantingContainer) return;
         var writer = Out.Begin(C2S.EnchantItem); writer.Write(_windowId); writer.Write((byte)button); Out.End();
+    }
+    public void UpdateSign(int x, int y, int z, string[] lines)
+    {
+        var writer = Out.Begin(C2S.UpdateSign); writer.Write(x); writer.Write(y); writer.Write(z);
+        for (int i = 0; i < 4; i++) writer.Write(i < lines.Length ? lines[i] ?? "" : "");
+        Out.End();
     }
     public void AnvilName(string name)
     {
@@ -401,6 +409,13 @@ public sealed class NetClient
                 }
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
+            case S2C.OpenSignEditor:
+                {
+                    int sx = r.ReadInt32(), sy = r.ReadInt32(), sz = r.ReadInt32();
+                    SignEditorOpened = (sx, sy, sz);
+                    G.SetScreen(new SignEditScreen(sx, sy, sz));
+                    break;
+                }
             case S2C.MerchantOffers:
                 {
                     byte id = r.ReadByte(); int index = r.ReadInt32(), n = r.ReadInt32();

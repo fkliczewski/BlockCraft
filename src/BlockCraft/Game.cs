@@ -314,6 +314,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= IPlayerHandler =================
     public void OpenBlockGui(GuiKind kind, int x, int y, int z)
     {
+        if (kind == GuiKind.SignEdit) { if (Client == null) SetScreen(new Gui.SignEditScreen(x, y, z)); return; }
         if (Client != null) return; // klient sieciowy: okno otworzy host (S2C.OpenWindow)
         var p = Player;
         var c = ContainerFactory.Create(World, p, kind, x, y, z);
