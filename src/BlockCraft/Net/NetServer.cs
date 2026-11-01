@@ -64,6 +64,8 @@ public sealed partial class NetServer
             if (c.Conn.IsClosed) { Disconnected(c, c.Conn.CloseReason); continue; }
             int n = 0;
             while (n++ < 200 && c.Conn.TryReceive(out var f)) HandleFrame(c, f);
+            if (c.Conn.IsClosed) continue;
+            c.ProcessInputs();
             if (_tick - c.LastPacketTick > 20 * 45) c.Kick("Przekroczono czas oczekiwania");
         }
     }
@@ -143,7 +145,7 @@ public sealed partial class NetServer
         switch (type)
         {
             case C2S.Login: Login(c, r.ReadInt32(), r.ReadString(), r.ReadByte()); break;
-            case C2S.Input: c.ApplyInput(NetInput.Read(r)); break;
+            case C2S.Input: c.QueueInput(NetInput.Read(r)); break;
             case C2S.Chat: Chat(c, r.ReadString()); break;
             case C2S.Click: c.Click(r.ReadByte(), r.ReadInt16(), r.ReadByte(), (ClickType)r.ReadByte()); break;
             case C2S.Distribute:

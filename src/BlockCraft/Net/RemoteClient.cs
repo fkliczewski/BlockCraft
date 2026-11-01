@@ -131,13 +131,25 @@ public sealed class RemoteClient : IPlayerHandler
     // Ruchy klienta przychodzą przez przekaźnik paczkami (0, 2, 1, 3 na tick). Host nakłada je w ticku gracza po PrevTick,
     // jeden na tick, z małym buforem: gracz u hosta porusza się płynnie, ma animację chodu i nie przeskakuje.
     private readonly Queue<NetInput> _inMoves = new();
+    private readonly Queue<NetInput> _inputs = new();
     private const int MoveBuffer = 2;
+
+    /// <summary>Wejście od klienta czeka w kolejce: host wykonuje je w stałym tempie (jedno na tick), jak klient je wysłał.
+    /// Bez tego paczki z przekaźnika dawały serie uderzeń kilofa i nakładające się dźwięki.</summary>
+    public int PendingInputs => _inputs.Count;
+    public void QueueInput(NetInput i) { if (_inputs.Count < 100) _inputs.Enqueue(i); }
+
+    public void ProcessInputs()
+    {
+        int n = _inputs.Count > MoveBuffer + 1 ? _inputs.Count - MoveBuffer : Math.Min(1, _inputs.Count);
+        for (int k = 0; k < n; k++) ApplyInput(_inputs.Dequeue());
+    }
 
     internal void ApplyQueuedMoves()
     {
         var p = P;
         if (p == null || _inMoves.Count == 0) return;
-        int n = _inMoves.Count > MoveBuffer + 1 ? _inMoves.Count - MoveBuffer : 1;
+        int n = _inMoves.Count; // tempo pilnuje już kolejka wejść
         Server.SetActor(this);
         try
         {

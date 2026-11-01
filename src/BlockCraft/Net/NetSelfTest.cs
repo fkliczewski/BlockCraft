@@ -147,6 +147,12 @@ public static partial class SelfTest
         Check(maxStep > 0.1 && puppet.X - startX > 2 && puppet.LimbSwing > 1, "Sieć: gość u hosta idzie płynnie i ma animację chodu",
             $"krok {maxStep:F2}, droga {puppet.X - startX:F2}, nogi {puppet.LimbSwing:F2}");
         host.Player.SetPosition(startX, host.Player.Y, host.Player.Z); Step(6);
+        var rc = server.Clients[0];
+        for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
+        client.Flush(); Thread.Sleep(5);
+        server.Tick();
+        Check(rc.PendingInputs is >= 1 and <= 3, "Sieć: paczka 6 wejść wykonywana w stałym tempie (nie naraz)", rc.PendingInputs.ToString());
+        dimensions.Tick(); server.AfterTick(); Step(8);
         var heard = new LightningSounds(); cw.Listeners.Add(heard);
         hw.PlaySound("eat", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
         hw.PlaySound("random.pop", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
