@@ -63,6 +63,7 @@ public static class HangingRender
         WallBox(b, o, r, n, -6 * px, -5 * px, -5 * px, 5 * px, 0, px, planks, new Vector4(2 / 16f, 3 / 16f, 3 / 16f, 13 / 16f), planks, full);
         WallBox(b, o, r, n, 5 * px, 6 * px, -5 * px, 5 * px, 0, px, planks, new Vector4(13 / 16f, 3 / 16f, 14 / 16f, 13 / 16f), planks, full);
         if (f.Item?.Item == null) return;
+        if (f.Item.Id == I.FilledMap) { er.MapBatch.Sky = b.Sky; er.MapBatch.Blk = b.Blk; er.RenderFrameMap(f, pos); return; }
         // RenderItemFrame: przedmiot 0.4375 od tylnej ściany ramki, skala 0.5, obrót co 45 stopni wokół osi ramki
         float yaw = f.Facing * 90f;
         var m = Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-f.Rotation * 45f));

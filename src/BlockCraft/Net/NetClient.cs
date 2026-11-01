@@ -59,7 +59,7 @@ public sealed class NetClient
     public long BytesReceived => Conn is QueuedConnection q ? q.BytesReceived : 0;
     public int ChunksReceived;
 
-    private NetClient(INetConnection c) { Conn = c; Array.Fill(_serverInv, -1); }
+    private NetClient(INetConnection c) { Conn = c; Array.Fill(_serverInv, -1); Items.MapStore.Client = new Items.MapStore(null); }
 
     /// <summary>Połączenie już otwarte (np. pętla w pamięci w testach): wysyła logowanie.</summary>
     public static NetClient Start(INetConnection conn, string nick, int view)
@@ -409,6 +409,7 @@ public sealed class NetClient
                 }
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
+            case S2C.MapData: MapSync.Read(r); break;
             case S2C.OpenSignEditor:
                 {
                     int sx = r.ReadInt32(), sy = r.ReadInt32(), sz = r.ReadInt32();

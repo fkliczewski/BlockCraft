@@ -186,6 +186,32 @@ public sealed partial class Game
         });
         Step(20, () => Shot("me_12_gracz_w_zbroi"));
         Step(5, () => { CameraMode = 0; for (int i = 0; i < 4; i++) Player.Inventory.Armor[i] = null; HideGui = false; });
+        // ME-h 39a: mapa w ręce i w ramce
+        long mapUntil = 0; int mapId = -1;
+        Step(5, () =>
+        {
+            Player.SetPositionAndPrev(tx + 6.5, ty, tz + 4.5); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 45;
+            var m = MapStore.Of(World).Create(0, Player.X, Player.Z, 0); mapId = m.Id;
+            Player.Inventory.Main[Player.Inventory.SelectedSlot] = new ItemStack(I.FilledMap, 1, m.Id);
+            mapUntil = _tickCount + 80;
+        });
+        WaitUntil(() => _tickCount >= mapUntil);
+        Step(10, () =>
+        {
+            var m = MapStore.Of(World).Get(mapId);
+            int drawn = m?.Colors.Count(c => c != 0) ?? 0;
+            MeCheck(drawn > 2000, "mapa w ręce rysuje teren", drawn.ToString());
+            Shot("me_13_mapa_w_rece");
+        });
+        Step(5, () =>
+        {
+            var f = World.Entities.OfType<ItemFrameEntity>().FirstOrDefault(e => e.HangX == tx - 1 && e.Item == null);
+            if (f != null) f.Item = new ItemStack(I.FilledMap, 1, mapId);
+            MeCheck(f != null, "ramka na mapę");
+            Player.Inventory.Main[Player.Inventory.SelectedSlot] = null;
+            Player.SetPositionAndPrev(tx - .5, ty, tz + 16 - 3.2); Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 0;
+        });
+        Step(25, () => Shot("me_14_mapa_w_ramce"));
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }
 }

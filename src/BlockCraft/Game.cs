@@ -277,6 +277,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         try
         {
             var home = Dimensions?.Get(DimensionId.Overworld) ?? World;
+            Items.MapStore.Of(home).SaveAll();
             _level.DayTime = home.DayTime; _level.Time = home.TotalTime;
             _level.Weather = home.Weather;
             _level.SpawnX = home.SpawnX; _level.SpawnY = home.SpawnY; _level.SpawnZ = home.SpawnZ;

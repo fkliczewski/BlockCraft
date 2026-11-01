@@ -557,6 +557,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         TileRenderHook?.Invoke(er, w, pt, cam);
         er.Flush(er.Skin, er.SkinTex);
         er.Flush(er.Terrain, Terrain);
+        er.FlushMaps();
 
         // --- cząsteczki ---
         RenderParticles(pt, cam);

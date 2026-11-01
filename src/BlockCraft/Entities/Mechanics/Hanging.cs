@@ -196,6 +196,21 @@ namespace BlockCraft.Entities
             return f;
         }
 
+        /// <summary>EntityTrackerEntry co 10 ticków: znacznik ramki na mapie, którą trzyma.</summary>
+        public override void Tick()
+        {
+            base.Tick();
+            if (World.IsRemote || Removed || Age % 10 != 0 || Item?.Id != I.FilledMap) return;
+            var m = MapLogic.DataFor(World, Item);
+            if (m != null) MapLogic.UpdateFrame(m, this);
+        }
+
+        /// <summary>removeFrameFromMap.</summary>
+        private void RemoveFromMap()
+        {
+            if (Item?.Id == I.FilledMap) MapStore.Of(World).Get(Item.Damage)?.RemoveDecoration("frame-" + Id);
+        }
+
         private void Changed()
         {
             if (!World.IsRemote) Redstone.UpdateComparatorOutputLevel(World, HangX, HangY, HangZ, B.Air);
@@ -225,6 +240,7 @@ namespace BlockCraft.Entities
             if (!source.IsExplosion && Item != null)
             {
                 DropItemOrSelf(source.Attacker, false);
+                RemoveFromMap();
                 Item = null; Rotation = 0;
                 Changed();
                 return true;
@@ -232,7 +248,7 @@ namespace BlockCraft.Entities
             return base.Attack(source, amount);
         }
 
-        protected override void OnBroken(Entity breaker) { DropItemOrSelf(breaker, true); Changed(); }
+        protected override void OnBroken(Entity breaker) { DropItemOrSelf(breaker, true); RemoveFromMap(); Changed(); }
 
         /// <summary>dropItemOrSelf: twórca nic nie dostaje, inaczej ramka (gdy niszczona) i przedmiot z szansą itemDropChance.</summary>
         private void DropItemOrSelf(Entity breaker, bool withFrame)

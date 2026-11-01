@@ -85,7 +85,7 @@ public partial class Player : LivingEntity
         else if (SleepTimer > 0) { SleepTimer++; if (SleepTimer >= 110) SleepTimer = 0; }
         base.Tick();
         if (Dead) return;
-        if (!World.IsRemote) FoodTick();
+        if (!World.IsRemote) { FoodTick(); MapLogic.TickPlayer(this); }
         UseItemTick();
         if (OnGround || InWater) PortalCooldown = 0;
         // podnoszenie przedmiotów
@@ -335,7 +335,7 @@ public partial class Player : LivingEntity
         }
     }
 
-    public void OnCrafted(ItemStack s) { }
+    public void OnCrafted(ItemStack s) => Recipes.OnCraftedHook?.Invoke(this, s);
 
     // ---------- interakcje ----------
     public void SendMessage(string msg) => Handler?.OnMessage(msg);

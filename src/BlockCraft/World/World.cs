@@ -67,6 +67,8 @@ public sealed partial class World : IBlockAccess
     private int _nextEntityId = 1;
     public ChunkManager ChunkManager;
     public WorldStorage Storage;
+    /// <summary>Mapy zapisu (tylko w świecie Overworld hosta), patrz Items.MapStore.Of.</summary>
+    public Items.MapStore MapStoreField;
     public MobSpawner Spawner;
 
     public World(long seed, WorldType type, bool remote, DimensionId dimension = DimensionId.Overworld)

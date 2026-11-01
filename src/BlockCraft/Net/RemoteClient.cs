@@ -7,7 +7,7 @@ using BlockCraft.World;
 namespace BlockCraft.Net;
 
 /// <summary>Zdalny gracz po stronie hosta: połączenie, jego Player (NetPuppet) i wszystko, co klient już dostał.</summary>
-public sealed class RemoteClient : IPlayerHandler
+public sealed partial class RemoteClient : IPlayerHandler
 {
     public readonly NetServer Server;
     public readonly INetConnection Conn;
@@ -340,6 +340,7 @@ public sealed class RemoteClient : IPlayerHandler
         if (_ticks % 100 == 0) ForceSync();
         SyncInventory();
         SyncWindow();
+        if (_ticks % 2 == 0) SendMaps();
         if (W.TotalTime - _lastTimeSent >= 20 || W.TotalTime < _lastTimeSent)
         {
             _lastTimeSent = W.TotalTime;

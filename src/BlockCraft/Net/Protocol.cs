@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 5;
+    public const int Version = 6;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -70,6 +70,7 @@ public enum S2C : byte
     Settings = 30,      // byte trudność, bool hardcore, bool komendy, gamerules (byte n, n x (string, bool))
     MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
     OpenSignEditor = 32,// int x,y,z
+    MapData = 33,       // patrz MapSync: int id, skala, wymiar, środek, wersja, rodzaj, prostokąt pikseli, znaczniki
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>

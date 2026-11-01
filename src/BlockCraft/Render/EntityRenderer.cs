@@ -679,6 +679,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             return;
         }
         var it = held.Item;
+        if (it?.Id == I.FilledMap) { RenderFirstPersonMap(p, pt, equip, swing, held); return; }
         bool using_ = p.ItemInUse != null && p.ItemInUse == held;
         if (using_ && (it.Action == UseAction.Eat || it.Action == UseAction.Drink))
         {

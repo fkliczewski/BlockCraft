@@ -129,6 +129,7 @@ public sealed partial class Game
             er.RenderFirstPerson(p, pt, equip, _equipped, w.GetSkyLight(bx, by, bz), w.GetBlockLight(bx, by, bz));
             er.Flush(er.Skin, er.SkinTex);
             er.Flush(er.Terrain, Renderer.Terrain);
+            er.FlushMaps();
         }
         GL.Disable(EnableCap.DepthTest);
     }
