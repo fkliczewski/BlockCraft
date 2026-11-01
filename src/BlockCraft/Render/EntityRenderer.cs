@@ -732,7 +732,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             gs.Rotate(25f, 0, 0, 1);
             gs.Scale(1.05f, 1.05f, 1.05f);
             if (held.Id == I.Banner) RenderBannerItem(held, gs.M);
-            else RenderSpriteExtruded(it.GetSprite(held), gs.M);
+            else RenderSpriteExtruded(held.Id==I.FishingRod&&p.FishHook is {Removed:false}&&TextureGen.Has("item_fishing_rod_cast")?TextureGen.Layer("item_fishing_rod_cast"):it.GetSprite(held), gs.M);
         }
     }
 

@@ -295,6 +295,21 @@ public sealed partial class Game
             Player.Inventory.Main[6]=new ItemStack(I.CakeItem);Player.Inventory.SelectedSlot=1;
         });
         Step(15, () => Shot("me_21_ryby_ciasto_ikony"));
+        Step(5, () =>
+        {
+            SetScreen(null);HideGui=false;
+            for(int x=tx-4;x<=tx+4;x++)for(int z=tz-44;z<=tz-36;z++)
+            {
+                World.SetBlock(x,ty-4,z,B.Stone);
+                for(int y=ty-3;y<ty;y++)World.SetBlock(x,y,z,B.Water);
+                for(int y=ty;y<ty+3;y++)World.SetBlock(x,y,z,B.Air);
+            }
+            Player.SetPositionAndPrev(tx+.5,ty,tz-46);Player.Yaw=Player.PrevYaw=0;Player.Pitch=Player.PrevPitch=25;
+            Player.Inventory.Selected=new ItemStack(I.FishingRod);
+            FishingHook.Use(Player,Player.Inventory.Selected);
+        });
+        Step(90, () => { MeCheck(Player.FishHook is {Removed:false},"wędka: aktywny spławik w stawie"); Shot("me_22_wedkowanie"); });
+        Step(5, () => { if(Player.FishHook!=null) FishingHook.Use(Player,Player.Inventory.Selected); });
         Step(5, () => { HideGui = false; });
         Step(5, () => { Log.Info($"ME-TEST KONIEC: {(_meFails == 0 ? "OK" : _meFails + " FAIL")}"); Log.Info("AUTOTEST DONE"); Close(); });
     }

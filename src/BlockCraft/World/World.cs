@@ -401,6 +401,7 @@ public sealed partial class World : IBlockAccess
 
     public void RemoveEntity(Entity e)
     {
+        if(e is FishingHook hook&&hook.Angler?.FishHook==hook)hook.Angler.FishHook=null;
         e.Removed = true;
         if (Entities.Remove(e))
         {

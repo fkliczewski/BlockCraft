@@ -115,7 +115,7 @@ public static partial class SelfTest
                     client.Tick();
                     host.World.Tick();
                     var p = host.Player;
-                    client.SendInput(new NetInput { X = p.X, Y = p.Y, Z = p.Z, Yaw = p.Yaw, Pitch = p.Pitch, OnGround = p.OnGround });
+                    client.SendInput(new NetInput { X = p.X, Y = p.Y, Z = p.Z, Yaw = p.Yaw, Pitch = p.Pitch, OnGround = p.OnGround, Selected=(byte)p.Inventory.SelectedSlot });
                 }
                 client.Flush();
                 Thread.Sleep(2);
@@ -161,6 +161,17 @@ public static partial class SelfTest
         Check(hw.GetMeta(6,gy+1,8)==1&&cw.GetMeta(6,gy+1,8)==1&&puppet.FoodLevel==12&&host.Player.FoodLevel==12,
             "Sieć: gość zjada jeden kęs, host rozlicza głód i synchronizuje bryłę");
         hw.SetBlock(6,gy+1,8,B.Air);Step(3);
+        puppet.Inventory.Main[2]=new ItemStack(I.FishingRod);host.Player.Inventory.SelectedSlot=2;Step(3);
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true });
+        Step(4);
+        Check(puppet.FishHook is {Removed:false}&&cw.Entities.OfType<FishingHook>().Any(h=>h.Angler?.Id==puppet.Id),
+            "Sieć: rzut gościa tworzy spławik hosta i wiąże żyłkę u klienta",
+            $"hostHook={puppet.FishHook?.Id}, selected={puppet.Inventory.Selected?.Id}, owner={puppet.Id}, clientPlayers={string.Join(',',cw.Entities.OfType<Player>().Select(p=>p.Id))}, clientHooks={string.Join(',',cw.Entities.OfType<FishingHook>().Select(h=>$"{h.Id}:{h.NetData}:{h.Angler?.Id}"))}");
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true });
+        Step(4);
+        Check(puppet.FishHook==null&&!cw.Entities.OfType<FishingHook>().Any(h=>h.Angler?.Id==puppet.Id&&!h.Removed),
+            "Sieć: zwinięcie gościa usuwa spławik po obu stronach");
+        host.Player.Inventory.SelectedSlot=0;Step(3);
         for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
         client.Flush(); Thread.Sleep(5);
         server.Tick();

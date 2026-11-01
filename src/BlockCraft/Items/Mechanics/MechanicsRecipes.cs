@@ -8,6 +8,7 @@ public static partial class Recipes
     static partial void RecipesMechanics()
     {
         RecipesFood18();
+        Shaped(new ItemStack(I.Bowl,4),"# #"," # ",'#',AnyPlanks);
         Shaped(new ItemStack(B.EnchantingTable), " B ", "D#D", "###", 'B', I.Book, 'D', I.Diamond, '#', B.Obsidian);
         Shaped(new ItemStack(I.BrewingStandItem), " B ", "###", 'B', I.BlazeRod, '#', B.Cobblestone);
         Shaped(new ItemStack(I.CauldronItem), "# #", "# #", "###", '#', I.IronIngot);

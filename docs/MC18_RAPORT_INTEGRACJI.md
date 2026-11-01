@@ -570,3 +570,39 @@ Osiągnięcia bakeCake i cookFish mają teraz dostępne zależności.
 Krok 53 podzielony na 54 (ten podetap), 55 wędkowanie, 56 czaszki i 57 latarnia.
 Krok zbiorczy pozostaje otwarty. Wędkowanie nadal nie jest podłączone do wędki;
 czaszek i latarni nie rejestrowano w ramach tego podetapu. Alfa 1.0 nietknięta.
+
+### 2026-11-01 — ME-53b, wędkowanie
+
+Wędka tworzy jedną encję fishing_hook przypisaną do gracza. Spławik jest
+autorytatywny na hoście: rzut z rozrzutem, kolizja z blokiem lub encją, wypór
+z pięciu warstw zanurzenia, utrata przy odłożeniu wędki/śmierci/zmianie wymiaru
+lub odległości ponad 32 bloki, wygaśnięcie po 1200 tickach utknięcia. Zwijanie
+kosztuje 0 (pusty), 1 (połów), 2 (blok), 3 (encja) trwałości; twórca jej nie traci.
+Holowany przedmiot lub mob dostaje prędkość w stronę gracza, połów daje 1-6 XP.
+
+Fazy: oczekiwanie 100-900 minus 100 ticków na poziom Przynęty, zbliżanie
+20-80, branie 10-30. Deszcz i brak widoku nieba zmieniają tempo. Plusk jest
+jednorazowy przy braniu; bez zapętlonego audio. Wagi ryb 60/25/2/13 oraz
+tablice śmieci/skarbów według ado oryginalnego klienta 1.8. Uwzględniono
+rzeczywisty wpływ Przynęty na szanse śmieci i skarbów w 1.8, Morską fortunę,
+zużyte narzędzia i losowe zaklęcia poziomu 30. Regułę uszkodzeń adp sprawdzono
+bezpośrednio przez javap. Dodano brakującą miskę (receptura 4 z desek) dla łupów.
+
+Renderer pokazuje spławik i żyłkę, a pierwsza osoba zmienia ikonę rzuconej wędki.
+Wędka i miska korzystają z oryginalnych tekstur w cache. Sieć używa istniejącego
+formatu encji i NetData z identyfikatorem wędkarza; usunięcie czyści powiązanie.
+Poprawiono testową pętlę wejścia, która podczas bezczynności zawsze wybierała
+slot 0: teraz utrzymuje faktycznie wybrany slot, jak gra.
+
+Release OK (4 wcześniejsze ostrzeżenia), selftest 873 OK/0 FAIL. Testy obejmują
+rzut, koszty zwijania, holowanie, branie przez rzeczywistą fizykę, powiązanie
+klienta, rozkład 20000 łupów, wszystkie typy ryb/skarbów i brak nagrody po
+ponownym zwinięciu. Test host/klient w pamięci sprawdza rzut gościa i usunięcie
+spławika po zwinięciu po obu stronach. --autotest --me OK, me_22_wedkowanie
+obejrzany. Nie wykonano nowego testu dwóch okien przez publiczny przekaźnik.
+
+Ograniczenia względem pełnego 1:1: grafika spławika i śladów ryby uproszczona,
+punkt mocowania żyłki przy ręce przybliżony, brak zmiany modelu wędki u innych
+graczy. Generator losowy świata pozostaje BlockCraft.Rng; nie potwierdzono
+identycznej sekwencji RNG Minecrafta ani kompletnego porównania trajektorii.
+Spławik nie jest utrwalany w zapisie świata. Czaszki i latarnia: nadal kroki56/57.
