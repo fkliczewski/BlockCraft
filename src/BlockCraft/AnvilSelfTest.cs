@@ -95,7 +95,7 @@ public static partial class SelfTest
         foreach (var e in w.Entities.OfType<LivingEntity>().Where(e => e != p).ToList()) e.Kill();
         var z = new Zombie(w); z.SetPositionAndPrev(4.5, 4, 4.5); w.AddEntityNow(z);
         w.SetBlock(4, 10, 4, B.Anvil, 1 << 2);
-        for (int i = 0; i < 60 && w.GetBlock(4, 4, 4) != B.Anvil && w.GetBlock(4, 5, 4) != B.Anvil; i++) w.Tick();
+        for (int i = 0; i < 60 && w.GetBlock(4, 4, 4) != B.Anvil && w.GetBlock(4, 5, 4) != B.Anvil; i++) { z.SetPositionAndPrev(4.5, 4, 4.5); w.Tick(); } // zombie stoi pod kowadłem (test obrażeń, nie AI)
         Check(z.Health < z.MaxHealth - 5, "Kowadło: spadające kowadło rani moba", $"{z.Health}");
         int landed = w.GetBlock(4, 4, 4) == B.Anvil ? w.GetMeta(4, 4, 4) : w.GetMeta(4, 5, 4);
         Check(AnvilBlock.Damage(landed) >= 1, "Kowadło: spadając zachowuje uszkodzenie");

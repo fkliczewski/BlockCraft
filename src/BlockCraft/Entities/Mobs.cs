@@ -16,7 +16,9 @@ public abstract partial class Mob : LivingEntity
 
     protected Mob(World.World w) : base(w) { Nav = new Navigator(this); Health = MaxHealth; }
 
-    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = 1; }
+    /// <summary>MC 1.8 EntityLiving.setAIMoveSpeed: prędkość trafia też do moveForward, więc przyspieszenie to speed^2
+    /// (krowa 0.2 -> ok. 1.8 bloku/s). Wcześniej MoveForward = 1 dawało moby 5 razy za szybkie i 5 razy częstsze kroki.</summary>
+    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = s; }
 
     public virtual string LivingSound => null;
     public virtual int LivingSoundInterval => 80;

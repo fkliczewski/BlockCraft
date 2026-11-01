@@ -31,6 +31,7 @@ public sealed partial class Game
         if (_args.Contains("--mo")) { SetupAutotestMobs(); return; }
         if (_args.Contains("--ow")) { SetupAutotestOverworld(); return; }
         if (_args.Contains("--me")) { SetupAutotestMechanics(); return; }
+        if (_args.Contains("--snd")) { SetupAutotestSound(); return; }
         int t0 = 0;
         WaitUntil(() => HasMenuWorld && Renderer.PendingMeshes < 20 || ++t0 > 600);
         Step(30, () => Shot("01_title"));

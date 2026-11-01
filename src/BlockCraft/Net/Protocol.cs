@@ -86,7 +86,9 @@ public sealed class PacketBuffer
 
     public BinaryWriter Begin(byte type)
     {
-        if (_start >= 0) throw new InvalidOperationException("Poprzedni pakiet nie został zamknięty");
+        // Wyjątek w trakcie pisania pakietu (np. null w BinaryWriter.Write) zostawiał bufor otwarty i każdy kolejny
+        // pakiet rzucał wyjątek: gość był wyrzucany, a host zalewany błędami. Niedokończony pakiet jest odrzucany.
+        if (_start >= 0) { BlockCraft.Core.Log.Error("PacketBuffer: odrzucam niedokończony pakiet"); Discard(); }
         _start = _ms.Position;
         W.Write(0); W.Write(type);
         return W;
@@ -103,9 +105,12 @@ public sealed class PacketBuffer
         _start = -1;
     }
 
+    void Discard() { _ms.SetLength(_start); _ms.Position = _start; _start = -1; }
+
     /// <summary>Zwraca ramkę i czyści bufor (null gdy pusty).</summary>
     public byte[] Take()
     {
+        if (_start >= 0) Discard();
         if (_ms.Length == 0) return null;
         var f = _ms.ToArray();
         _ms.SetLength(0);

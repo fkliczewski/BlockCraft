@@ -16,6 +16,8 @@ public static class Sound
     static readonly object BankLock = new();
 
     public static bool Enabled => _started && Mix.Running;
+    /// <summary>Diagnostyka: BLOCKCRAFT_SOUND_TRACE=1 zapisuje w logu każdy start głosu (SND play/drop).</summary>
+    static readonly bool Trace = Environment.GetEnvironmentVariable("BLOCKCRAFT_SOUND_TRACE") == "1";
     public static int ActiveVoices => Mix.Count;
     internal static int RainVoices
     {
@@ -112,7 +114,11 @@ public static class Sound
             v.Data = pcm.Data; v.Channels = pcm.Channels; v.Rate = pcm.Rate; v.Frames = pcm.Frames;
         }
         v.Step = p * v.Rate / 44100.0;
-        if (enqueue) Mix.Add(v);
+        if (enqueue)
+        {
+            Mix.Add(v);
+            if (Trace) Log.Info($"SND t={Environment.TickCount64 % 10000000} {(v.Done ? "drop" : "play")} {ev} vol={v.Volume:0.###} pitch={p:0.##} pos={(positional ? $"{x:0.#},{y:0.#},{z:0.#}" : "ui")} dist={(positional ? Math.Sqrt((x - Mix.LX) * (x - Mix.LX) + (y - Mix.LY) * (y - Mix.LY) + (z - Mix.LZ) * (z - Mix.LZ)) : 0):0.#} voices={Mix.Count}");
+        }
         return v;
     }
 

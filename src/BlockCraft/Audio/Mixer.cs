@@ -70,6 +70,7 @@ public sealed class Mixer : ISampleProvider
         try
         {
             _out = new WaveOutEvent { DesiredLatency = 100, NumberOfBuffers = 3 };
+            StartWavDump();
             _out.Init(this);
             _out.Play();
             return true;
@@ -79,7 +80,23 @@ public sealed class Mixer : ISampleProvider
 
     public bool Running => _out != null;
 
-    public void Stop() { try { _out?.Stop(); _out?.Dispose(); } catch { } _out = null; Clear(); }
+    // Diagnostyka: BLOCKCRAFT_SOUND_WAV=plik.wav nagrywa to, co idzie na głośniki.
+    WaveFileWriter _wav;
+    void StartWavDump()
+    {
+        string path = Environment.GetEnvironmentVariable("BLOCKCRAFT_SOUND_WAV");
+        if (string.IsNullOrEmpty(path)) return;
+        path = path.Replace("{pid}", Environment.ProcessId.ToString());
+        try { _wav = new WaveFileWriter(path, WaveFormat); Log.Info("Mixer: nagrywanie wyjścia do " + path); }
+        catch (Exception ex) { Log.Error("Mixer WAV: " + ex.Message); }
+    }
+
+    public void Stop()
+    {
+        try { _out?.Stop(); _out?.Dispose(); } catch { }
+        _out = null; Clear();
+        lock (_lock) { try { _wav?.Dispose(); } catch { } _wav = null; }
+    }
 
     public void Clear(bool includeMusic = true)
     {
@@ -176,6 +193,7 @@ public sealed class Mixer : ISampleProvider
                 buffer[p] = l * _limiterGain; buffer[p + 1] = r * _limiterGain;
             }
             _mixedFrames += frames;
+            if (_wav != null) try { _wav.WriteSamples(buffer, offset, count); _wav.Flush(); } catch { _wav = null; }
         }
         return count;
     }
