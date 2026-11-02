@@ -697,3 +697,42 @@ zgodności graficznej 1:1. Alfa 1.0, instalacje i komputer brata nietknięte.
 Użytkownik polecił: „zapisz stan prac i na teraz pauza”. Nie rozpoczęto kroku58.
 Następne: naprawić limity oczekiwania NE zależne od FPS (58), domknąć zbiorcze
 53/39/40 i przeprowadzić integrację41 wraz z aktualizacją README/CHECKLISTA.
+
+### 2026-11-02 — CMD: komendy Minecraft 1.8
+
+Gałąź `mc18/commands` otrzymała nowy rdzeń komend, selektory `@p/@a/@r/@e`,
+parser Mojangson i JSON, komendy bloków/encji/świata oraz model scoreboardu
+i granicy świata. Dodano `/scoreboard`, `/stats`, `/trigger`, `/worldborder`,
+blok poleceń z TE89 i wagonik z blokiem poleceń. Blok reaguje na zbocze
+narastające redstone, udostępnia wynik komparatorowi oraz zapisuje `SuccessCount`,
+`LastOutput`, `trackOutput` i ustawienia statystyk. Edycja zdalna działa przez
+hosta po protokole 9 (C2S.CommandBlock 18, S2C.CommandUi 34).
+
+Scoreboard zapisuje cele, wyniki, drużyny, sloty wyświetlania i wiązania `/stats`
+w `data/scoreboard.dat`; wyświetla sidebar, listę Tab i wynik pod nazwą gracza.
+Granica świata obsługuje zmianę średnicy w czasie, obrażenia, kolizję, blokadę
+stawiania, render ściany i ostrzegawczą winietę, a stan zapisuje w
+`data/worldborder.dat`. Tryb przygody respektuje `CanDestroy` i `CanPlaceOn`
+w NBT przedmiotu i pokazuje te tagi w podpowiedzi.
+
+Weryfikacja: `dotnet build -c Release` zakończony zerem błędów i czterema
+wcześniejszymi ostrzeżeniami kompilatora. Pełny `--selftest`: 1108 OK, 0 FAIL;
+CMD-only: 182 OK, 0 FAIL. `--missing` nie zgłasza CommandBlock. `--autotest --cmd`
+zakończył się komunikatem `AUTOTEST DONE`; wykonano i obejrzano pięć zrzutów
+sidebaru, title, ściany granicy, edytora i impulsu redstone. Test pętli host-gość
+sprawdza uprawnienia i zasięg edycji, synchronizację scoreboardu/granicy/title,
+GUI oraz wyrzucenie gracza.
+
+Pozostałe różnice wobec klienta 1.8: tekst JSON parsuje `clickEvent`, `hoverEvent`
+i `insertion`, ale czat nie obsługuje interakcji. Kody fontu `k-o` są ignorowane.
+Cząstki używają najbliższego dostępnego rodzaju, a parametry prędkości i trybu
+nie odwzorowują wszystkich zachowań vanilla. `/entitydata` zapisuje tylko pola
+obsługiwane przez modele encji BlockCraft. Kryteria `stat.*` aktualizują się
+z dostępnych statystyk gracza. Część nazw slotów `/replaceitem` (enderchest,
+koń) nie ma jeszcze magazynu w tej implementacji. Wynik serca w HUD Tab i
+proceduralny render granicy są uproszczone. Test sieci używa pętli lokalnej,
+nie publicznego przekaźnika.
+
+Commity `b3407e9`, `5bb5dc7` i `c96deef` wypchnięto na `mc18/commands`.
+Gałąź nie została scalona z `feature/mc18`; integrację wykonuje master.
+Logi testów i obejrzane PNG pozostawiono w `.modus/cmd-evidence`.
