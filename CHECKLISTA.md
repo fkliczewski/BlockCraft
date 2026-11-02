@@ -9,7 +9,7 @@ Stan integracji MC 1.8 z 2026-11-02: [raport i lista braków](docs/MC18_RAPORT_I
 - [x] CMD scalone: komendy 1.8, selektory, blok poleceń, scoreboard, granica świata, tryb przygody.
 - [x] NET2 scalone: pęknięcia kopania innych graczy, jazda i smycze gościa, części smoka, wyposażenie u innych. Wspólny protokół 10.
 - [x] Końcowe testy po scaleniu fali 2: selftest 1262/0, pełny autotest i autotesty modułów OK, E2E dwóch procesów przez gry.fimson.pl OK.
-- [ ] Merge do main po akceptacji Filipa.
+- [x] Merge do main po akceptacji Filipa (03.11, Alfa 1.5, tag alfa-1.5).
 
 Rejestracja wszystkich mobów i biomów nie oznacza pełnej zgodności każdej mechaniki, grafiki ani generacji z oryginałem. Raport opisuje ograniczenia; część liczników statystyk nadal nie ma wyzwalaczy.
 
@@ -80,7 +80,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 ## Etap 6 - Extra
 - [x] Redstone: pył, pochodnia, dźwignia, przycisk, blok, lampa, repeater, TNT, tłok i lepki tłok, drzwi
 - [x] Multiplayer Tailcat.Link: host w grze, kod i zapamiętane parowanie, klient, chunki/bloki/TE/encje, modele i nicki graczy, kontenery, czat, ekwipunek, śmierć i respawn; test dwóch procesów przez prawdziwy przekaźnik (od 2026-10-31 gry.fimson.pl) i PNG z obu okien. Wymiary/pogoda wymagają integracji po scaleniu NE/OW; zbroja modelu i pęknięcia kopania innych graczy pozostają do dodania. Szczegóły: `docs/MC18_NET.md`.
-- [~] Dźwięki proceduralne  *(wywołania `PlaySound` są w całej grze, ale `Sound.Play` w `GameRender.cs` to pusty stub; folder `Audio/` pusty)*
+- [x] Dźwięki i muzyka  *(mikser 3D w `Audio/`, dźwięki i muzyka 1.8 z lokalnego cache assetów Mojang, zapasowe dźwięki proceduralne)*
 - [~] Testy jednostkowe + autotest wizualny, publish do pojedynczego folderu  *(zamiast xUnit: `--selftest` (`SelfTest.cs`) + `--autotest` (`GameAutotest.cs`); publish do `BlockCraft_Gra/` działa; brak projektu `BlockCraft.Tests`)*
 
 ## Weryfikacja modułu G (2026-10-30)
