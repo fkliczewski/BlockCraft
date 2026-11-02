@@ -34,7 +34,7 @@ public sealed class LoginInfo
 /// Lokalny gracz porusza się sam (jak w MC) i wysyła co tick ruch oraz akcje; kopanie, stawianie i kliknięcia w GUI
 /// są przewidywane lokalnie, a host i tak odsyła prawdziwy stan.
 /// </summary>
-public sealed class NetClient
+public sealed partial class NetClient
 {
     public readonly INetConnection Conn;
     private LinkClientService _link;
@@ -42,6 +42,8 @@ public sealed class NetClient
     public LoginInfo Login;
     public string Error;
     public INetClientHost G;
+    /// <summary>Ostatnia tabliczka otwarta do edycji przez hosta (testy).</summary>
+    public (int x, int y, int z)? SignEditorOpened;
     private World.World W => G?.World;
     private Player P => G?.Player;
     private readonly Queue<(byte type, byte[] frame, int off, int len)> _packets = new();
@@ -57,7 +59,7 @@ public sealed class NetClient
     public long BytesReceived => Conn is QueuedConnection q ? q.BytesReceived : 0;
     public int ChunksReceived;
 
-    private NetClient(INetConnection c) { Conn = c; Array.Fill(_serverInv, -1); }
+    private NetClient(INetConnection c) { Conn = c; Array.Fill(_serverInv, -1); Items.MapStore.Client = new Items.MapStore(null); }
 
     /// <summary>Połączenie już otwarte (np. pętla w pamięci w testach): wysyła logowanie.</summary>
     public static NetClient Start(INetConnection conn, string nick, int view)
@@ -150,6 +152,7 @@ public sealed class NetClient
             if (G == null) return; // rozłączono w trakcie
         }
         if (P == null) return;
+        TickSync();
         // zamknięcie okna przez gracza -> host
         if (_window != null && P.OpenContainer != _window)
         {
@@ -186,6 +189,37 @@ public sealed class NetClient
 
     public void SendChat(string s) { var w = Out.Begin(C2S.Chat); w.Write(s); Out.End(); }
     public void SendRespawn() { Out.Begin(C2S.Respawn); Out.End(); }
+    public void SelectRecipe(int index)
+    {
+        if (_window is not MerchantContainer) return;
+        var writer = Out.Begin(C2S.SelectRecipe); writer.Write(_windowId); writer.Write(index); Out.End();
+    }
+    public void SetBeacon(Effect primary,Effect secondary)
+    {
+        if(_window is not BeaconContainer)return;
+        var writer=Out.Begin(C2S.Beacon);writer.Write(_windowId);writer.Write((int)primary);writer.Write((int)secondary);Out.End();
+    }
+    public void EnchantItem(int button)
+    {
+        if (_window is not EnchantingContainer) return;
+        var writer = Out.Begin(C2S.EnchantItem); writer.Write(_windowId); writer.Write((byte)button); Out.End();
+    }
+    public void UpdateCommands(int x, int y, int z, int entityId, string command, bool track)
+    {
+        var writer = Out.Begin(C2S.CommandBlock); writer.Write(x); writer.Write(y); writer.Write(z); writer.Write(entityId); writer.Write(command); writer.Write(track); Out.End();
+    }
+
+    public void UpdateSign(int x, int y, int z, string[] lines)
+    {
+        var writer = Out.Begin(C2S.UpdateSign); writer.Write(x); writer.Write(y); writer.Write(z);
+        for (int i = 0; i < 4; i++) writer.Write(i < lines.Length ? lines[i] ?? "" : "");
+        Out.End();
+    }
+    public void AnvilName(string name)
+    {
+        if (_window is not AnvilContainer) return;
+        var writer = Out.Begin(C2S.AnvilName); writer.Write(_windowId); writer.Write(name ?? ""); Out.End();
+    }
     public void SendDrop(bool all) { var w = Out.Begin(C2S.DropSelected); w.Write(all); Out.End(); }
 
     private void ClickHook(Container c, int slot, int button, ClickType type, Player p)
@@ -347,7 +381,7 @@ public sealed class NetClient
             case S2C.RemoveEntities:
                 {
                     int n = r.ReadInt32();
-                    for (int i = 0; i < n; i++) { int id = r.ReadInt32(); if (id != p.Id && w.EntityById.TryGetValue(id, out var e)) w.RemoveEntity(e); }
+                    for (int i = 0; i < n; i++) { int id = r.ReadInt32(); OnRemoved(id); if (id != p.Id && w.EntityById.TryGetValue(id, out var e)) w.RemoveEntity(e); }
                     break;
                 }
             case S2C.Sound:
@@ -386,6 +420,35 @@ public sealed class NetClient
                 }
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
+            case S2C.MapData: MapSync.Read(r); break;
+            case S2C.Statistics: Bl2Net.ReadStatistics(P, r); break;
+            case S2C.CommandUi:
+                {
+                    int kind = r.ReadByte();
+                    if (kind == 0) p.Title.Show(r.ReadInt32(), r.ReadString(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32());
+                    else if (kind == 1) G.SetScreen(new CommandBlockScreen(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadString(), r.ReadBoolean(), r.ReadString()));
+                    break;
+                }
+            case S2C.OpenSignEditor:
+                {
+                    int sx = r.ReadInt32(), sy = r.ReadInt32(), sz = r.ReadInt32();
+                    SignEditorOpened = (sx, sy, sz);
+                    G.SetScreen(new SignEditScreen(sx, sy, sz));
+                    break;
+                }
+            case S2C.MerchantOffers:
+                {
+                    byte id = r.ReadByte(); int index = r.ReadInt32(), n = r.ReadInt32();
+                    if (n < 0 || n > 4096) throw new InvalidDataException("Za dużo ofert handlu");
+                    var offers = new List<MerchantRecipe>();
+                    for (int i = 0; i < n; i++) offers.Add(MerchantRecipe.Load(r));
+                    if (id == _windowId && _window is MerchantContainer merchant)
+                    {
+                        merchant.Villager.Recipes.Clear(); merchant.Villager.Recipes.AddRange(offers);
+                        merchant.Index = index;
+                    }
+                    break;
+                }
             case S2C.WindowSlots:
                 {
                     byte id = r.ReadByte(); int n = r.ReadInt16();
@@ -403,8 +466,10 @@ public sealed class NetClient
                     byte id = r.ReadByte();
                     if (id == _windowId && _window != null && P.OpenContainer == _window)
                     {
+                        var closed = _window;
                         _window = null; // bez odsyłania CloseWindow
                         G.SetScreen(null);
+                        if (P.OpenContainer == closed) P.CloseContainer();
                     }
                     break;
                 }
@@ -433,6 +498,8 @@ public sealed class NetClient
                     break;
                 }
             case S2C.ChangeDimension: ChangeDimension(r.ReadSByte(), r.ReadInt32()); break;
+            case S2C.BlockBreakAnim: BlockBreakAnim(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadSByte()); break;
+            case S2C.EntityLinks: EntityLinks(r.ReadInt32(), new EntityLinkIds(r.ReadInt32(), r.ReadInt32(), r.ReadInt32())); break;
         }
     }
 
@@ -441,7 +508,11 @@ public sealed class NetClient
         if (!W.Chunks.TryRemove(key, out var c)) return;
         c.Unloaded = true;
         foreach (var e in W.Entities.ToArray())
-            if (e != P && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz) W.RemoveEntity(e);
+            if (e != P && e is not DragonPart && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz)
+            {
+                OnRemoved(e.Id);
+                W.RemoveEntity(e);
+            }
     }
 
     private void ApplyTile(int x, int y, int z, int type, byte[] data)
@@ -461,7 +532,7 @@ public sealed class NetClient
     {
         var w = W;
         if (id == P.Id) return;
-        if (w.EntityById.TryGetValue(id, out var old)) w.RemoveEntity(old);
+        if (w.EntityById.TryGetValue(id, out var old)) { OnRemoved(id); w.RemoveEntity(old); }
         Entity e = key == "player" ? new Player(w) { Name = string.IsNullOrEmpty(name) ? "?" : name } : EntitySerializer.Create(key, w);
         if (e == null) { Log.Error("Sieć: nieznany typ encji '" + key + "' (brak rejestracji w Registries?)"); return; }
         e.Id = id;
@@ -470,6 +541,7 @@ public sealed class NetClient
         e.IsRemoteControlled = true;
         e.NetX = e.X; e.NetY = e.Y; e.NetZ = e.Z; e.NetYaw = e.Yaw; e.NetPitch = e.Pitch;
         w.AddEntityNow(e);
+        OnSpawned(e);
     }
 
     private static void LoadKeepingPosition(Entity e, byte[] data, int netData)
@@ -502,12 +574,13 @@ public sealed class NetClient
     {
         var p = P;
         p.Health = r.ReadSingle(); p.MaxHealth = r.ReadSingle(); p.FoodLevel = r.ReadInt32(); p.Saturation = r.ReadSingle();
-        p.XpLevel = r.ReadInt32(); p.XpProgress = r.ReadSingle(); p.XpTotal = r.ReadInt32(); p.Air = r.ReadInt32();
+        p.XpLevel = r.ReadInt32(); p.XpProgress = r.ReadSingle(); p.XpTotal = r.ReadInt32(); p.Air = r.ReadInt32(); p.EnchantmentSeed = r.ReadInt32();
         int gm = r.ReadByte(); bool fire = r.ReadBoolean(), dead = r.ReadBoolean(), sleeping = r.ReadBoolean();
         p.HasSpawn = r.ReadBoolean(); p.SpawnX = r.ReadInt32(); p.SpawnY = r.ReadInt32(); p.SpawnZ = r.ReadInt32();
         int ne = r.ReadByte();
         var effects = new Dictionary<Effect, EffectInstance>();
         for (int i = 0; i < ne; i++) { var id = (Effect)r.ReadInt32(); int dur = r.ReadInt32() * 20, amp = r.ReadInt32(); effects[id] = new EffectInstance(id, dur, amp); }
+        p.ReceiveAchievements(r.ReadUInt64());
         foreach (var id in p.Effects.Keys.ToList()) if (!effects.ContainsKey(id)) p.RemoveEffect(id);
         foreach (var (id, ef) in effects)
         {
@@ -533,7 +606,24 @@ public sealed class NetClient
         var layout = new List<(bool player, int index, int sx, int sy, int flags)>();
         for (int i = 0; i < n; i++) layout.Add((r.ReadByte() == 0, r.ReadInt16(), r.ReadInt16(), r.ReadInt16(), r.ReadByte()));
         Container c = kind >= 0 ? ContainerFactory.Create(W, P, (GuiKind)kind, x, y, z) : null;
+        if (kind == -2)
+        {
+            var horse = new Horse(W); horse.Load(r); c = new HorseContainer(P.Inventory, horse);
+        }
+        else if (kind == -3)
+        {
+            var villager = new Villager(W); villager.Load(r);
+            var merchant = new MerchantContainer(P.Inventory, villager) { Index = r.ReadInt32() };
+            merchant.Inv.OnChanged = null; // wynik i zapłata przychodzą wyłącznie od hosta
+            c = merchant;
+        }
+        else if (kind == -4)
+        {
+            var rsLayout = (RsContainer.Layout)r.ReadByte();
+            c = new RsContainer(P.Inventory, new SimpleInventory(rsLayout == RsContainer.Layout.Hopper ? 5 : rsLayout == RsContainer.Layout.Grid3 ? 9 : 27), title, rsLayout);
+        }
         if (c == null || c.Slots.Count != n) c = new NetContainer(P.Inventory, title, width, height, layout);
+        c.Title = title;
         if (G.CurrentScreen != null) G.SetScreen(null);
         if (_window != null) { var o = Out.Begin(C2S.CloseWindow); o.Write(_windowId); Out.End(); }
         _windowId = id; _window = c;
@@ -545,6 +635,7 @@ public sealed class NetClient
     {
         _dim = dim; _gen++;
         _decoding.Clear(); _deferred.Clear();
+        ResetSync();
         W.RemoveEntity(P);
         P.Id = entityId;
         P.Removed = false;

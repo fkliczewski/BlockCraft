@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 2;
+    public const int Version = 10;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -29,6 +29,15 @@ public enum C2S : byte
     DropSelected = 9,   // bool cały stos
     Respawn = 10,
     KeepAlive = 11,     // long czas klienta (ms)
+    SelectRecipe = 12,  // byte okno, int indeks oferty
+    EnchantItem = 13,   // byte okno, byte przycisk (0-2)
+    AnvilName = 14,     // byte okno, string nazwa (MC|ItemName, maks. 30 znaków)
+    UpdateSign = 15,    // int x,y,z, 4 x string
+    Beacon = 17, // byte okno, int primary, int secondary; rozlicza host
+    OpenInventory = 16, // otwarcie lokalnego ekwipunku; wyłącznie wyzwalacz openInventory
+    CommandBlock = 18,  // int x,y,z,entityId (-1 blok), string komenda, bool trackOutput
+    EditBook = 40,      // BL2: bool podpis, string tytuł, short n, n x string strona (MC|BEdit / MC|BSign); rozlicza host
+    RequestStats = 41,  // BL2: prośba o statystyki (C16 REQUEST_STATS)
 }
 
 /// <summary>Pakiety host -> klient.</summary>
@@ -64,6 +73,13 @@ public enum S2C : byte
     ChangeDimension = 28,// sbyte wymiar
     KeepAlive = 29,     // long czas klienta (echo)
     Settings = 30,      // byte trudność, bool hardcore, bool komendy, gamerules (byte n, n x (string, bool))
+    MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
+    OpenSignEditor = 32,// int x,y,z
+    MapData = 33,       // patrz MapSync: int id, skala, wymiar, środek, wersja, rodzaj, prostokąt pikseli, znaczniki
+    BlockBreakAnim = 34,// int id kopiącego, int x,y,z, sbyte etap pęknięcia 0-9 (-1 koniec); świat odbiorcy (S25PacketBlockBreakAnim)
+    EntityLinks = 35,   // int id, int pojazd (RidingEntity), int wierzchowiec (Player.RidingMob / Mob.Vehicle), int trzymający smycz; -1 brak (S1BPacketEntityAttach)
+    Statistics = 40,    // BL2: int len, bajty (int n, n x (string klucz, int wartość)) - S37PacketStatistics
+    CommandUi = 36,     // byte rodzaj: 0 tytul, 1 edytor bloku polecen
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>
@@ -80,7 +96,9 @@ public sealed class PacketBuffer
 
     public BinaryWriter Begin(byte type)
     {
-        if (_start >= 0) throw new InvalidOperationException("Poprzedni pakiet nie został zamknięty");
+        // Wyjątek w trakcie pisania pakietu (np. null w BinaryWriter.Write) zostawiał bufor otwarty i każdy kolejny
+        // pakiet rzucał wyjątek: gość był wyrzucany, a host zalewany błędami. Niedokończony pakiet jest odrzucany.
+        if (_start >= 0) { BlockCraft.Core.Log.Error("PacketBuffer: odrzucam niedokończony pakiet"); Discard(); }
         _start = _ms.Position;
         W.Write(0); W.Write(type);
         return W;
@@ -97,9 +115,12 @@ public sealed class PacketBuffer
         _start = -1;
     }
 
+    void Discard() { _ms.SetLength(_start); _ms.Position = _start; _start = -1; }
+
     /// <summary>Zwraca ramkę i czyści bufor (null gdy pusty).</summary>
     public byte[] Take()
     {
+        if (_start >= 0) Discard();
         if (_ms.Length == 0) return null;
         var f = _ms.ToArray();
         _ms.SetLength(0);

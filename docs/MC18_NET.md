@@ -1,7 +1,25 @@
 # Moduł G: multiplayer Tailcat.Link
 
-Aktualizacja po scaleniu: protokół 2, podłączone DimensionSet i kontenery
-redstone/alchemii. Test sieciowej zmiany wymiaru i ID gracza przechodzi.
+Aktualizacja NET2 2026-11-02, gałąź `mc18/net2`: protokół 9, pęknięcia
+kopania, jazda gościa i smycze (`EntityLinks`), trafianie części smoka Endu.
+Numer dotyczy tej gałęzi; master nada wspólny numer po integracji z BL2.
+Host liczy ruch łódki, wagonika, konia i świni z wejścia gościa. Pozycja
+pasażera pochodzi z pojazdu, a wysiadanie kończy się korektą od hosta.
+Części smoka tworzy klient z ujemnymi ID wyliczonymi z ID smoka; host
+rozwiązuje trafienie na swoją część. Części znikają także przy wyładowaniu
+chunka. Rozłączenie i zamknięcie hosta zwracają kursor oraz siatkę do
+ekwipunku przed zapisaniem gracza.
+
+Renderer pokazuje pozę pasażera i zarzuconą wędkę innych graczy. Stan
+przedmiotu, zbroi, łuku, skradania, jedzenia i snu przechodzi przez istniejące
+pakiety wyposażenia i danych gracza. Trafiony gość otrzymuje również
+zdarzenie własnych obrażeń. Kontakt zdalnego gracza z blokami wykonuje host
+(m.in. płyty naciskowe), mimo że zwykły ruch pieszy przewiduje klient.
+
+Aktualizacja 2026-10-31: protokół 3, podłączone DimensionSet, kontenery
+redstone/alchemii oraz GUI koni, wagoników i handlu. Wybór oferty,
+rozliczenie i zamykanie okien wykonuje host; sprawdzone w dwóch procesach
+przez gry.fimson.pl. Test sieciowej zmiany wymiaru i ID gracza przechodzi.
 Pełny stan i ograniczenia: [raport integracji](MC18_RAPORT_INTEGRACJI.md).
 Wyniki poniżej opisują wcześniejszy test samej gałęzi `mc18/net`.
 
@@ -69,7 +87,7 @@ nickiem wraca jego ekwipunek i postęp. Operatorzy są zapisywani w tym samym
 pliku. Polecenia zmieniające świat wymagają operatora; lista pomocniczych
 poleceń bez operatora jest w `NetServer.FreeCommands`.
 
-## Protokół 1
+## Protokół (podstawy od wersji 1)
 
 Własny protokół BlockCraft, nie protokół serwerów Minecraft Java. Aplikacja
 Tailcat: `blockcraft`, maksymalnie 8 sparowanych peerów. Oddzielny uporządkowany
@@ -94,6 +112,7 @@ w `Protocol.cs` oraz metodach zapisu i odczytu. Pierwszy pakiet to
 | S2C | Sound, Particles, Time, Settings, Chat, Stats, InventorySlots, Cursor |
 | S2C | OpenWindow, WindowSlots, CloseWindow, Teleport, Velocity, Death, PlayerList |
 | S2C | WorldState, ChangeDimension, KeepAlive |
+| S2C, NET2 | BlockBreakAnim (id kopiącego, pozycja bloku, etap -1/0..9), EntityLinks (id encji, pojazdu, wierzchowca, uchwytu smyczy) |
 
 `NetInput` niesie pozycję i orientację, flagi ruchu, wybrany slot, przyciski,
 trafiony blok/encję i potwierdzenie teleportu. Ruch pozostałych encji jest
@@ -189,8 +208,61 @@ nie zastępuje próby na dwóch osobnych komputerach.
 Zwykły `--autotest` także zakończył się `AUTOTEST DONE`; kopanie i stawianie
 mają wynik OK, obejrzano zrzut świata gry jednoosobowej.
 
-Pozostałe ograniczenia: pęknięcia bloku kopanego przez innego gracza nie są
-rozsyłane, a renderer gracza nie rysuje zbroi mimo synchronizacji jej slotów.
-Integrację NE/OW i specjalnych wskaźników nowych GUI trzeba sprawdzić po
-scaleniu modułów. Nie ma deklaracji zgodności różnych zestawów modułów
-o tej samej wersji protokołu.
+### Przegląd GUI i interakcji NET2
+
+| Interakcja | Stan u gościa i weryfikacja |
+|---|---|
+| Skrzynia | Otwarcie przez wejście gościa, zawartość i shift-klik rozlicza host (`NetSelfTest`) |
+| Skrzynia-pułapka | Ekran i liczba zdalnych widzów (`NetSelfTest`) |
+| Piec | Paliwo, postęp, wynik i odbiór przez shift-klik (`Net2SelfTest`) |
+| Warzenie | Ekran, sloty i czas warzenia przez TE (`NetSelfTest`, `Net2SelfTest`) |
+| Zaklinanie | Seed, oferty, koszt poziomów i lapisu, zaklęty wynik (`NetSelfTest`) |
+| Kowadło | Nazwa od gościa, koszt, wynik i pobranie przez hosta (`NetSelfTest`) |
+| Latarnia | Wybór efektu, płatność, poziom piramidy i odrzucenie złego żądania (`NetSelfTest`) |
+| Lej, dozownik, podajnik | Układ i sloty kontenera, ekran (`NetSelfTest`, `Net2SelfTest`) |
+| Stół | Siatka, wynik oraz zużycie składników przez hosta; także dwa okna przez DERP |
+| Tabliczka | Postawienie, edytor, filtrowanie tekstu, odrzucenie edycji bez uprawnionego okna (`NetSelfTest`) |
+| Sztandar | Meta, NBT wzorów i późniejsza aktualizacja TE (`NetSelfTest`) |
+| Mapa | Utworzenie przez gościa, rysowanie przez hosta i przesłanie kolorów (`Net2SelfTest`) |
+| Koń, wagonik ze skrzynią, handel | Specjalne GUI, kliknięcia, wynik i brak powielania; selftest oraz dwa procesy |
+
+Ekrany korzystają z fabryk `ContainerFactory`, a zmiany konfiguracji
+zaklinania, kowadła, latarni i tabliczki mają osobne żądania do hosta.
+Nie trzeba przewidywać tych operacji lokalnie. Skrzynia Endu, książki i inne
+zmiany BL2 są integrowane osobno przez mastera i nie należą do tego audytu.
+
+### Weryfikacja NET2 i ograniczenia
+
+Build Release: 0 błędów (4 wcześniejsze ostrzeżenia). Pełny selftest:
+1001 OK / 0 FAIL, log `.modus/selftest-net2-final.log` (82 s).
+Przy wysyłce ok. 600 przedmiotów najdłuższy zmierzony `AfterTick` wyniósł
+0,5 ms; po scaleniu stosów gość widział wszystkie 578 encji hosta.
+
+Nowe testy są w `Net/Net2SelfTest.cs`: host i dwóch gości w pamięci,
+cztery rodzaje jazdy, smycze, części smoka, wygląd graczy, GUI, mapa,
+600 encji, zator wejścia/odbioru, wadliwa ramka, powrót z zachowaniem
+ekwipunku, portale Endu/Netheru i powrót. Istniejące testy płynnego ruchu,
+animacji chodu i braku echa przewidzianych dźwięków nadal przechodzą.
+Test utraty trasy używa osobnego `FakeDerpRelay` z wyłączoną ścieżką
+bezpośrednią: przekaźnik połyka ruch, następnie zrywa połączenie DERP.
+Sprawdzamy kompletne ramki w kolejności albo jawne zakończenie kanału.
+Zaobserwowany wynik to zakończenie sesji po około 15 sekundach, bez
+dostarczenia fragmentu ramki. Powrót gracza jest sprawdzony osobno.
+
+`Test-Net.ps1` wymaga również potwierdzeń nowych faz NET2. Rzeczywisty
+przebieg `.modus/net2-e2e-final`: oba procesy OK przez `gry.fimson.pl`,
+pęknięcia gościa u hosta, wyposażenie hosta u gościa, wytworzenie czterech
+desek, sterowanie łódką bez teleportów i wysiadanie. Obejrzano PNG hosta
+i gościa: pęknięcia, pasażer z hełmem i pozą siedzącą, miecz/zbroja hosta,
+wynik wytwarzania i widok z łódki. Przechodzą również wcześniejsze fazy
+GUI konia/wagonika/handlu, pogody, wyrzucenia i powrotu bez kodu.
+
+Ograniczenia weryfikacji: rzeczywisty przekaźnik testowano w dwóch procesach
+na jednym komputerze. Koń, świnia, wagonik osobowy, smycze, smok i portale
+mają testy logiki sieci w pamięci; nie deklarujemy ręcznej próby każdego
+z nich na dwóch komputerach. Stan jedzenia i snu jest sprawdzony w danych
+gracza, bez osobnych PNG każdej animacji. Nie mierzono opóźnienia WAN
+ani wydajności słabszego komputera. Sam numer protokołu nie potwierdza
+zgodności różnych zestawów modułów; obie strony muszą mieć to samo wydanie.
+Kanały Tailcat są uporządkowane w ramach sesji, ale nie odtwarzają się
+po jej zakończeniu; wtedy gracz korzysta z dołączenia ponownie.

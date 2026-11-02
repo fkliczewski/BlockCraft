@@ -16,7 +16,13 @@ public static class Sound
     static readonly object BankLock = new();
 
     public static bool Enabled => _started && Mix.Running;
+    /// <summary>Diagnostyka: BLOCKCRAFT_SOUND_TRACE=1 zapisuje w logu każdy start głosu (SND play/drop).</summary>
+    static readonly bool Trace = Environment.GetEnvironmentVariable("BLOCKCRAFT_SOUND_TRACE") == "1";
     public static int ActiveVoices => Mix.Count;
+    internal static int RainVoices
+    {
+        get { int count = 0; Mix.ForEach(v => { if (!v.Done && v.Tag == "ambient:rain") count++; }); return count; }
+    }
 
     /// <summary>Start systemu: otwiera urządzenie, uruchamia pobieranie assetów w tle.</summary>
     public static void Init(Settings settings)
@@ -72,13 +78,18 @@ public static class Sound
         catch (Exception ex) { Log.Error("Sound.PlayUi " + ev + ": " + ex.Message); }
     }
 
-    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0)
+    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0, bool enqueue = true)
     {
         SoundBank bank; lock (BankLock) bank = _bank;
         bank.Events.TryGetValue(ev, out var def);
-        var v = new Voice { Positional = positional, X = x, Y = y, Z = z };
+        var v = new Voice { Positional = positional, X = x, Y = y, Z = z, EventKey = ev, EventPitch = pitch };
         float att = 16f * Math.Max(1f, vol);
         v.AttDist = attOverride > 0 ? attOverride : att;
+        if (positional)
+        {
+            double dx = x - Mix.LX, dy = y - Mix.LY, dz = z - Mix.LZ;
+            if (dx * dx + dy * dy + dz * dz >= v.AttDist * v.AttDist) return null;
+        }
         float entryVol = 1f, entryPitch = 1f;
         PcmData pcm = null; bool stream = false; string name = null;
         if (def != null)
@@ -88,7 +99,7 @@ public static class Sound
             if (e != null) { entryVol = e.Volume; entryPitch = e.Pitch; stream = e.Stream || forceStream; name = e.Name; }
         }
         else if (bank.HasAssets) return null; // nieznane zdarzenie przy załadowanych assetach: cisza
-        v.Volume = Math.Clamp(vol, 0f, 1f) * entryVol;
+        v.Volume = Math.Clamp(vol * entryVol, 0f, 1f);
         float p = Math.Clamp(pitch * entryPitch, 0.5f, 2f);
         if (name != null && stream)
         {
@@ -103,8 +114,25 @@ public static class Sound
             v.Data = pcm.Data; v.Channels = pcm.Channels; v.Rate = pcm.Rate; v.Frames = pcm.Frames;
         }
         v.Step = p * v.Rate / 44100.0;
-        Mix.Add(v);
+        if (enqueue)
+        {
+            Mix.Add(v);
+            if (Trace) Log.Info($"SND t={Environment.TickCount64 % 10000000} {(v.Done ? "drop" : "play")} {ev} vol={v.Volume:0.###} pitch={p:0.##} pos={(positional ? $"{x:0.#},{y:0.#},{z:0.#}" : "ui")} dist={(positional ? Math.Sqrt((x - Mix.LX) * (x - Mix.LX) + (y - Mix.LY) * (y - Mix.LY) + (z - Mix.LZ) * (z - Mix.LZ)) : 0):0.#} voices={Mix.Count}");
+        }
         return v;
+    }
+
+    /// <summary>Lokalny deszcz: pojedyncza próbka w kategorii pogody, z ograniczoną głośnością.</summary>
+    public static void SetRain(float volume)
+    {
+        if (!Enabled) return;
+        volume = Math.Clamp(volume, 0, .25f);
+        try
+        {
+            Mix.SetLoop("ambient:rain", volume, () => BankReady && HasEvent("ambient.weather.rain")
+                ? Start(true, "ambient.weather.rain", 0, 0, 0, 1, 1, false, enqueue: false) : null);
+        }
+        catch (Exception ex) { Log.Error("Sound.SetRain: " + ex.Message); }
     }
 
     // ---- płyty (szafa grająca) ----
@@ -150,4 +178,6 @@ public static class Sound
 
     /// <summary>Wstrzymanie wszystkiego (np. wyjście do menu): kasuje głosy nie-muzyczne.</summary>
     public static void StopAll() => Mix.ForEach(v => v.Done = true);
+
+    public static void StopWorldSounds() => Mix.Clear(includeMusic: false);
 }

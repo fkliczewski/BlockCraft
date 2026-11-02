@@ -30,7 +30,9 @@ public sealed class NetHostScreen : Screen
         _lastClients = G.Server?.Clients.Count ?? 0;
         if (!hosting)
         {
-            Add(new Button(W / 2 - 100, H / 4 + 60, 200, 20, () => G.HostStarting ? "Uruchamianie..." : "Otwórz świat w sieci", () => G.OpenToNetwork()) { Enabled = !G.HostStarting });
+            _nick = Add(new TextField(W / 2 - 100, H / 4 + 98, 200, 20) { MaxLength = 16, Text = G.Player?.Name ?? G.Settings.PlayerName ?? "Steve" });
+            _nick.OnEnter = Open;
+            Add(new Button(W / 2 - 100, H / 4 + 60, 200, 20, () => G.HostStarting ? "Uruchamianie..." : "Otwórz świat w sieci", Open) { Enabled = !G.HostStarting });
         }
         else
         {
@@ -48,6 +50,18 @@ public sealed class NetHostScreen : Screen
                 }
         }
         Add(new Button(W / 2 - 100, H - 30, 200, 20, "Gotowe", () => G.SetScreen(_parent)));
+    }
+
+    private TextField _nick;
+
+    /// <summary>Nick hosta ustawiany przed otwarciem świata (goście widzą go nad głową i w wiadomościach).</summary>
+    private void Open()
+    {
+        if (G.HostStarting) return;
+        string nick = NetServer.SanitizeName(_nick?.Text);
+        G.Settings.PlayerName = nick; G.Settings.Save();
+        if (G.Player != null) G.Player.Name = nick;
+        G.OpenToNetwork();
     }
 
     protected override void Escape() => G.SetScreen(_parent);
@@ -69,6 +83,7 @@ public sealed class NetHostScreen : Screen
             sb.TextCentered("Inni gracze dołączą do tego świata kodem zaproszenia,", W / 2f, H / 4f, 0xFFE0E0E0);
             sb.TextCentered("bez serwera i bez przekierowania portów (przekaźnik " + RelayOptions.Default.Host + ").", W / 2f, H / 4f + 12, 0xFFA0A0A0);
             if (G.HostStatus != null) sb.TextCentered(G.HostStatus, W / 2f, H / 4f + 30, G.HostStatus.StartsWith("Nie") ? 0xFFFF6060 : 0xFFFFFF80);
+            sb.Text("Twój nick", W / 2 - 100, H / 4 + 88, 0xFFA0A0A0);
         }
         else
         {

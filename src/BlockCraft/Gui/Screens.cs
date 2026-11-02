@@ -40,7 +40,7 @@ public sealed class TitleScreen : Screen
         sb.PushTransform(lx + lw * scale - 20, ly + lh * scale - 6, -20, s);
         sb.TextCentered(_splash, 0, -8, 0xFF00FFFF);
         sb.PopTransform();
-        sb.Text("BlockCraft 1.0 (.NET)", 2, H - 10, 0xFFFFFFFF);
+        sb.Text("BlockCraft " + GameVersion.Name + " (.NET)", 2, H - 10, 0xFFFFFFFF);
         var ast = BlockCraft.Audio.AssetStore.Status;
         if (!string.IsNullOrEmpty(ast)) sb.Text(ast + (BlockCraft.Audio.AssetStore.Done ? "" : " (" + (int)(BlockCraft.Audio.AssetStore.Progress * 100) + "%)"), 2, H - 20, 0xFFA0A0A0);
         string c = "Nie jest powiązane z Mojang AB.";
@@ -60,12 +60,12 @@ public sealed class HelpScreen : Screen
     {
         DrawDirtBackground();
         var sb = G.Sb;
-        sb.TextCentered("BlockCraft – sterowanie", W / 2f, 15, 0xFFFFFFFF);
+        sb.TextCentered("BlockCraft - sterowanie", W / 2f, 15, 0xFFFFFFFF);
         string[] lines =
         {
-            "WASD – ruch, Spacja – skok (2x w kreatywnym: latanie)", "Shift – kucanie (trzymanie krawędzi), Ctrl lub 2x W – sprint",
-            "LPM – kopanie / atak, PPM – stawianie / używanie, ŚPM – wybierz blok", "1-9 / kółko – pasek szybkiego wyboru, Q – wyrzuć przedmiot",
-            "E – ekwipunek, T – czat, / – komenda, Esc – pauza", "F1 – ukryj HUD, F2 – zrzut ekranu, F3 – debug, F5 – kamera, F11 – pełny ekran",
+            "WASD - ruch, Spacja - skok (2x w kreatywnym: latanie)", "Shift - kucanie (trzymanie krawędzi), Ctrl lub 2x W - sprint",
+            "LPM - kopanie / atak, PPM - stawianie / używanie, ŚPM - wybierz blok", "1-9 / kółko - pasek szybkiego wyboru, Q - wyrzuć przedmiot",
+            "E - ekwipunek, T - czat, / - komenda, Esc - pauza", "F1 - ukryj HUD, F2 - zrzut ekranu, F3 - debug, F5 - kamera, F11 - pełny ekran",
             "", "Komendy: /help, /time set day, /gamemode creative, /give @p diamond 64,", "/tp x y z, /summon zombie, /kill, /gamerule keepInventory true",
         };
         for (int i = 0; i < lines.Length; i++) sb.TextCentered(lines[i], W / 2f, 40 + i * 12, 0xFFE0E0E0);
@@ -104,7 +104,7 @@ public sealed class WorldSelectScreen : Screen
         sb.Fill(0, ListTop, W, ListBottom - ListTop, 0xC0000000);
         sb.TextCentered("Wybierz świat", W / 2f, 12, 0xFFFFFFFF);
         _play.Enabled = _sel >= 0; _del.Enabled = _sel >= 0;
-        if (_worlds.Count == 0) sb.TextCentered("Brak światów – stwórz nowy!", W / 2f, ListTop + 20, 0xFFA0A0A0);
+        if (_worlds.Count == 0) sb.TextCentered("Brak światów - stwórz nowy!", W / 2f, ListTop + 20, 0xFFA0A0A0);
         for (int i = 0; i < _worlds.Count; i++)
         {
             int y = ListTop + 4 + i * 36 - (int)_scroll;
@@ -152,7 +152,7 @@ public sealed class CreateWorldScreen : Screen
         _seed = Add(new TextField(W / 2 - 100, 92, 200, 20) { Text = oldSeed, Placeholder = "(losowe)", MaxLength = 32 });
         Add(new Button(W / 2 - 155, 124, 150, 20, () => "Tryb gry: " + (_mode switch { 0 => "Przetrwanie", 1 => "Kreatywny", _ => "Hardkor" }),
             () => { _mode = (_mode + 1) % 3; _cheats = _mode == 1; }));
-        Add(new Button(W / 2 + 5, 124, 150, 20, () => "Typ świata: " + (_type == 0 ? "Domyślny" : "Superpłaski"), () => _type = 1 - _type));
+        Add(new Button(W / 2 + 5, 124, 150, 20, () => "Typ świata: " + (_type switch { 0 => "Domyślny", 1 => "Superpłaski", 2 => "Duże biomy", _ => "Amplified" }), () => _type = (_type + 1) % 4));
         Add(new Button(W / 2 - 155, 148, 150, 20, () => "Komendy: " + (_cheats ? "TAK" : "NIE"), () => _cheats = !_cheats) );
         Add(new Button(W / 2 - 155, H - 28, 150, 20, "Stwórz nowy świat", Create));
         Add(new Button(W / 2 + 5, H - 28, 150, 20, "Anuluj", () => G.SetScreen(_parent)));
@@ -194,7 +194,7 @@ public sealed class OptionsScreen : Screen
         Add(new Button(W / 2 + 5, y, 150, 20, () => "Poziom trudności: " + DiffName(G.CurrentDifficulty), () =>
         {
             G.CurrentDifficulty = (G.CurrentDifficulty + 1) % 4; s.Difficulty = G.CurrentDifficulty;
-        }) { Enabled = G.World == null || !G.World.Hardcore });
+        }) { Enabled = (G.World == null || !G.World.Hardcore) && G.Client == null }); // gość: trudność ustala host
         Add(new Button(W / 2 - 155, y + 48, 150, 20, "Ustawienia graficzne...", () => G.SetScreen(new VideoScreen(this))));
         Add(new Button(W / 2 + 5, y + 48, 150, 20, "Sterowanie...", () => G.SetScreen(new ControlsScreen(this))));
         Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));
@@ -282,6 +282,8 @@ public sealed class PauseScreen : Screen
     {
         int y = H / 4 + 8;
         Add(new Button(W / 2 - 100, y + 24 - 16, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
+        Add(new Button(W / 2 - 100, y + 72 - 16, 98, 20, "Osiągnięcia", () => G.SetScreen(new AchievementsScreen(this))));
+        Add(new Button(W / 2 + 2, y + 72 - 16, 98, 20, "Statystyki", () => G.SetScreen(new StatsScreen(this))));
         Add(new Button(W / 2 - 100, y + 96 - 16, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
         Add(new Button(W / 2 + 2, y + 96 - 16, 98, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
         if (G.Client == null) Add(new Button(W / 2 - 100, y + 48 - 16, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));

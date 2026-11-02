@@ -57,6 +57,7 @@ public sealed partial class Game : INetClientHost
         Server = new NetServer(Dimensions?.Get(DimensionId.Overworld) ?? World)
         {
             HostPlayer = () => Player,
+            HostCtrl = () => Ctrl,
             ViewDistance = Math.Max(4, Settings.RenderDistance),
             DefaultGameMode = _level?.GameMode ?? 0,
         };
@@ -211,6 +212,7 @@ public sealed partial class Game : INetClientHost
             i.HitFx = (float)(h.HitX - h.X); i.HitFy = (float)(h.HitY - h.Y); i.HitFz = (float)(h.HitZ - h.Z);
         }
         _netLeftPressed = _netRightPressed = _netMiddle = false;
+        if (ArgsNetAutotest && _net2TestInput != null) i = _net2TestInput(i);
         return i;
     }
 
@@ -249,10 +251,15 @@ public sealed partial class Game : INetClientHost
             float nx = clip.X / clip.W, ny = clip.Y / clip.W;
             if (nx < -1.2f || nx > 1.2f || ny < -1.2f || ny > 1.2f) continue;
             float gx = (nx * 0.5f + 0.5f) * GuiW, gy = (1f - (ny * 0.5f + 0.5f)) * GuiH;
-            string name = other.Name ?? "?";
+            var scoreboard = Cmd.Scoreboard.Of(World);
+            var team = scoreboard.TeamOf(other.Name); var ownTeam = scoreboard.TeamOf(Player.Name);
+            if (team != null && (team.NameTagVisibility == "never" || team.NameTagVisibility == "hideForOtherTeams" && team != ownTeam || team.NameTagVisibility == "hideForOwnTeam" && team == ownTeam)) continue;
+            string name = scoreboard.FormatName(other.Name ?? "?");
             float wpx = sb.Measure(name);
             sb.Fill(gx - wpx / 2 - 2, gy - 9, wpx + 4, 10, 0x60000000);
             sb.TextCentered(name, gx, gy - 8, other.Sneaking ? 0x80FFFFFFu : 0xFFFFFFFFu);
+            if (!other.Sneaking && d2 < 100 && scoreboard.Display[2] is { } objective && scoreboard.GetScore(other.Name, objective, false) is { } score)
+                sb.TextCentered(score.Points + " " + objective.DisplayName, gx, gy + 3, 0xFFFFFFFF);
         }
         _netCamOk = false;
     }

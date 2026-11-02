@@ -22,6 +22,7 @@ public static partial class SelfTest
     {
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         var w = new World.World(seed, type, false);
+        w.Rand.SetSeed(seed); // Powtarzalne AI i dropy w testach, niezależnie od czasu generowania terenu.
         var list = new List<Chunk>();
         for (int cx = -radius; cx <= radius; cx++)
             for (int cz = -radius; cz <= radius; cz++)
@@ -41,7 +42,13 @@ public static partial class SelfTest
         try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
         var sw = Stopwatch.StartNew();
         Console.WriteLine("=== BlockCraft self-test ===");
+        if (args.Contains("--cmd-only"))
+        {
+            try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
+            Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); return _fail == 0 ? 0 : 2;
+        }
         try { TestRegistry(); } catch (Exception e) { Check(false, "Registry", e.ToString()); }
+        try { TestAudioMix(); } catch (Exception e) { Check(false, "Audio", e.ToString()); }
         try { TestWorldGen(); } catch (Exception e) { Check(false, "WorldGen", e.ToString()); }
         try { TestLighting(); } catch (Exception e) { Check(false, "Lighting", e.ToString()); }
         try { TestCrafting(); } catch (Exception e) { Check(false, "Crafting", e.ToString()); }
@@ -56,7 +63,25 @@ public static partial class SelfTest
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
         try { TestMechanicsEffects(); } catch (Exception e) { Check(false, "Efekty", e.ToString()); }
+        try { TestEnchanting(); } catch (Exception e) { Check(false, "Zaklinanie", e.ToString()); }
+        try { TestEnchantEffects(); } catch (Exception e) { Check(false, "Działanie zaklęć", e.ToString()); }
+        try { TestAnvil(); } catch (Exception e) { Check(false, "Kowadło", e.ToString()); }
+        try { TestUtilityItems(); } catch (Exception e) { Check(false, "Kompas, zegar, płyty", e.ToString()); }
+        try { TestMobSpeed(); } catch (Exception e) { Check(false, "Prędkość mobów", e.ToString()); }
+        try { TestHanging(); } catch (Exception e) { Check(false, "Obrazy, ramki, stojaki", e.ToString()); }
+        try { TestMaps(); } catch (Exception e) { Check(false, "Mapy", e.ToString()); }
+        try { TestFireworks(); } catch (Exception e) { Check(false, "Fajerwerki", e.ToString()); }
+        try { TestBanners(); } catch (Exception e) { Check(false, "Sztandary", e.ToString()); }
+        try { TestAchievements(); } catch (Exception e) { Check(false, "Osiągnięcia", e.ToString()); }
+        try { TestFood18(); } catch (Exception e) { Check(false, "Ciasto i ryby", e.ToString()); }
+        try { TestFishing(); } catch (Exception e) { Check(false, "Wędkowanie", e.ToString()); }
+        try { TestBeacon(); } catch (Exception e) { Check(false, "Latarnia", e.ToString()); }
+        try { TestSkulls(); } catch (Exception e) { Check(false, "Czaszki", e.ToString()); }
+        try { TestBoat(); } catch (Exception e) { Check(false, "Łódka", e.ToString()); }
+        try { TestSigns(); } catch (Exception e) { Check(false, "Tabliczki", e.ToString()); }
+        try { TestBl2(); } catch (Exception e) { Check(false, "BL2", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
+        try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }
         try { TestNet(); } catch (Exception e) { Check(false, "Net", e.ToString()); }
@@ -278,7 +303,7 @@ public static partial class SelfTest
         p.X = 0.5; p.MoveForward = 1; Ticks(w, 40); p.MoveForward = 0;
         Check(p.Z <= MathUtil.FloorToInt(p.Z) + 1 && p.CollidedH | true, "Kolizja ze ścianą", p.Z.ToString("F3"));
         Check(Math.Abs(p.Z + 0.3 - Math.Round(p.Z + 0.3)) < 0.01, "Stoi przy ścianie", p.Z.ToString("F3"));
-        // stopień 1 bloku – wejście skokiem
+        // stopień 1 bloku - wejście skokiem
         // upadek
         var p2 = SpawnPlayer(w, 10.5, 19, 10.5);
         Ticks(w, 80);

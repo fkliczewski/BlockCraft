@@ -205,13 +205,13 @@ public sealed partial class Game
             t => Player.Yaw += 0.35f);
         Step(5, () => _autoInput = null);
 
-        // dzień i noc – widok na wschód z wysokości
+        // dzień i noc - widok na wschód z wysokości
         Step(5, () => { Stage(sx, sz - 30, 0, -6, 0, 12); FaceEast(); });
         WaitForMeshes();
         Record("daycycle", 240, 2, () => World.DayTime = 22000, t => World.DayTime = 22000 + t * 100L);
         Step(5, () => World.DayTime = 6000);
 
-        // Steve – kamera z przodu, obrót dookoła
+        // Steve - kamera z przodu, obrót dookoła
         Step(5, () =>
         {
             Stage(sx + 30, sz, 0, 12, 5);

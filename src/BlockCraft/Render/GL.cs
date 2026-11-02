@@ -123,7 +123,7 @@ public sealed class TextureArray : IDisposable
                 }
                 if (n == 0) { dst[y * h + x] = 0; continue; }
                 int aa = a / 4;
-                // zachowaj krycie dla wycięć (liście) – zaokrąglenie jak MC
+                // zachowaj krycie dla wycięć (liście) - zaokrąglenie jak MC
                 if (amax == 255 && n >= 2) aa = 255;
                 if (amax < 255) aa = a / n;
                 dst[y * h + x] = (uint)((r / n) | ((g / n) << 8) | ((b / n) << 16) | (aa << 24));

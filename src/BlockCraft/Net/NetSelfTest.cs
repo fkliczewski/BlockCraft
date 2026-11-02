@@ -33,6 +33,8 @@ public static partial class SelfTest
         TestNetLoopback();
         Console.WriteLine("-- Sieć: Tailcat.Link przez przekaźnik w pamięci");
         TestNetTailcat().GetAwaiter().GetResult();
+        Console.WriteLine("-- Sieć: NET2 (gość jak gracz jednoosobowy)");
+        TestNet2();
     }
 
     private static void TestNetProtocol()
@@ -115,7 +117,7 @@ public static partial class SelfTest
                     client.Tick();
                     host.World.Tick();
                     var p = host.Player;
-                    client.SendInput(new NetInput { X = p.X, Y = p.Y, Z = p.Z, Yaw = p.Yaw, Pitch = p.Pitch, OnGround = p.OnGround });
+                    client.SendInput(new NetInput { X = p.X, Y = p.Y, Z = p.Z, Yaw = p.Yaw, Pitch = p.Pitch, OnGround = p.OnGround, Selected=(byte)p.Inventory.SelectedSlot });
                 }
                 client.Flush();
                 Thread.Sleep(2);
@@ -134,6 +136,64 @@ public static partial class SelfTest
         Check(cc != null && cc.Blocks.AsSpan().SequenceEqual(hc.Blocks), "Sieć: chunk klienta = chunk hosta");
         Check(host.Player.Y > gy - 1 && host.Player.Y < gy + 3, $"Sieć: gracz klienta stoi na ziemi (y={host.Player.Y:F2}, grunt {gy})");
         Check(Math.Abs(puppet.Y - host.Player.Y) < 0.01, "Sieć: host zna pozycję klienta");
+
+        // ruch gościa u hosta: przesunięcie widoczne między PrevX a X (płynny render) i animacja nóg
+        double maxStep = 0, startX = puppet.X;
+        for (int k = 0; k < 12; k++)
+        {
+            host.Player.SetPosition(host.Player.X + 0.2, host.Player.Y, host.Player.Z);
+            Step(1);
+            maxStep = Math.Max(maxStep, puppet.X - puppet.PrevX);
+        }
+        Step(4);
+        Check(maxStep > 0.1 && puppet.X - startX > 2 && puppet.LimbSwing > 1, "Sieć: gość u hosta idzie płynnie i ma animację chodu",
+            $"krok {maxStep:F2}, droga {puppet.X - startX:F2}, nogi {puppet.LimbSwing:F2}");
+        host.Player.SetPosition(startX, host.Player.Y, host.Player.Z); Step(6);
+        var rc = server.Clients[0];
+        client.Out.Begin(C2S.OpenInventory); client.Out.End(); Step(4);
+        Check(puppet.Achievements.Contains("openInventory")&&host.Player.Achievements.Contains("openInventory"),
+            "Sieć: otwarcie ekwipunku przyznaje osiągnięcie na hoście i odsyła stan");
+        var hostAchievementBits=puppet.AchievementBits;
+        host.Player.Achievements.Add("diamonds"); Step(42);
+        Check(!host.Player.Achievements.Contains("diamonds")&&puppet.AchievementBits==hostAchievementBits,
+            "Sieć: lokalne sfałszowanie osiągnięcia jest nadpisane przez hosta");
+        hw.SetBlock(6,gy+1,8,B.Cake);puppet.FoodLevel=10;puppet.Saturation=0;Step(4);
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true,HitKind=1,HitX=6,HitY=gy+1,HitZ=8,HitFace=Dir.Up,HitFx=.5f,HitFy=.5f,HitFz=.5f });
+        Step(6);
+        Check(hw.GetMeta(6,gy+1,8)==1&&cw.GetMeta(6,gy+1,8)==1&&puppet.FoodLevel==12&&host.Player.FoodLevel==12,
+            "Sieć: gość zjada jeden kęs, host rozlicza głód i synchronizuje bryłę");
+        hw.SetBlock(6,gy+1,8,B.Air);Step(3);
+        puppet.Inventory.Main[2]=new ItemStack(I.FishingRod);host.Player.Inventory.SelectedSlot=2;Step(3);
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true });
+        Step(4);
+        Check(puppet.FishHook is {Removed:false}&&cw.Entities.OfType<FishingHook>().Any(h=>h.Angler?.Id==puppet.Id),
+            "Sieć: rzut gościa tworzy spławik hosta i wiąże żyłkę u klienta",
+            $"hostHook={puppet.FishHook?.Id}, selected={puppet.Inventory.Selected?.Id}, owner={puppet.Id}, clientPlayers={string.Join(',',cw.Entities.OfType<Player>().Select(p=>p.Id))}, clientHooks={string.Join(',',cw.Entities.OfType<FishingHook>().Select(h=>$"{h.Id}:{h.NetData}:{h.Angler?.Id}"))}");
+        client.SendInput(new NetInput { X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true });
+        Step(4);
+        Check(puppet.FishHook==null&&!cw.Entities.OfType<FishingHook>().Any(h=>h.Angler?.Id==puppet.Id&&!h.Removed),
+            "Sieć: zwinięcie gościa usuwa spławik po obu stronach");
+        host.Player.Inventory.SelectedSlot=0;Step(3);
+        puppet.Inventory.Main[2]=new ItemStack(I.SkullItem,2,3);
+        puppet.Inventory.Main[2].GetOrCreateTag()["SkullOwner"]="Tester";
+        host.Player.Inventory.SelectedSlot=2;Step(3);
+        client.SendInput(new NetInput {X=host.Player.X,Y=host.Player.Y,Z=host.Player.Z,OnGround=true,Selected=2,RightPressed=true,HitKind=1,HitX=6,HitY=gy,HitZ=8,HitFace=Dir.Up,HitFx=.5f,HitFy=1,HitFz=.5f});
+        Step(6);
+        Check(hw.GetTileEntity(6,gy+1,8) is SkullTile{SkullType:3} hsHead&&cw.GetTileEntity(6,gy+1,8) is SkullTile{SkullType:3} csHead
+            &&hsHead.Owner.GetString("Name")=="Tester"&&Nbt.Same(hsHead.Owner,csHead.Owner)&&puppet.Inventory.Main[2]?.Count==1,
+            "Sieć: głowa gracza postawiona przez gościa zachowuje typ, właściciela i koszt");
+        hw.SetBlock(6,gy+1,8,B.Air);host.Player.Inventory.SelectedSlot=0;Step(3);
+        for (int k = 0; k < 6; k++) client.SendInput(new NetInput { X = host.Player.X, Y = host.Player.Y, Z = host.Player.Z, OnGround = true });
+        client.Flush(); Thread.Sleep(5);
+        server.Tick();
+        Check(rc.PendingInputs is >= 1 and <= 3, "Sieć: paczka 6 wejść wykonywana w stałym tempie (nie naraz)", rc.PendingInputs.ToString());
+        dimensions.Tick(); server.AfterTick(); Step(8);
+        var heard = new LightningSounds(); cw.Listeners.Add(heard);
+        hw.PlaySound("eat", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
+        hw.PlaySound("random.pop", puppet.X, puppet.Y, puppet.Z, .5f, 1f);
+        Step(3);
+        cw.Listeners.Remove(heard);
+        Check(!heard.Sounds.Contains("eat") && heard.Sounds.Contains("random.pop"), "Sieć: dźwięk przewidziany przez gościa nie wraca echem, pozostałe docierają", string.Join(",", heard.Sounds));
 
         hw.SetBlock(8, gy + 4, 8, B.Stone);
         Step(3);
@@ -157,6 +217,27 @@ public static partial class SelfTest
         client.SendChat("/time set 13000");
         Step(25);
         Check(cw.DayTime % 24000 >= 13000 && cw.DayTime % 24000 < 13100, $"Sieć: komenda operatora + czas (pora {cw.DayTime % 24000})");
+
+        client.SendChat("/weather thunder 42");
+        Step(25);
+        Check(hw.Weather.Raining && hw.Weather.Thundering && cw.Weather.Raining && cw.Weather.Thundering,
+            "Sieć: komenda pogody gościa wykonywana na hoście i stan wraca do klienta");
+        client.SendChat("/weather clear 42");
+        Step(25);
+        Check(!hw.Weather.Raining && !cw.Weather.Raining && !cw.Weather.Thundering && cw.Weather.CleanTime > 0,
+            "Sieć: koniec opadów i czas dobrej pogody docierają do klienta");
+
+        var lightning = new LightningBolt(hw) { RemainingFlashes = 0, VertexSeed = 1809 };
+        lightning.SetPositionAndPrev(1, gy + 1, 1); hw.AddEntityNow(lightning);
+        Step(1);
+        var clientBolt = cw.Entities.OfType<LightningBolt>().FirstOrDefault();
+        Check(clientBolt != null && clientBolt.Id == lightning.Id && clientBolt.VertexSeed == lightning.VertexSeed
+            && clientBolt.State == lightning.State, "Sieć: piorun ma ten sam stan i geometrię u hosta i gościa");
+        Step(5);
+        Check(!hw.Entities.Contains(lightning) && !cw.Entities.OfType<LightningBolt>().Any(), "Sieć: zakończenie błysku usuwa piorun u gościa");
+        client.SendChat("/gamerule doFireTick false"); Step(25);
+        Check(!hw.Rules.DoFireTick && !cw.Rules.DoFireTick, "Sieć: reguła doFireTick ustawiona przez operatora dociera do gościa");
+        hw.Rules.DoFireTick = true; Step(25);
 
         puppet.Inventory.Main[0] = new ItemStack(B.Stone, 10);
         puppet.Inventory.Main[1] = new ItemStack(I.Diamond, 5);
@@ -220,6 +301,147 @@ public static partial class SelfTest
             host.Player.CloseContainer(); Step(4);
         }
 
+        // Latarnia: gość wybiera moc, płatność i walidacja należą do hosta.
+        hw.SetBlock(6,gy+1,8,B.Beacon);
+        for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)hw.SetBlock(6+dx,gy,8+dz,B.IronBlock);
+        for(int yy=gy+2;yy<Chunk.Height;yy++)hw.SetBlock(6,yy,8,B.Air);
+        ((BeaconTile)hw.GetTileEntity(6,gy+1,8)).Update(hw);Step(5);
+        puppet.OpenBlockGui(GuiKind.Beacon,6,gy+1,8);Step(4);
+        if(puppet.OpenContainer is BeaconContainer serverBeacon && host.Player.OpenContainer is BeaconContainer clientBeacon)
+        {
+            serverBeacon.Beacon.Payment.Set(0,new ItemStack(I.Emerald));Step(4);
+            Check(clientBeacon.Beacon.Payment.Get(0)?.Id==I.Emerald,"Sieć: płatność latarni widoczna u gościa");
+            client.SetBeacon(Effect.Strength,Effect.None);Step(4);
+            Check(serverBeacon.Beacon.Primary==Effect.None&&serverBeacon.Beacon.Payment.Get(0)!=null,"Sieć: zablokowana moc z wyższego poziomu piramidy");
+            client.SetBeacon(Effect.Speed,Effect.None);Step(4);
+            Check(serverBeacon.Beacon.Primary==Effect.Speed&&serverBeacon.Beacon.Payment.Get(0)==null
+                &&clientBeacon.Beacon.Primary==Effect.Speed&&clientBeacon.Beacon.Payment.Get(0)==null,"Sieć: host rozlicza wybór mocy i jedną opłatę");
+            client.SetBeacon(Effect.Haste,Effect.None);Step(3);
+            Check(serverBeacon.Beacon.Primary==Effect.Speed,"Sieć: druga zmiana bez opłaty odrzucona");
+            host.Player.CloseContainer();Step(4);
+        }
+        else Check(false,"Sieć: GUI latarni");
+        // Stół do zaklinania: oferty liczone z tego samego ziarna po obu stronach, zaklinanie wykonuje host.
+        hw.SetBlock(6, gy + 1, 8, B.EnchantingTable); puppet.XpLevel = 30; Step(5);
+        puppet.OpenBlockGui(GuiKind.Enchanting, 6, gy + 1, 8); Step(4);
+        if (puppet.OpenContainer is EnchantingContainer serverTable && host.Player.OpenContainer is EnchantingContainer clientTable)
+        {
+            serverTable.Inv.Set(0, new ItemStack(I.DiamondSword)); serverTable.Inv.Set(1, new ItemStack(I.Lapis, 3)); Step(4);
+            Check(clientTable.Inv.Get(0)?.Id == I.DiamondSword && host.Player.EnchantmentSeed == puppet.EnchantmentSeed
+                && clientTable.Offers[0].RequiredLevel > 0 && clientTable.Offers[0].RequiredLevel == serverTable.Offers[0].RequiredLevel
+                && clientTable.Offers[0].Clue == serverTable.Offers[0].Clue, "Sieć: oferty zaklinania u gościa jak u hosta");
+            int seed = puppet.EnchantmentSeed;
+            client.EnchantItem(0); Step(4);
+            Check(EnchantHelper.IsEnchanted(serverTable.Inv.Get(0)) && EnchantHelper.IsEnchanted(clientTable.Inv.Get(0))
+                && puppet.XpLevel == 29 && host.Player.XpLevel == 29 && serverTable.Lapis == 2 && clientTable.Lapis == 2
+                && puppet.EnchantmentSeed != seed && host.Player.EnchantmentSeed == puppet.EnchantmentSeed, "Sieć: zaklinanie rozliczone przez hosta");
+            client.EnchantItem(0); Step(3);
+            Check(puppet.XpLevel == 29 && serverTable.Lapis == 2, "Sieć: ponowne zaklinanie zaklętego przedmiotu odrzucone");
+            host.Player.CloseContainer(); Step(4);
+            Check(puppet.Inventory.CountOf(I.DiamondSword) == 1 && puppet.Inventory.CountOf(I.Lapis) == 2 && puppet.OpenContainer == null,
+                "Sieć: zamknięcie stołu zwraca przedmioty gościowi");
+        }
+        else Check(false, "Sieć: GUI stołu do zaklinania", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
+
+        // tabliczka: host otwiera edytor gościowi, tekst wraca pakietem i trafia do wszystkich
+        hw.SetBlock(6, gy + 1, 8, B.Air); hw.SetBlock(7, gy + 1, 8, B.Air);
+        puppet.Inventory.Main[2] = new ItemStack(I.SignItem, 4); Step(3);
+        client.SendInput(new NetInput { X = p0.X, Y = p0.Y, Z = p0.Z, OnGround = true, Selected = 2, RightPressed = true, HitKind = 1, HitX = 6, HitY = gy, HitZ = 8, HitFace = Dir.Up, HitFx = .5f, HitFy = 1f, HitFz = .5f });
+        Step(4);
+        Check(hw.GetBlock(6, gy + 1, 8) == B.StandingSign && client.SignEditorOpened == (6, gy + 1, 8), "Sieć: postawienie tabliczki otwiera edytor u gościa");
+        client.UpdateSign(6, gy + 1, 8, new[] { "Witaj", "§cbrat", "", "!" }); Step(8);
+        Check(hw.GetTileEntity(6, gy + 1, 8) is SignTile hs && hs.Lines[0] == "Witaj" && hs.Lines[1] == "cbrat" && cw.GetTileEntity(6, gy + 1, 8) is SignTile cs && cs.Lines[3] == "!",
+            "Sieć: tekst tabliczki od gościa zapisany na hoście i odesłany");
+        client.UpdateSign(6, gy + 1, 8, new[] { "hack", "", "", "" }); Step(3);
+        Check(((SignTile)hw.GetTileEntity(6, gy + 1, 8)).Lines[0] == "Witaj", "Sieć: ponowna edycja bez otwartego edytora odrzucona");
+        hw.SetBlock(6, gy + 1, 8, B.Air); Step(2);
+
+        // Sztandar stawiany przez gościa: wzory i późniejsze zmiany TE wracają od hosta.
+        puppet.Inventory.Main[2] = Banners.MakeItem(1, new[] { ("cre", 4), ("bo", 15) }); Step(3);
+        client.SendInput(new NetInput { X = p0.X, Y = p0.Y, Z = p0.Z, OnGround = true, Selected = 2, RightPressed = true, HitKind = 1, HitX = 6, HitY = gy, HitZ = 8, HitFace = Dir.Up, HitFx = .5f, HitFy = 1f, HitFz = .5f });
+        Step(8);
+        Check(hw.GetTileEntity(6, gy + 1, 8) is BannerTile hb && cw.GetTileEntity(6, gy + 1, 8) is BannerTile cb
+            && hb.Base == 1 && hb.Patterns.Count == 2 && hb.Design == cb.Design,
+            "Sieć: sztandar gościa zachowuje tło i wzory na obu komputerach");
+        if (hw.GetTileEntity(6, gy + 1, 8) is BannerTile changed) changed.Patterns.RemoveAt(1);
+        Step(8);
+        Check(cw.GetTileEntity(6, gy + 1, 8) is BannerTile updated && updated.Patterns.Count == 1,
+            "Sieć: zmiana wzorów sztandaru dociera do klienta");
+        hw.SetBlock(6, gy + 1, 8, B.Air); Step(2);
+
+        // kowadło: nazwa od gościa, rozliczenie poziomów na hoście
+        hw.SetBlock(6, gy + 1, 8, B.Anvil); puppet.XpLevel = 5; Step(5);
+        puppet.OpenBlockGui(GuiKind.Anvil, 6, gy + 1, 8); Step(4);
+        if (puppet.OpenContainer is AnvilContainer serverAnvil && host.Player.OpenContainer is AnvilContainer clientAnvil)
+        {
+            serverAnvil.Inv.Set(0, new ItemStack(I.DiamondSword)); serverAnvil.Inv.Changed(); Step(4);
+            clientAnvil.SetName("Mieczyk"); client.AnvilName("Mieczyk"); Step(4);
+            Check(serverAnvil.RepairedName == "Mieczyk" && serverAnvil.MaximumCost == 1 && clientAnvil.MaximumCost == 1 && clientAnvil.Output.Get(0)?.CustomName == "Mieczyk",
+                "Sieć: nazwa z kowadła gościa dociera do hosta", serverAnvil.RepairedName + " " + serverAnvil.MaximumCost);
+            clientAnvil.Click(2, 0, ClickType.QuickMove, host.Player); client.Flush(); Step(4);
+            Check(puppet.XpLevel == 4 && puppet.Inventory.Main.Any(s => s?.CustomName == "Mieczyk") && host.Player.Inventory.Main.Any(s => s?.CustomName == "Mieczyk") && serverAnvil.Inv.Get(0) == null,
+                "Sieć: odbiór z kowadła rozliczony przez hosta", $"lvl {puppet.XpLevel}");
+            host.Player.CloseContainer(); Step(3);
+        }
+        else Check(false, "Sieć: GUI kowadła", puppet.OpenContainer?.GetType().Name + "/" + host.Player.OpenContainer?.GetType().Name);
+
+        // Kontenery encji: ekran klienta, akcje i rozliczenie po stronie hosta.
+        var horse = new Horse(hw) { Tamed = true };
+        horse.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(horse);
+        puppet.Sneaking = true; horse.Interact(puppet); puppet.Sneaking = false;
+        puppet.Inventory.Main[0] = new ItemStack(I.Saddle); Step(5);
+        Check(host.CurrentScreen is HorseScreen && host.Player.OpenContainer is HorseContainer,
+            "Sieć: ekran ekwipunku konia u gościa");
+        if (host.Player.OpenContainer is HorseContainer remoteHorse)
+        {
+            remoteHorse.Click(remoteHorse.FirstPlayerSlot + 27, 0, ClickType.QuickMove, host.Player); Step(4);
+            Check(horse.Inv.Get(0)?.Id == I.Saddle && remoteHorse.Horse.Inv.Get(0)?.Id == I.Saddle
+                && puppet.Inventory.Main[0] == null, "Sieć: siodło przeniesione do konia przez hosta");
+        }
+        host.Player.CloseContainer(); Step(3);
+
+        var cart = new ChestMinecartEntity(hw);
+        cart.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(cart);
+        cart.Set(0, new ItemStack(I.GoldIngot, 3)); cart.Interact(puppet); Step(4);
+        Check(host.CurrentScreen is RsContainerScreen && host.Player.OpenContainer is RsContainer,
+            "Sieć: ekran wagonika ze skrzynią u gościa");
+        if (host.Player.OpenContainer is RsContainer remoteCart)
+        {
+            remoteCart.Click(0, 0, ClickType.QuickMove, host.Player); Step(4);
+            Check(cart.Get(0) == null && puppet.Inventory.CountOf(I.GoldIngot) == 3
+                && host.Player.Inventory.CountOf(I.GoldIngot) == 3, "Sieć: ładunek wagonika przeniesiony bez powielania");
+        }
+        host.Player.CloseContainer(); Step(3);
+
+        var villager = new Villager(hw, 0);
+        villager.SetPositionAndPrev(puppet.X + 1, puppet.Y, puppet.Z); hw.AddEntityNow(villager);
+        villager.Recipes.Clear();
+        villager.Recipes.Add(new(new ItemStack(I.Wheat, 4), null, new ItemStack(I.Emerald)));
+        villager.Recipes.Add(new(new ItemStack(I.Wheat, 8), null, new ItemStack(I.Emerald, 2)) { MaxUses = 1 });
+        villager.Interact(puppet); Step(5);
+        Check(host.CurrentScreen is MerchantScreen && host.Player.OpenContainer is MerchantContainer,
+            "Sieć: ekran handlu z ofertami u gościa");
+        if (host.Player.OpenContainer is MerchantContainer remoteTrade && puppet.OpenContainer is MerchantContainer trade)
+        {
+            client.SelectRecipe(1); Step(3);
+            Check(trade.Index == 1 && remoteTrade.Index == 1 && remoteTrade.Current.Sell.Count == 2,
+                "Sieć: wybór oferty potwierdzony przez hosta");
+            client.SelectRecipe(999); Step(2);
+            Check(trade.Index == 1, "Sieć: nieprawidłowy indeks oferty jest odrzucany");
+            puppet.Cursor = new ItemStack(I.Wheat, 8); Step(3);
+            remoteTrade.Click(0, 0, ClickType.Pickup, host.Player); Step(3);
+            Check(remoteTrade.Inv.Get(2)?.Count == 2, "Sieć: wynik handlu dociera od hosta");
+            remoteTrade.Click(2, 0, ClickType.Pickup, host.Player); Step(4);
+            Check(trade.Inv.Get(0) == null && puppet.Cursor?.Id == I.Emerald && puppet.Cursor.Count == 2
+                && host.Player.Cursor?.Count == 2 && trade.Current.Uses == 1 && remoteTrade.Current.Disabled,
+                "Sieć: zapłata, wynik i wyczerpanie oferty rozliczone raz");
+            var cursor = host.Player.Cursor; int emeralds = host.Player.Inventory.CountOf(I.Emerald);
+            remoteTrade.OnClose(host.Player);
+            Check(host.Player.Cursor == cursor && host.Player.Inventory.CountOf(I.Emerald) == emeralds,
+                "Sieć: lokalne zamknięcie GUI nie przenosi kursora ponownie do ekwipunku");
+            puppet.CloseContainer(); client.SelectRecipe(0); Step(4);
+            Check(trade.Index == 1 && host.Player.OpenContainer == null, "Sieć: spóźniony wybór zamkniętego okna jest odrzucany");
+        }
         puppet.SetGameMode(1);
         var nether = dimensions.Get(DimensionId.Nether);
         // Zajmij ID w nowym wymiarze, aby przetestować zmianę ID gracza w protokole.
@@ -244,7 +466,7 @@ public static partial class SelfTest
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var relay = new FakeDerpRelay();
-        var gw = new FakeRelayGatewayFactory(relay, null);
+        var gw = new FakeRelayGatewayFactory(relay, null) { DirectPaths = false };
         await using var host = await LinkHostService.StartAsync(LinkSetup.Options("host", gw, new InMemoryLinkStore()), cts.Token);
         string code = await host.InviteAsync(cts.Token);
         Check(!string.IsNullOrEmpty(code), "Tailcat: kod zaproszenia", code);
@@ -277,5 +499,6 @@ public static partial class SelfTest
         }
         Check(client.Login != null && server.Clients.Count == 1, "Tailcat: logowanie do gry", client.Error ?? "");
         server.Shutdown("koniec testu");
+        await TestNet2PacketLoss();
     }
 }

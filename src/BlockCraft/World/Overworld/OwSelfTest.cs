@@ -12,6 +12,7 @@ public static partial class SelfTest
 
     private static void TestOverworld()
     {
+        TestOwEntityPopulation();
         Console.WriteLine("[Overworld]");
         var r = Recipes.Find(new[] { S(B.SpruceLog), null, null, null }, 2, 2);
         Check(r != null && r.Id == B.SprucePlanks && r.Count == 4, "Świerkowa kłoda -> 4 świerkowe deski");
@@ -78,5 +79,13 @@ public static partial class SelfTest
         for (int i = 0; i < 200; i++) { var s = new Sheep(w); if (s.Color is not (0 or 6 or 7 or 8 or 12 or 15)) ok = false; }
         Check(ok, "Kolory owiec jak w 1.8");
         TestOwGenLayers();
+        TestOwTerrain();
+        TestOwCavesAndPopulation();
+        TestOwStructures();
+        TestOwLargeStructures();
+        TestOwWeather();
+        TestOwLightning();
+        TestOwStructureSpawns();
+        TestOwSpawnCycle();
     }
 }

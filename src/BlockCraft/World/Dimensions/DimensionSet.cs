@@ -47,6 +47,7 @@ public sealed partial class World
         {
             Light.MergeChunk(c); c.MarkAllDirty();
             if (c.PendingEntityData != null) { EntitySerializer.LoadEntities(this,c.PendingEntityData); c.PendingEntityData = null; }
+            ApplyGeneratedEntities(c);
         }
     }
 }
@@ -81,6 +82,7 @@ public sealed class DimensionSet : IDisposable
     private void CopyRules(World w)
     {
         // Nether i End mają własny spawner (DimensionSpawner), więc ogólny MobSpawner świata jest w nich wyłączony
+        if (w != _overworld) w.Rules.CopyFrom(_overworld.Rules);
         w.Rules.DoDaylightCycle = _overworld.Rules.DoDaylightCycle; w.Rules.DoMobSpawning = w == _overworld && _overworld.Rules.DoMobSpawning;
         w.Rules.KeepInventory = _overworld.Rules.KeepInventory; w.Rules.DoFireTick = _overworld.Rules.DoFireTick;
         w.Rules.MobGriefing = _overworld.Rules.MobGriefing; w.Rules.NaturalRegeneration = _overworld.Rules.NaturalRegeneration;
@@ -100,6 +102,12 @@ public sealed class DimensionSet : IDisposable
         if (old == next) return;
         next.EnsureDimensionArea(MathUtil.FloorToInt(x),MathUtil.FloorToInt(z),32);
         if (entity is Player player) player.CloseContainer();
+        if (entity is Player achiever)
+        {
+            if (target == DimensionId.Nether) achiever.AwardAchievement("portal");
+            if (target == DimensionId.End) achiever.AwardAchievement("theEnd");
+            if (old.Dimension == DimensionId.End && target == DimensionId.Overworld) achiever.AwardAchievement("theEnd2");
+        }
         old.RemoveEntity(entity); entity.World = next; entity.Id = 0; entity.Removed = false;
         entity.MotionX = entity.MotionY = entity.MotionZ = 0; entity.FallDistance = 0;
         entity.SetPositionAndPrev(x,y,z); next.AddEntityNow(entity);

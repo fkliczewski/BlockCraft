@@ -75,7 +75,7 @@ public class Item
     public int Hunger; public float SaturationMod;
     public int ArmorSlot = -1;        // 0=hełm,1=napierśnik,2=spodnie,3=buty
     public int ArmorPoints;
-    public int ArmorMaterial = -1;    // 0 skóra,1 żelazo,2 złoto,3 diament
+    public int ArmorMaterial = -1;    // 0 skóra,1 żelazo,2 złoto,3 diament,4 kolczuga
     public int CreativeTab = 3;
     public bool InCreative = true;
     public bool Handheld;             // trzymany jak narzędzie (po przekątnej)
@@ -90,6 +90,8 @@ public class Item
     public Func<ItemStack, (int layer, uint color)> OverlayFn;
     /// <summary>Własna nazwa zależna od stacka (np. mikstury, zaklęta książka).</summary>
     public Func<ItemStack, string> NameFn;
+    /// <summary>Szary opis pod nazwą w dymku (np. wykonawca płyty).</summary>
+    public Func<ItemStack, string> LoreFn;
     /// <summary>Własne użycie PPM na bloku: (gracz, stack, x, y, z, ściana, hx, hy, hz). True = obsłużone, domyślna logika się nie wykona.</summary>
     public Func<Player, ItemStack, int, int, int, int, double, double, double, bool> UseOnBlock;
     /// <summary>Własne użycie PPM w powietrze (też gdy UseOnBlock nie obsłużył). True = obsłużone.</summary>
@@ -162,6 +164,8 @@ public sealed class ItemStack
     {
         var it = Item;
         if (it == null || it.MaxDamage <= 0) return false;
+        amount = EnchantEffects.Unbreaking(this, amount, Random.Shared);
+        if (amount <= 0) return false;
         Damage += amount;
         if (Damage >= it.MaxDamage) { Count--; Damage = 0; return true; }
         return false;

@@ -51,9 +51,20 @@ public sealed class BrewingContainer : Container
     public BrewingContainer(PlayerInventory inv, BrewingStandTile stand)
     {
         Stand = stand; Title = "Statyw alchemiczny";
-        Slots.Add(new FilterSlot(stand, 0, 56, 51, Bottle, 1)); Slots.Add(new FilterSlot(stand, 1, 79, 58, Bottle, 1)); Slots.Add(new FilterSlot(stand, 2, 102, 51, Bottle, 1));
+        Slots.Add(new BrewingBottleSlot(stand, 0, 56, 51)); Slots.Add(new BrewingBottleSlot(stand, 1, 79, 58)); Slots.Add(new BrewingBottleSlot(stand, 2, 102, 51));
         Slots.Add(new FilterSlot(stand, 3, 79, 17, Potions.IsIngredient)); AddPlayerSlots(inv, 84, 142);
     }
     private static bool Bottle(ItemStack s) => s.Id is I.Potion or I.GlassBottle;
     protected override bool TransferFromPlayer(ItemStack s) => Potions.IsIngredient(s) ? MergeStack(s, 3, 4, false) : Bottle(s) && MergeStack(s, 0, 3, false);
+}
+
+public sealed class BrewingBottleSlot : Slot
+{
+    public BrewingBottleSlot(IInventory inv,int index,int x,int y):base(inv,index,x,y){}
+    public override bool CanPlace(ItemStack s)=>s?.Id is I.Potion or I.GlassBottle;
+    public override int MaxStack(ItemStack s)=>1;
+    public override void OnTake(Player p,ItemStack taken)
+    {
+        if(taken?.Id==I.Potion&&taken.Damage>0) p?.AwardAchievement("potion");
+    }
 }

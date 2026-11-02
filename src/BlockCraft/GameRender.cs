@@ -33,13 +33,14 @@ public sealed partial class Game
         {
             try { _screen.Render(MouseGuiX, MouseGuiY, pt); } catch (Exception ex) { Log.Error("Screen: " + ex); }
         }
+        DrawAchievementNotice();
         Sb.End();
     }
 
     private void RenderMenuWorld(float pt, int fw, int fh)
     {
         var w = _menuWorld;
-        _menuYaw += 0.03f;
+        _menuYaw = (_tickCount + pt) * 0.1f; // 1.8 GuiMainMenu: 0,1 stopnia na tick, niezależnie od liczby klatek
         int top = 0;
         for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) top = Math.Max(top, w.GetHeight(w.SpawnX + dx, w.SpawnZ + dz));
         var cam = new Vector3d(w.SpawnX + 0.5, Math.Max(w.SpawnY + 4, top + 2.5), w.SpawnZ + 0.5);
@@ -109,6 +110,8 @@ public sealed partial class Game
         World.World.HitResult? sel = Ctrl.Hit.Hit && !p.Spectator && !HideGui ? Ctrl.Hit : null;
         Renderer.Render(cam, view, _proj, pt, p, third, sel, Ctrl.BreakStage);
         NetCaptureCamera(cam, view);
+        DrawSignTexts(cam, view * _proj);
+        DrawWorldBorder(cam, view * _proj);
 
         // ręka
         if (!third && !p.Spectator && !p.Sleeping && !HideGui)
@@ -128,6 +131,8 @@ public sealed partial class Game
             er.RenderFirstPerson(p, pt, equip, _equipped, w.GetSkyLight(bx, by, bz), w.GetBlockLight(bx, by, bz));
             er.Flush(er.Skin, er.SkinTex);
             er.Flush(er.Terrain, Renderer.Terrain);
+            er.FlushMaps();
+            er.FlushBanners();
         }
         GL.Disable(EnableCap.DepthTest);
     }
@@ -159,10 +164,38 @@ public sealed partial class Game
     }
 
     // ================= przedmioty w GUI =================
+    /// <summary>Połysk zaklęcia: fioletowa, pulsująca kopia kształtu przedmiotu (przybliżenie RenderItem.renderEffect).</summary>
+    /// <summary>Item.hasEffect z 1.8: zaklęcia, zaklęta książka, zaklęte złote jabłko, mikstury z efektami, flaga Glint.</summary>
+    public static bool HasGlint(ItemStack s) => s.Item.Glint || s.Id == I.EnchantedBook || EnchantHelper.IsEnchanted(s)
+        || s.Id == I.GoldenApple && s.Damage > 0 || s.Id == I.Potion && Potions.Effects(s).Any();
+
+    private void DrawGlint(ItemStack s, float x, float y)
+    {
+        // addytywnie (GL_SRC_ALPHA, GL_ONE) jak RenderItem.renderEffect: rozjaśnia, nie brudzi koloru przedmiotu
+        float t = (Environment.TickCount64 % 3000) / 3000f;
+        int a = (int)(90 + 45 * Math.Sin(t * Math.PI * 2 + x * .05));
+        uint c = SpriteBatch.Col(128, 64, 204, a);
+        Sb.Flush();
+        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
+        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, c, 0, 1, 1, 0);
+        else Sb.DrawLayer(Renderer.Terrain, s.Item.GetSprite(s), x, y, 16, 16, c);
+        Sb.Flush();
+        GL.BlendFuncSeparate(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha, BlendingFactorSrc.One, BlendingFactorDest.OneMinusSrcAlpha);
+    }
+
     public void DrawItem(ItemStack s, float x, float y, bool count = true)
     {
         if (s == null || s.Item == null) return;
-        if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
+        if (s.Id == I.Banner)
+        {
+            // Finish queued GUI vertices before the texture LRU may replace their layer.
+            Sb.Flush();
+            var tex = Renderer.Entities.BannerTextures;
+            int bannerLayer = tex.LayerFor(Banners.BaseOf(s), Banners.PatternsOf(s));
+            Sb.Fill(x + 4, y + 1, 1, 15, 0xFF406080);
+            Sb.DrawLayer(tex.Array, bannerLayer, x + 5, y + 1, 7, 13, 0xFFFFFFFF, 1 / 64f, 1 / 64f, 21 / 64f, 41 / 64f);
+        }
+        else if (Icons.TryGet(s, out int layer)) Sb.DrawLayer(Icons.Array, layer, x, y, 16, 16, 0xFFFFFFFF, 0, 1, 1, 0); // FBO ma oś Y od dołu
         else
         {
             var it = s.Item;
@@ -171,6 +204,7 @@ public sealed partial class Game
             Sb.DrawLayer(Renderer.Terrain, sp, x, y, 16, 16, col);
             if (it.OverlayFn != null) { var (ol, oc) = it.OverlayFn(s); if (ol > 0) Sb.DrawLayer(Renderer.Terrain, ol, x, y, 16, 16, oc); }
         }
+        if (HasGlint(s)) DrawGlint(s, x, y);
         if (count && s.Count > 1)
         {
             string t = s.Count.ToString();
@@ -244,6 +278,7 @@ public sealed partial class Game
             if (p.IsInsideOpaqueBlock() && !p.Spectator) sb.Fill(0, 0, W, H, 0xC0101010);
         }
         NetDrawNameTags(pt);
+        DrawCommandHud(pt);
         // winieta
         sb.Gradient(0, 0, W, H / 6f, 0x30000000, 0x00000000);
         sb.Gradient(0, H - H / 6f, W, H / 6f, 0x00000000, 0x30000000);
@@ -364,7 +399,9 @@ public sealed partial class Game
         string[] facing = { "południe (+Z)", "zachód (-X)", "północ (-Z)", "wschód (+X)" };
         var lines = new List<string>
         {
-            $"BlockCraft 1.0 ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
+            $"BlockCraft {GameVersion.Name} ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
+            $"Tempo: {_tps} TPS, czas świata +{_dayRate}/s (w 1.8: 20 i 20){(Server != null ? ", HOST" : Client != null ? ", GOŚĆ" : "")}",
+            Ctrl.LastBreakTicks > 0 ? $"Ostatnie kopanie: {Ctrl.LastBreakKey} {Ctrl.LastBreakTicks} t = {Ctrl.LastBreakTicks / 20.0:F2} s (wzór 1.8: {Ctrl.LastBreakExpected} t)" : "Ostatnie kopanie: -",
             $"C: {Renderer.RenderedSections}/{Renderer.TotalSections} sekcji, E: {w.Entities.Count}, P: {Renderer.Particles.Count}",
             $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager?.PendingCount ?? 0} w kolejce",
             "",

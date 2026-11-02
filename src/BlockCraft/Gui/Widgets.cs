@@ -88,7 +88,6 @@ public sealed class TextField : Widget
     public bool Focused;
     public int MaxLength = 64;
     public string Placeholder = "";
-    private int _cursorBlink;
     public Action OnEnter;
     public TextField(int x, int y, int w, int h) { X = x; Y = y; W = w; H = h; }
     public override void Draw(Game g, int mx, int my)
@@ -100,8 +99,8 @@ public sealed class TextField : Widget
         while (sb.Measure(t) > W - 8 && t.Length > 0) t = t[1..];
         if (Text.Length == 0 && !Focused) sb.Text(Placeholder, X + 4, Y + (H - 8) / 2f, 0xFF707070, false);
         sb.Text(t, X + 4, Y + (H - 8) / 2f, 0xFFE0E0E0);
-        _cursorBlink++;
-        if (Focused && (_cursorBlink / 30) % 2 == 0) sb.Text("_", X + 4 + sb.Measure(t), Y + (H - 8) / 2f, 0xFFE0E0E0);
+        // 1.8 GuiTextField: cursorCounter / 6 % 2 w tickach, czyli 300 ms (wcześniej liczone w klatkach: przy 500 Hz miga 8x za szybko)
+        if (Focused && Environment.TickCount64 / 300 % 2 == 0) sb.Text("_", X + 4 + sb.Measure(t), Y + (H - 8) / 2f, 0xFFE0E0E0);
     }
     public override bool MouseDown(Game g, int mx, int my, int btn) { Focused = Hover(mx, my); return Focused; }
     public override bool Char(Game g, char c)

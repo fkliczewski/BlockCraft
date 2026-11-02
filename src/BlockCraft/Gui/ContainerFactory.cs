@@ -18,6 +18,9 @@ public static class ContainerFactory
         [GuiKind.Brewing] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is BrewingStandTile b ? new BrewingContainer(p.Inventory, b) : null,
         [GuiKind.Hopper] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is World.HopperTileEntity h ? new World.RsContainer(p.Inventory, h, "Lej", World.RsContainer.Layout.Hopper) : null,
         [GuiKind.Dispenser] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is World.DispenserTileEntity d ? new World.RsContainer(p.Inventory, d, w.GetBlock(x,y,z) == World.B.Dropper ? "Podajnik" : "Dozownik", World.RsContainer.Layout.Grid3) : null,
+        [GuiKind.Enchanting] = (w, p, x, y, z) => w.GetBlock(x, y, z) == World.B.EnchantingTable ? new EnchantingContainer(p, w, x, y, z) : null,
+        [GuiKind.Beacon] = (w,p,x,y,z) => w.GetTileEntity(x,y,z) is World.BeaconTile tile ? new BeaconContainer(p,w,tile) : null,
+        [GuiKind.Anvil] = (w, p, x, y, z) => w.GetBlock(x, y, z) == World.B.Anvil ? new AnvilContainer(p, w, x, y, z) : null,
         [GuiKind.TrappedChest] = (w, p, x, y, z) => World.Block.Get(w.GetBlock(x,y,z)) is World.TrappedChestBlock t ? t.CreateContainer(w, p, x, y, z) : null,
     };
 
@@ -26,6 +29,11 @@ public static class ContainerFactory
     {
         [typeof(BrewingContainer)] = (p, c) => new BrewingScreen(p, (BrewingContainer)c),
         [typeof(World.RsContainer)] = (p, c) => new RsContainerScreen(p, c),
+        [typeof(HorseContainer)] = (p, c) => new HorseScreen(p, (HorseContainer)c),
+        [typeof(EnchantingContainer)] = (p, c) => new EnchantingScreen(p, (EnchantingContainer)c),
+        [typeof(BeaconContainer)] = (p,c) => new BeaconScreen(p,(BeaconContainer)c),
+        [typeof(AnvilContainer)] = (p, c) => new AnvilScreen(p, (AnvilContainer)c),
+        [typeof(MerchantContainer)] = (p, c) => new MerchantScreen(p, (MerchantContainer)c),
     };
 
     public static Container Create(World.World w, Player p, GuiKind kind, int x, int y, int z)

@@ -1,4 +1,4 @@
-using System.Globalization;
+using BlockCraft.Cmd;
 using BlockCraft.Core;
 using BlockCraft.Entities;
 using BlockCraft.Items;
@@ -6,362 +6,264 @@ using BlockCraft.World;
 
 namespace BlockCraft;
 
-/// <summary>Komendy czatu jak w Minecraft.</summary>
-public sealed class Commands
+/// <summary>
+/// Komendy MC 1.8 (CommandHandler/ServerCommandManager): rozwijanie selektorów wielu encji w argumencie gracza
+/// (isUsernameIndex), wynik = liczba udanych wykonań (SuccessCount), powiadomienia operatorów i reguły
+/// sendCommandFeedback/commandBlockOutput/logAdminCommands. Implementacje komend w Commands/Cmd*.cs.
+/// </summary>
+public sealed partial class Commands
 {
     private readonly World.World _w;
     public Commands(World.World w) { _w = w; }
 
-    public static readonly string[] Names =
+    private static readonly Dictionary<string, CommandDef> Map = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<CommandDef> Defs = new();
+    [ThreadStatic] private static Dictionary<string, Entity> _resolved;
+    [ThreadStatic] private static int _commandDepth;
+
+    public static string[] Names => Defs.SelectMany(d => d.Aliases.Prepend(d.Name)).ToArray();
+
+    static Commands()
     {
-        "help", "time", "gamemode", "tp", "teleport", "give", "kill", "summon", "setblock", "fill", "difficulty", "gamerule", "clear",
-        "seed", "spawnpoint", "setworldspawn", "say", "me", "xp", "list", "weather", "heal", "feed", "effect", "locate"
+        RegisterBasic(); RegisterEntities(); RegisterBlocks(); RegisterScoreboard(); RegisterExtra();
+    }
+
+    private static CommandDef Reg(string name, int level, string usage, Action<CommandSender, string[]> run, Func<string[], int, bool> user = null,
+        Func<CommandSender, string[], IEnumerable<string>> tab = null, params string[] aliases)
+    {
+        var d = new CommandDef { Name = name, Level = level, Usage = usage, Run = run, Aliases = aliases, Tab = tab };
+        if (user != null) d.UserIndex = user;
+        Defs.Add(d); Map[name] = d;
+        foreach (var a in aliases) Map[a] = d;
+        return d;
+    }
+
+    /// <summary>Wykonanie komendy przez gracza (czat). Zwraca true, gdy przynajmniej jedno wykonanie się udało.</summary>
+    public bool Execute(Player p, string line) => Run(new PlayerSender(p), line) > 0;
+
+    /// <summary>CommandHandler.executeCommand: zwraca liczbę udanych wykonań.</summary>
+    public static int Run(CommandSender s, string line)
+    {
+        if (_commandDepth >= 64) { s.Message("§cPrzekroczono limit zagnieżdżenia komend"); s.SetStat(StatType.SuccessCount, 0); return 0; }
+        _commandDepth++;
+        try { return RunInner(s, line); }
+        catch (CommandException e) { s.Message("§c" + e.Message); s.SetStat(StatType.SuccessCount, 0); return 0; }
+        finally { _commandDepth--; }
+    }
+
+    private static int RunInner(CommandSender s, string line)
+    {
+        line = (line ?? "").Trim();
+        if (line.StartsWith('/')) line = line[1..];
+        var parts = SplitJava(line);
+        if (parts.Length == 0 || parts[0].Length == 0) return 0;
+        var args = parts[1..];
+        int count = 0;
+        if (!Map.TryGetValue(parts[0], out var def))
+            s.Message("§cNieznana komenda. Wpisz \"/help\", aby wyświetlić listę komend.");
+        else if (s.PermissionLevel < def.Level)
+            s.Message(s.Entity is Player { Handler: Net.RemoteClient } ? "§cTylko host i operatorzy mogą używać tej komendy." : "§cNie masz uprawnień do użycia tej komendy");
+        else
+        {
+            int ui = UsernameIndex(def, args);
+            if (ui > -1)
+            {
+                var list = Selector.Match(s, args[ui]);
+                string orig = args[ui];
+                s.SetStat(StatType.AffectedEntities, list.Count);
+                var prev = _resolved; _resolved = new Dictionary<string, Entity>();
+                try
+                {
+                    foreach (var e in list)
+                    {
+                        string id = Selector.Uuid(e); _resolved[id] = e;
+                        args[ui] = id;
+                        if (TryRun(s, def, args)) count++;
+                    }
+                }
+                finally { _resolved = prev; args[ui] = orig; }
+            }
+            else
+            {
+                s.SetStat(StatType.AffectedEntities, 1);
+                if (TryRun(s, def, args)) count++;
+            }
+        }
+        s.SetStat(StatType.SuccessCount, count);
+        return count;
+    }
+
+    private static int UsernameIndex(CommandDef d, string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+            if (d.UserIndex(args, i) && Selector.MatchesMultiple(args[i])) return i;
+        return -1;
+    }
+
+    private static bool TryRun(CommandSender s, CommandDef d, string[] args)
+    {
+        try { d.Run(s, args); return true; }
+        catch (CommandException e) { s.Message("§c" + e.Message); }
+        catch (Exception e) { s.Message("§cWystąpił nieznany błąd podczas wykonywania tej komendy"); Log.Error("Komenda /" + d.Name + ": " + e); }
+        return false;
+    }
+
+    /// <summary>String.split(" ") z Javy: puste elementy w środku zostają, końcowe puste są usuwane.</summary>
+    public static string[] SplitJava(string line)
+    {
+        var a = line.Split(' ');
+        int n = a.Length;
+        while (n > 0 && a[n - 1].Length == 0) n--;
+        return n == a.Length ? a : a[..n];
+    }
+
+    // ================= wspólne narzędzia =================
+
+    public static World.World Home(World.World w)
+    {
+        if (w?.Dimensions != null && w.Dimensions.Loaded.TryGetValue(DimensionId.Overworld, out var o)) return o;
+        return w;
+    }
+    public static IEnumerable<World.World> Worlds(World.World w) => w?.Dimensions != null ? w.Dimensions.Loaded.Values.ToList() : new List<World.World> { w };
+    public static IEnumerable<Player> AllPlayers(World.World w) => Worlds(w).SelectMany(x => x.Players).ToList();
+
+    /// <summary>Entity.getName: gracz, własna nazwa, nazwa typu (po polsku).</summary>
+    public static string EntityName(Entity e) => e switch
+    {
+        Player p => p.Name,
+        Mob { CustomName: { Length: > 0 } n } => n,
+        LivingEntity le => le.DisplayName,
+        ItemEntity it => it.Stack?.Name ?? "Przedmiot",
+        _ => EntityNames.McName(e)
     };
-
-    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-
-    public bool Execute(Player p, string line)
+    /// <summary>getDisplayName: z prefiksem i sufiksem drużyny.</summary>
+    public static string EntityDisplayName(Entity e)
     {
-        line = line.Trim();
-        if (line.StartsWith("/")) line = line[1..];
-        if (line.Length == 0) return false;
-        var a = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        string cmd = a[0].ToLowerInvariant();
-        bool needsCheats = cmd is not ("help" or "me" or "say" or "list" or "seed");
-        if (needsCheats && !_w.AllowCheats && !p.IsLocalOp)
+        string n = EntityName(e);
+        return e.World != null ? Scoreboard.Of(e.World).TeamOf(ScoreName(e))?.Format(n) ?? n : n;
+    }
+    /// <summary>Nazwa w scoreboardzie: gracz po nicku, inne encje po UUID (func_175758_e).</summary>
+    public static string ScoreName(Entity e) => e is Player p ? p.Name : Selector.Uuid(e);
+
+    public static Player GetPlayer(CommandSender s, string arg)
+    {
+        Player p = Selector.MatchOnePlayer(s, arg);
+        if (p == null && _resolved != null && _resolved.TryGetValue(arg, out var e)) p = e as Player;
+        if (p == null)
         {
-            p.SendMessage("§cNie masz uprawnień do użycia tej komendy (komendy wyłączone).");
-            return false;
+            var all = AllPlayers(s.World);
+            p = all.FirstOrDefault(x => x.Name.Equals(arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(x => Selector.Uuid(x) == arg);
+            // wygoda BlockCraft: jednoznaczny początek nicku
+            if (p == null && !arg.StartsWith('@') && arg.Length > 0) { var pre = all.Where(x => x.Name.StartsWith(arg, StringComparison.OrdinalIgnoreCase)).ToList(); if (pre.Count == 1) p = pre[0]; }
         }
-        try
+        return p ?? throw new CommandException("Nie można odnaleźć tego gracza");
+    }
+
+    public static Entity GetEntity(CommandSender s, string arg)
+    {
+        Entity e = Selector.MatchOne(s, arg);
+        if (e == null && _resolved != null) _resolved.TryGetValue(arg, out e);
+        if (e == null)
         {
-            switch (cmd)
+            var all = AllPlayers(s.World);
+            e = all.FirstOrDefault(x => x.Name.Equals(arg, StringComparison.OrdinalIgnoreCase));
+            if (e == null && Guid.TryParse(arg, out var g))
             {
-                case "help": Help(p); return true;
-                case "time": return Time(p, a);
-                case "gamemode": case "gm": return GameMode(p, a);
-                case "tp": case "teleport": return Tp(p, a);
-                case "give": return Give(p, a);
-                case "kill": return Kill(p, a);
-                case "summon": return Summon(p, a);
-                case "setblock": return SetBlock(p, a);
-                case "fill": return Fill(p, a);
-                case "difficulty": return DifficultyCmd(p, a);
-                case "gamerule": return GameRule(p, a);
-                case "clear": return Clear(p, a);
-                case "seed": p.SendMessage("Ziarno: [§a" + _w.Seed + "§r]"); return true;
-                case "spawnpoint": return SpawnPoint(p, a);
-                case "setworldspawn":
-                    _w.SpawnX = MathUtil.FloorToInt(p.X); _w.SpawnY = MathUtil.FloorToInt(p.Y); _w.SpawnZ = MathUtil.FloorToInt(p.Z);
-                    p.SendMessage($"Ustawiono punkt odrodzenia świata na {_w.SpawnX}, {_w.SpawnY}, {_w.SpawnZ}"); return true;
-                case "say": _w.BroadcastMessage($"§d[{p.Name}] " + string.Join(' ', a.Skip(1))); return true;
-                case "me": _w.BroadcastMessage($"* {p.Name} " + string.Join(' ', a.Skip(1))); return true;
-                case "xp": return Xp(p, a);
-                case "list": p.SendMessage($"Graczy online: {_w.Players.Count}: " + string.Join(", ", _w.Players.Select(x => x.Name))); return true;
-                case "weather": p.SendMessage("W tym świecie zawsze świeci słońce :) (pogoda nieobsługiwana)"); return true;
-                case "heal": p.Health = p.MaxHealth; p.SendMessage("Uleczono."); return true;
-                case "feed": p.FoodLevel = 20; p.Saturation = 20; p.SendMessage("Najedzono."); return true;
-                case "locate": p.SendMessage("Brak struktur do zlokalizowania."); return true;
-                default: p.SendMessage("§cNieznana komenda. Wpisz /help aby zobaczyć listę komend."); return false;
+                string n = g.ToString("N");
+                foreach (var w in Worlds(s.World)) { e = w.Entities.FirstOrDefault(x => x.SaveId == n && !x.Removed); if (e != null) break; }
             }
+            else if (e == null && !arg.StartsWith('@') && arg.Count(c => c == '-') == 4) throw new CommandException("Nieprawidłowy format UUID");
         }
-        catch (Exception ex)
+        return e ?? throw new CommandException("Nie można odnaleźć tej encji");
+    }
+
+    /// <summary>getEntityName: gracz, encja (UUID) albo dosłowny tekst (fałszywy gracz, np. #licznik).</summary>
+    public static string EntityNameArg(CommandSender s, string arg)
+    {
+        try { return GetPlayer(s, arg).Name; }
+        catch (CommandException)
         {
-            p.SendMessage("§cBłąd składni: " + ex.Message);
-            return false;
+            try { return ScoreName(GetEntity(s, arg)); }
+            catch (CommandException) { if (arg != null && !arg.StartsWith('@')) return arg; throw; }
         }
     }
 
-    private void Help(Player p)
+    /// <summary>Encje z argumentu: selektor (wiele) albo jedna encja/gracz.</summary>
+    public static List<Entity> GetEntities(CommandSender s, string arg)
     {
-        p.SendMessage("§e--- Komendy ---");
-        p.SendMessage("/time set <day|night|noon|midnight|liczba>, /time add <n>");
-        p.SendMessage("/gamemode <survival|creative|spectator|0|1|3>");
-        p.SendMessage("/tp [gracz] <x> <y> <z>  (~ = względnie)");
-        p.SendMessage("/give <gracz> <przedmiot> [ilość] [meta]");
-        p.SendMessage("/summon <zombie|skeleton|creeper|spider|enderman|cow|pig|sheep|chicken> [x y z]");
-        p.SendMessage("/setblock, /fill, /kill [@e|@a|gracz], /clear, /xp <n>[L]");
-        p.SendMessage("/difficulty <peaceful|easy|normal|hard>, /gamerule <reguła> <wartość>");
-        p.SendMessage("/seed, /spawnpoint, /setworldspawn, /say, /me, /list, /heal, /feed");
+        if (Selector.IsSelector(arg)) return Selector.Match(s, arg);
+        return new List<Entity> { GetEntity(s, arg) };
     }
 
-    private List<Player> Players(Player self, string sel)
+    /// <summary>notifyOperators: szare powiadomienie do innych operatorów, komunikat do nadawcy (gdy sendCommandFeedback / trackOutput).</summary>
+    public static void Notify(CommandSender s, string msg)
     {
-        if (sel == "@p" || sel == "@s") return new() { self };
-        if (sel == "@a") return _w.Players.ToList();
-        if (sel == "@r") return _w.Players.Count > 0 ? new() { _w.Players[_w.Rand.Next(_w.Players.Count)] } : new();
-        var pl = _w.Players.FirstOrDefault(x => x.Name.Equals(sel, StringComparison.OrdinalIgnoreCase));
-        return pl != null ? new() { pl } : new();
+        var home = Home(s.World);
+        if (s.CommandFeedback)
+            foreach (var p in AllPlayers(s.World))
+                if (p != s.Entity && p.IsLocalOp && p.Handler != null && !(s is PlayerSender ps && ps.P == p))
+                    p.SendMessage("§7§o[" + s.Name + ": " + msg + "]");
+        if (home.Rules.LogAdminCommands && s is not ConsoleSender) Log.Info("[" + s.Name + ": " + msg + "]");
+        bool own = home.Rules.SendCommandFeedback;
+        if (s is CommandBlockLogic cb) own = cb.TrackOutput;
+        if (own || s is ConsoleSender) s.Message(msg);
     }
 
-    private bool Time(Player p, string[] a)
+    /// <summary>Łączy argumenty od indeksu i zamienia w nich selektory na nazwy encji (getChatComponentFromNthArg).</summary>
+    public static string ChatArg(CommandSender s, string[] a, int from, bool selectors)
     {
-        if (a.Length < 2) throw new Exception("/time <set|add|query> <wartość>");
-        string sub = a[1].ToLowerInvariant();
-        if (sub == "query") { p.SendMessage($"Czas dnia: {_w.DayTime % 24000}, dzień {_w.DayTime / 24000}"); return true; }
-        if (a.Length < 3) throw new Exception("/time set <wartość>");
-        long v = a[2].ToLowerInvariant() switch
+        var parts = new List<string>();
+        for (int i = from; i < a.Length; i++)
         {
-            "day" or "dzien" or "dzień" => 1000, "night" or "noc" => 13000, "noon" or "poludnie" or "południe" => 6000, "midnight" or "polnoc" or "północ" => 18000,
-            "sunrise" => 23000, "sunset" => 12000,
-            _ => long.Parse(a[2], Inv)
-        };
-        if (sub == "set") { _w.DayTime = (_w.DayTime / 24000) * 24000 + v; p.SendMessage("Ustawiono czas na " + v); }
-        else if (sub == "add") { _w.DayTime += v; p.SendMessage("Dodano do czasu " + v); }
-        else throw new Exception("/time <set|add|query>");
-        return true;
-    }
-
-    private bool GameMode(Player p, string[] a)
-    {
-        if (a.Length < 2) throw new Exception("/gamemode <tryb> [gracz]");
-        int gm = a[1].ToLowerInvariant() switch
-        {
-            "0" or "s" or "survival" or "przetrwanie" => 0,
-            "1" or "c" or "creative" or "kreatywny" => 1,
-            "2" or "a" or "adventure" => 0,
-            "3" or "sp" or "spectator" or "obserwator" => 3,
-            _ => throw new Exception("Nieznany tryb gry: " + a[1])
-        };
-        var targets = a.Length > 2 ? Players(p, a[2]) : new() { p };
-        foreach (var t in targets)
-        {
-            t.SetGameMode(gm);
-            t.NetGameModeHook?.Invoke();
-            string name = gm switch { 0 => "Przetrwanie", 1 => "Kreatywny", _ => "Obserwator" };
-            t.SendMessage("Twój tryb gry został zmieniony na: " + name);
+            string w = a[i];
+            if (selectors && Selector.IsSelector(w))
+                w = Selector.MatchToString(s, w) ?? throw new CommandException("Nie można odnaleźć tego gracza");
+            parts.Add(w);
         }
-        return true;
+        return string.Join(' ', parts);
     }
 
-    private static double Coord(string s, double cur)
+    /// <summary>Zapis stanu komend świata (scoreboard, granica).</summary>
+    public static void SaveState(World.World home)
     {
-        if (s.StartsWith("~")) return cur + (s.Length > 1 ? double.Parse(s[1..], Inv) : 0);
-        double v = double.Parse(s, Inv);
-        return v;
+        if (home?.ScoreboardField != null) home.ScoreboardField.Save();
+        home?.BorderField?.Save();
     }
 
-    private bool Tp(Player p, string[] a)
+    /// <summary>Wyszukanie serwera sieciowego (host) przez handlery graczy.</summary>
+    public static Net.NetServer FindServer(World.World w)
     {
-        var target = p;
-        int i = 1;
-        if (a.Length == 2 || a.Length == 5)
+        foreach (var p in AllPlayers(w))
         {
-            var t = Players(p, a[1]);
-            if (t.Count == 0) throw new Exception("Nie znaleziono gracza " + a[1]);
-            if (a.Length == 2) { p.SetPositionAndPrev(t[0].X, t[0].Y, t[0].Z); p.NetTeleportHook?.Invoke(); p.SendMessage("Przeteleportowano do " + t[0].Name); return true; }
-            target = t[0]; i = 2;
+            if (p.Handler is Net.RemoteClient rc) return rc.Server;
+            if (p.Handler is Game g && g.Server != null) return g.Server;
         }
-        if (a.Length - i < 3) throw new Exception("/tp [gracz] <x> <y> <z>");
-        double x = Coord(a[i], target.X), y = Coord(a[i + 1], target.Y), z = Coord(a[i + 2], target.Z);
-        if (!a[i].StartsWith("~") && !a[i].Contains('.')) x += 0.5;
-        if (!a[i + 2].StartsWith("~") && !a[i + 2].Contains('.')) z += 0.5;
-        target.SetPositionAndPrev(x, y, z);
-        target.MotionX = target.MotionY = target.MotionZ = 0; target.FallDistance = 0;
-        target.NetTeleportHook?.Invoke();
-        p.SendMessage($"Przeteleportowano {target.Name} na {x:F1}, {y:F1}, {z:F1}");
-        return true;
+        return null;
     }
 
-    private bool Give(Player p, string[] a)
-    {
-        if (a.Length < 3) throw new Exception("/give <gracz> <przedmiot> [ilość] [meta]");
-        var targets = Players(p, a[1]);
-        if (targets.Count == 0) throw new Exception("Nie znaleziono gracza " + a[1]);
-        var it = Item.Get(a[2]) ?? throw new Exception("Nieznany przedmiot: " + a[2]);
-        int count = a.Length > 3 ? int.Parse(a[3], Inv) : 1;
-        int meta = a.Length > 4 ? int.Parse(a[4], Inv) : 0;
-        count = Math.Clamp(count, 1, 64 * 36);
-        foreach (var t in targets)
-        {
-            int left = count;
-            while (left > 0)
-            {
-                int n = Math.Min(left, it.MaxStack);
-                var s = new ItemStack(it.Id, n, meta);
-                if (!t.Inventory.Add(s)) _w.DropItem(t.X, t.Y + 0.5, t.Z, s, false);
-                left -= n;
-            }
-            t.Inventory.Dirty = true;
-            p.SendMessage($"Dano {count} x [{it.DisplayName(meta)}] graczowi {t.Name}");
-        }
-        return true;
-    }
+    // ================= podpowiedzi TAB =================
 
-    private bool Kill(Player p, string[] a)
-    {
-        if (a.Length > 1 && a[1] == "@e")
-        {
-            int n = 0;
-            foreach (var e in _w.Entities.ToList()) if (e is not Player) { e.Kill(); n++; }
-            p.SendMessage($"Zabito {n} encji");
-            return true;
-        }
-        var targets = a.Length > 1 ? Players(p, a[1]) : new() { p };
-        foreach (var t in targets)
-        {
-            t.Health = 0;
-            t.OnDeath(new DamageSource("kill") { BypassArmor = true });
-        }
-        return true;
-    }
-
-    private bool Summon(Player p, string[] a)
-    {
-        if (a.Length < 2) throw new Exception("/summon <mob> [x y z]");
-        string key = a[1].ToLowerInvariant().Replace("minecraft:", "");
-        double x = p.X, y = p.Y, z = p.Z;
-        if (a.Length >= 5) { x = Coord(a[2], p.X); y = Coord(a[3], p.Y); z = Coord(a[4], p.Z); }
-        Entity e = MobSpawner.Create(key, _w);
-        if (e == null && (key == "tnt" || key == "primedtnt")) e = new TntEntity(_w, x, y, z, 80);
-        if (e == null) throw new Exception("Nieznana encja: " + a[1]);
-        e.SetPositionAndPrev(x, y, z);
-        _w.SpawnEntity(e);
-        p.SendMessage("Przywołano: " + (e is LivingEntity le ? le.DisplayName : key));
-        return true;
-    }
-
-    private static (byte id, int meta) ParseBlock(string s, string metaStr)
-    {
-        var it = Item.Get(s);
-        if (it == null || !it.IsBlock) throw new Exception("Nieznany blok: " + s);
-        return ((byte)it.BlockId, metaStr != null ? int.Parse(metaStr, Inv) : 0);
-    }
-
-    private bool SetBlock(Player p, string[] a)
-    {
-        if (a.Length < 5) throw new Exception("/setblock <x> <y> <z> <blok> [meta]");
-        int x = MathUtil.FloorToInt(Coord(a[1], p.X)), y = MathUtil.FloorToInt(Coord(a[2], p.Y)), z = MathUtil.FloorToInt(Coord(a[3], p.Z));
-        var (id, meta) = a[4] == "air" ? ((byte)0, 0) : ParseBlock(a[4], a.Length > 5 ? a[5] : null);
-        _w.SetBlock(x, y, z, id, meta);
-        p.SendMessage("Postawiono blok.");
-        return true;
-    }
-
-    private bool Fill(Player p, string[] a)
-    {
-        if (a.Length < 8) throw new Exception("/fill <x1> <y1> <z1> <x2> <y2> <z2> <blok> [meta]");
-        int x1 = MathUtil.FloorToInt(Coord(a[1], p.X)), y1 = MathUtil.FloorToInt(Coord(a[2], p.Y)), z1 = MathUtil.FloorToInt(Coord(a[3], p.Z));
-        int x2 = MathUtil.FloorToInt(Coord(a[4], p.X)), y2 = MathUtil.FloorToInt(Coord(a[5], p.Y)), z2 = MathUtil.FloorToInt(Coord(a[6], p.Z));
-        var (id, meta) = a[7] == "air" ? ((byte)0, 0) : ParseBlock(a[7], a.Length > 8 ? a[8] : null);
-        long vol = (long)(Math.Abs(x2 - x1) + 1) * (Math.Abs(y2 - y1) + 1) * (Math.Abs(z2 - z1) + 1);
-        if (vol > 32768) throw new Exception($"Za duży obszar ({vol} > 32768)");
-        int n = 0;
-        for (int x = Math.Min(x1, x2); x <= Math.Max(x1, x2); x++)
-            for (int y = Math.Max(0, Math.Min(y1, y2)); y <= Math.Min(Chunk.Height - 1, Math.Max(y1, y2)); y++)
-                for (int z = Math.Min(z1, z2); z <= Math.Max(z1, z2); z++)
-                    if (_w.SetBlock(x, y, z, id, meta)) n++;
-        p.SendMessage($"Wypełniono {n} bloków");
-        return true;
-    }
-
-    private bool DifficultyCmd(Player p, string[] a)
-    {
-        if (a.Length < 2) { p.SendMessage("Poziom trudności: " + _w.Difficulty); return true; }
-        _w.Difficulty = a[1].ToLowerInvariant() switch
-        {
-            "0" or "peaceful" or "p" or "pokojowy" => Difficulty.Peaceful,
-            "1" or "easy" or "e" or "latwy" or "łatwy" => Difficulty.Easy,
-            "2" or "normal" or "n" or "normalny" => Difficulty.Normal,
-            "3" or "hard" or "h" or "trudny" => Difficulty.Hard,
-            _ => throw new Exception("Nieznany poziom: " + a[1])
-        };
-        p.SendMessage("Ustawiono poziom trudności na " + _w.Difficulty);
-        return true;
-    }
-
-    private bool GameRule(Player p, string[] a)
-    {
-        if (a.Length < 2) { p.SendMessage("Reguły: " + string.Join(", ", GameRules.Names)); return true; }
-        if (a.Length < 3)
-        {
-            var r = _w.Rules;
-            bool? v = a[1].ToLowerInvariant() switch
-            {
-                "dodaylightcycle" => r.DoDaylightCycle, "keepinventory" => r.KeepInventory, "domobspawning" => r.DoMobSpawning,
-                "mobgriefing" => r.MobGriefing, "naturalregeneration" => r.NaturalRegeneration, "doentitydrops" => r.DoEntityDrops, _ => null
-            };
-            p.SendMessage(v == null ? "Nieznana reguła" : $"{a[1]} = {v.Value.ToString().ToLowerInvariant()}");
-            return true;
-        }
-        if (!_w.Rules.Set(a[1], a[2], out var err)) throw new Exception(err);
-        p.SendMessage($"Reguła {a[1]} zmieniona na {a[2]}");
-        return true;
-    }
-
-    private bool Clear(Player p, string[] a)
-    {
-        var targets = a.Length > 1 ? Players(p, a[1]) : new() { p };
-        int? id = a.Length > 2 ? Item.Get(a[2])?.Id : null;
-        foreach (var t in targets)
-        {
-            int n = 0;
-            for (int i = 0; i < 40; i++)
-            {
-                var s = t.Inventory.Get(i);
-                if (s != null && (id == null || s.Id == id)) { n += s.Count; t.Inventory.Set(i, null); }
-            }
-            p.SendMessage($"Wyczyszczono ekwipunek gracza {t.Name}, usunięto {n} przedmiotów");
-        }
-        return true;
-    }
-
-    private bool SpawnPoint(Player p, string[] a)
-    {
-        var t = a.Length > 1 ? Players(p, a[1]).FirstOrDefault() ?? p : p;
-        int x = MathUtil.FloorToInt(t.X), y = MathUtil.FloorToInt(t.Y), z = MathUtil.FloorToInt(t.Z);
-        if (a.Length >= 5) { x = MathUtil.FloorToInt(Coord(a[2], t.X)); y = MathUtil.FloorToInt(Coord(a[3], t.Y)); z = MathUtil.FloorToInt(Coord(a[4], t.Z)); }
-        t.SpawnX = x; t.SpawnY = y; t.SpawnZ = z; t.HasSpawn = true;
-        p.SendMessage($"Ustawiono punkt odrodzenia gracza {t.Name} na {x}, {y}, {z}");
-        return true;
-    }
-
-    private bool Xp(Player p, string[] a)
-    {
-        if (a.Length < 2) throw new Exception("/xp <ilość>[L] [gracz]");
-        var t = a.Length > 2 ? Players(p, a[2]).FirstOrDefault() ?? p : p;
-        string v = a[1];
-        if (v.EndsWith("L", StringComparison.OrdinalIgnoreCase))
-        {
-            int lv = int.Parse(v[..^1], Inv);
-            t.XpLevel = Math.Max(0, t.XpLevel + lv); if (t.XpLevel == 0) t.XpProgress = 0;
-            p.SendMessage($"Dano {lv} poziomów graczowi {t.Name}");
-        }
-        else { int n = int.Parse(v, Inv); t.AddXp(n); p.SendMessage($"Dano {n} doświadczenia graczowi {t.Name}"); }
-        return true;
-    }
-
-    /// <summary>Podpowiedzi dla TAB.</summary>
     public static List<string> Complete(string text, World.World w)
     {
         var res = new List<string>();
-        if (!text.StartsWith("/")) return res;
+        if (!text.StartsWith("/") || w == null) return res;
         var parts = text[1..].Split(' ');
         if (parts.Length == 1)
         {
-            foreach (var n in Names) if (n.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase)) res.Add("/" + n);
+            foreach (var n in Names.OrderBy(x => x)) if (n.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase)) res.Add("/" + n);
             return res;
         }
-        string cmd = parts[0].ToLowerInvariant(); string last = parts[^1].ToLowerInvariant();
-        IEnumerable<string> opts = cmd switch
-        {
-            "time" when parts.Length == 2 => new[] { "set", "add", "query" },
-            "time" when parts.Length == 3 => new[] { "day", "night", "noon", "midnight" },
-            "gamemode" when parts.Length == 2 => new[] { "survival", "creative", "spectator" },
-            "difficulty" when parts.Length == 2 => new[] { "peaceful", "easy", "normal", "hard" },
-            "summon" when parts.Length == 2 => MobSpawner.MobKeys,
-            "give" when parts.Length == 2 => new[] { "@p", "@a" }.Concat(w.Players.Select(x => x.Name)),
-            "give" when parts.Length == 3 => Item.All.Select(i => i.Key),
-            "setblock" when parts.Length == 5 => Item.All.Where(i => i.IsBlock).Select(i => i.Key),
-            "fill" when parts.Length == 8 => Item.All.Where(i => i.IsBlock).Select(i => i.Key),
-            "gamerule" when parts.Length == 2 => GameRules.Names,
-            "gamerule" when parts.Length == 3 => new[] { "true", "false" },
-            "kill" when parts.Length == 2 => new[] { "@e", "@a", "@p" },
-            "tp" when parts.Length == 2 => w.Players.Select(x => x.Name),
-            _ => Array.Empty<string>()
-        };
+        if (!Map.TryGetValue(parts[0], out var d)) return res;
+        var args = parts[1..];
+        IEnumerable<string> opts;
+        try { opts = d.Tab?.Invoke(new ConsoleSender(w), args) ?? PlayerNames(w); } catch { opts = Array.Empty<string>(); }
+        string last = args[^1];
         string prefix = string.Join(' ', parts.Take(parts.Length - 1)) + " ";
-        foreach (var o in opts) if (o.StartsWith(last, StringComparison.OrdinalIgnoreCase)) res.Add("/" + prefix + o);
+        foreach (var o in opts.Distinct()) if (o.StartsWith(last, StringComparison.OrdinalIgnoreCase)) res.Add("/" + prefix + o);
         return res;
     }
+
+    public static IEnumerable<string> PlayerNames(World.World w) => AllPlayers(w).Select(p => p.Name);
+    private static IEnumerable<string> BlockKeys => Item.All.Where(i => i.IsBlock).Select(i => i.Key);
+    private static IEnumerable<string> ItemKeys => Item.All.Select(i => i.Key);
 }

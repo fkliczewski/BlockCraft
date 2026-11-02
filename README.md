@@ -6,19 +6,18 @@
 
 Stan rozbudowy MC 1.8: [raport integracji, wyniki testów i pozostałe braki](docs/MC18_RAPORT_INTEGRACJI.md).
 
-Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI są generowane proceduralnie w kodzie.
+Tekstury zastępcze, modele mobów, font i GUI powstają w kodzie. Wybrane tekstury oraz dźwięki i muzyka 1.8 korzystają z pobieranego lokalnie cache assetów Mojang; pliki te nie są dołączane do repozytorium.
 
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-latest-239120?logo=csharp&logoColor=white)
 ![OpenGL](https://img.shields.io/badge/OpenGL-3.3_core-5586A4?logo=opengl&logoColor=white)
 ![OpenTK](https://img.shields.io/badge/OpenTK-4.8-0B3D91)
 ![Platforma](https://img.shields.io/badge/platforma-Windows-0078D6?logo=windows&logoColor=white)
-![Linie kodu](https://img.shields.io/badge/kod-~17_tys._linii-orange)
 ![Status](https://img.shields.io/badge/status-w_rozwoju-yellow)
 
 <img src="docs/media/gif/flyover.gif" alt="Przelot nad proceduralnie wygenerowanym światem" width="640">
 
-*Przelot w trybie kreatywnym nad lasem i pustynią – każdy kadr to prawdziwa klatka z gry.*
+*Przelot w trybie kreatywnym nad lasem i pustynią - każdy kadr to prawdziwa klatka z gry.*
 
 [Galeria](#-galeria) · [Zrzuty ekranu](#-zrzuty-ekranu) · [Funkcje](#-funkcje) · [Sterowanie](#-sterowanie) · [Uruchomienie](#-uruchomienie) · [Architektura](#-architektura) · [Roadmapa](#-roadmapa)
 
@@ -30,12 +29,14 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 
 | | |
 |---|---|
-| 🌍 **Nieskończony świat** | Szum Perlina, biomy las i pustynia, jaskinie, rudy, drzewa, woda na poziomie morza |
+| 🌍 **Świat i wymiary** | Biomy 1.8, struktury, pogoda, Nether i End z portalami |
 | ☀️ **Oświetlenie jak w MC** | Sky light + block light (BFS), smooth lighting, ambient occlusion, cykl dnia i nocy |
 | 🧱 **Pełny survival** | Kopanie wg twardości/narzędzia, crafting 2×2 i 3×3, piec, skrzynie, głód, obrażenia, śmierć |
-| 🐄 **Moby z AI** | 9 mobów, pathfinding A*, spawnowanie w ciemności, rozmnażanie, płonięcie w słońcu |
-| 🔴 **Redstone** | Pył, pochodnie, dźwignie, przyciski, repeatery, lampy, tłoki (też lepkie), TNT, drzwi |
-| 🎨 **Zero assetów** | Pixel-artowe tekstury 16×16, skiny mobów i font z polskimi znakami generowane w kodzie |
+| 🐄 **Moby z AI** | Moby 1.8, konie, oswajanie, rozmnażanie, handel, smok i Wither; ograniczenia zgodności opisuje raport |
+| 🔴 **Redstone** | Komparatory, leje, dozowniki, tłoki, quasi-connectivity, tory i wagoniki; testy reguł 1.8 |
+| 📚 **Przedmioty i mechaniki** | Zaklinanie, kowadło, mikstury, mapy, sztandary, fajerwerki, latarnie, książki, skrzynie Endu i statystyki |
+| ⌨️ **Komendy 1.8** | Selektory, blok poleceń, scoreboard, granica świata, tryb przygody |
+| 🎵 **Audio i multiplayer** | Mikser 3D, muzyka, host w grze i dołączanie kodem przez przekaźnik |
 
 ---
 
@@ -110,7 +111,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
     <td><img src="docs/media/screens/sunset.png" alt="Zachód słońca"></td>
   </tr>
   <tr>
-    <td align="center"><sub>HUD przetrwania – serca, głód, zbroja, hotbar</sub></td>
+    <td align="center"><sub>HUD przetrwania - serca, głód, zbroja, hotbar</sub></td>
     <td align="center"><sub>Rudy, lawa i oświetlenie pochodni pod ziemią</sub></td>
     <td align="center"><sub>Zachód słońca nad lasem i pustynią</sub></td>
   </tr>
@@ -121,7 +122,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
   </tr>
   <tr>
     <td align="center"><sub>Ekwipunek z podglądem gracza i zbroją</sub></td>
-    <td align="center"><sub>Crafting 3×3 – diamentowy kilof</sub></td>
+    <td align="center"><sub>Crafting 3×3 - diamentowy kilof</sub></td>
     <td align="center"><sub>Piec: paliwo, przetapianie, pieczenie</sub></td>
   </tr>
   <tr>
@@ -141,7 +142,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
   </tr>
   <tr>
     <td align="center"><sub>Ekran debug (F3)</sub></td>
-    <td align="center"><sub>Czat i komendy – z polskimi znakami</sub></td>
+    <td align="center"><sub>Czat i komendy - z polskimi znakami</sub></td>
     <td align="center"><sub>Tworzenie świata: tryb, typ, ziarno</sub></td>
   </tr>
 </table>
@@ -154,7 +155,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 <summary><b>🌍 Świat</b></summary>
 
 - Rejestr bloków (id + metadata), chunki 16×128×16 dzielone na sekcje 16³
-- Generator terenu: szum Perlina (oktawy), biomy **las** i **pustynia**, plaże, woda na poziomie 63, jaskinie, bedrock
+- Generator terenu: biomy 1.8, plaże, woda na poziomie 63, jaskinie, bedrock, struktury i dekoracje; wysokość świata 256
 - Rudy: węgiel, żelazo, złoto, redstone, lapis, diament
 - Drzewa (dąb, brzoza) jak w MC, kwiaty, trawa, kaktusy, martwe krzaki, trzcina
 - Świat superpłaski
@@ -183,7 +184,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 <details>
 <summary><b>🎒 Itemy i GUI</b></summary>
 
-- Ekwipunek: 36 slotów + zbroja, hotbar, klik L/P, shift-klik, przeciąganie, klawisze 1–9, Q
+- Ekwipunek: 36 slotów + zbroja, hotbar, klik L/P, shift-klik, przeciąganie, klawisze 1-9, Q
 - Crafting 2×2 w ekwipunku i 3×3 na stole, receptury shaped i shapeless
 - Piec (paliwo, przetapianie, pieczenie) i skrzynia
 - Narzędzia drewno → kamień → żelazo → diament (+ złoto), miecze, motyki, nożyce, wiadra, zbroje
@@ -201,7 +202,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 - AI + pathfinding A*, spawnowanie (światło ≤ 7, noc i jaskinie), despawn
 - **Potwory:** zombie, szkielet (łuk i strzały), creeper (eksplozja), pająk (wspinanie), enderman (teleport, reakcja na wzrok)
 - Zombie i szkielety płoną w słońcu
-- **Zwierzęta:** krowa (mleko, skóra), owca (wełna, strzyżenie, odrastanie), świnia, kurczak (jajka) – z rozmnażaniem i młodymi
+- **Zwierzęta:** krowa (mleko, skóra), owca (wełna, strzyżenie, odrastanie), świnia, kurczak (jajka) - z rozmnażaniem i młodymi
 - Dropy, łuk gracza, TNT
 
 </details>
@@ -221,29 +222,33 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 | Klawisz | Akcja | | Klawisz | Akcja |
 |---|---|---|---|---|
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Ruch | | <kbd>E</kbd> | Ekwipunek / menu kreatywne |
-| <kbd>Spacja</kbd> | Skok · 2× – latanie (kreatywny) | | <kbd>Q</kbd> | Wyrzuć przedmiot |
+| <kbd>Spacja</kbd> | Skok · 2× - latanie (kreatywny) | | <kbd>Q</kbd> | Wyrzuć przedmiot |
 | <kbd>Shift</kbd> | Kucanie | | <kbd>T</kbd> / <kbd>/</kbd> | Czat / komenda |
 | <kbd>Ctrl</kbd> / 2× <kbd>W</kbd> | Sprint | | <kbd>F1</kbd> | Ukryj HUD |
 | <kbd>LPM</kbd> | Niszczenie / atak | | <kbd>F2</kbd> | Zrzut ekranu |
 | <kbd>PPM</kbd> | Stawianie / użycie | | <kbd>F3</kbd> | Ekran debug |
 | <kbd>ŚPM</kbd> | Wybierz blok | | <kbd>F5</kbd> | Zmiana kamery |
-| <kbd>1</kbd>–<kbd>9</kbd> / kółko | Slot hotbara | | <kbd>F11</kbd> | Pełny ekran |
+| <kbd>1</kbd>-<kbd>9</kbd> / kółko | Slot hotbara | | <kbd>F11</kbd> | Pełny ekran |
 
 ### 💬 Komendy
 
-Dostępne w światach z włączonymi kodami:
+Dostępne w światach z włączonymi kodami (komendy 1.8 z selektorami `@p @a @r @e` i argumentami `[r=,c=,m=,score_...]`, NBT w formacie Mojangson, tekst JSON):
 
 | Komenda | Opis |
 |---|---|
-| `/time set <day\|noon\|night\|midnight\|liczba>` | Zmiana pory dnia |
-| `/gamemode <survival\|creative\|spectator>` | Tryb gry (`/gm`) |
-| `/tp`, `/spawnpoint`, `/setworldspawn` | Teleport i punkty odrodzenia |
-| `/give <item> [ilość]`, `/clear` | Przedmioty |
-| `/summon <mob> [x y z]`, `/kill` | Moby |
-| `/setblock`, `/fill` | Edycja świata |
-| `/difficulty`, `/gamerule` | Trudność i reguły (np. `doDaylightCycle`) |
-| `/xp`, `/heal`, `/feed` | Gracz |
-| `/seed`, `/say`, `/me`, `/list`, `/help` | Pozostałe |
+| `/time`, `/weather`, `/toggledownfall`, `/difficulty`, `/gamerule` | Świat i reguły |
+| `/gamemode`, `/defaultgamemode` | Tryby gry, także przygoda (`CanDestroy`, `CanPlaceOn`) |
+| `/tp`, `/spreadplayers`, `/spawnpoint`, `/setworldspawn` | Teleport i odrodzenie |
+| `/give`, `/clear`, `/replaceitem`, `/enchant`, `/effect`, `/xp` | Gracz i przedmioty |
+| `/summon`, `/kill`, `/entitydata` | Encje |
+| `/setblock`, `/fill`, `/clone`, `/blockdata` | Edycja świata |
+| `/testfor`, `/testforblock`, `/testforblocks`, `/execute` | Warunki (dla bloku poleceń i komparatora) |
+| `/scoreboard`, `/trigger`, `/stats` | Cele, wyniki, drużyny, sidebar i lista Tab |
+| `/worldborder` | Granica świata ze ścianą, obrażeniami i zmianą w czasie |
+| `/title`, `/tellraw`, `/tell`, `/say`, `/me` | Komunikaty |
+| `/particle`, `/playsound`, `/achievement`, `/kick`, `/list`, `/seed`, `/locate`, `/help` | Pozostałe |
+
+Blok poleceń (tylko `/give`, edycja w kreatywnym przez operatora) i wagonik z blokiem poleceń działają z redstone jak w 1.8.
 
 ---
 
@@ -346,8 +351,8 @@ cd ../../tools/readme-media && npm install && npm run media
 - [x] Itemy i GUI: ekwipunek, crafting, piec, menu kreatywne, czat
 - [x] Moby: AI, pathfinding, spawnowanie, rozmnażanie
 - [x] Redstone
-- [ ] 🌐 Multiplayer – host w grze + serwer dedykowany (`--server`) + klient TCP
-- [ ] 🔊 Dźwięki syntezowane proceduralnie (NAudio)
+- [x] 🌐 Multiplayer - host w grze i dołączanie kodem przez Tailcat.Link (`derp.fimson.pl`)
+- [x] 🔊 Dźwięki i muzyka 1.8 (assety Mojang pobierane przy starcie, mikser 3D)
 - [ ] 🧪 Projekt testów xUnit (`BlockCraft.Tests`)
 
 Szczegóły w [CHECKLISTA.md](CHECKLISTA.md).

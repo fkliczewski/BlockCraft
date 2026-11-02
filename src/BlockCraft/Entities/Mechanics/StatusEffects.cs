@@ -97,8 +97,7 @@ public partial class Player
     {
         var food = stack.Item; if (food == null) return;
         int hunger = food.Hunger; float saturation = food.SaturationMod;
-        if (stack.Id == I.RawFish) { hunger = stack.Damage is 2 or 3 ? 1 : 2; saturation = stack.Damage is 2 or 3 ? .1f : .1f; }
-        if (stack.Id == I.CookedFish) { hunger = stack.Damage == 1 ? 6 : 5; saturation = stack.Damage == 1 ? .8f : .6f; }
+        if (stack.Id is I.RawFish or I.CookedFish) (hunger,saturation)=FishFood.Nutrition(stack.Damage,stack.Id==I.CookedFish);
         FoodLevel = Math.Min(20, FoodLevel + hunger);
         Saturation = Math.Min(FoodLevel, Saturation + hunger * saturation * 2);
         if (food.Id == I.RawChicken && World.Rand.NextFloat() < .3f || food.Id == I.RottenFlesh && World.Rand.NextFloat() < .8f) AddEffect(Effect.Hunger, 600);

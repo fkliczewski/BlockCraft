@@ -116,6 +116,8 @@ public class Slot
     }
     public virtual int MaxStack(ItemStack s) => ArmorType >= 0 ? 1 : s?.MaxStack ?? 64;
     public virtual void OnTake(Player p, ItemStack taken) { }
+    /// <summary>Slot.canTakeStack (np. wynik kowadła wymaga poziomów).</summary>
+    public virtual bool CanTake(Player p) => true;
     public ItemStack Take(int n)
     {
         var s = Stack; if (s == null) return null;
@@ -135,10 +137,13 @@ public sealed class CraftResultSlot : Slot
     {
         // zużyj składniki
         var grid = _c.CraftGrid;
+        var snapshot = new ItemStack[grid.Size];
+        for (int i = 0; i < grid.Size; i++) snapshot[i] = grid.Get(i);
+        int keep = Recipes.KeepSlotHook?.Invoke(snapshot, taken) ?? -1;
         for (int i = 0; i < grid.Size; i++)
         {
             var s = grid.Get(i);
-            if (s == null) continue;
+            if (s == null || i == keep) continue;
             int id = s.Id;
             s.Count--;
             if (s.Count <= 0) grid.Set(i, null);
@@ -161,6 +166,9 @@ public sealed class FurnaceOutputSlot : Slot
             f.StoredXp = 0;
             if (xp > 0) p.AddXp(xp);
         }
+        Entities.Bl2Stats.Crafted(p, taken);
+        if (taken?.Id == I.IronIngot) p?.AwardAchievement("acquireIron");
+        if (taken?.Id == I.CookedFish) p?.AwardAchievement("cookFish");
     }
 }
 
@@ -209,6 +217,7 @@ public abstract class Container
         if (type == ClickType.QuickMove && slotIdx >= 0)
         {
             var slot = Slots[slotIdx];
+            if (!slot.CanTake(p)) return;
             if (slot.IsOutput && slot is CraftResultSlot)
             {
                 // craftuj ile się da
@@ -232,7 +241,7 @@ public abstract class Container
         {
             if (slotIdx < 0) return;
             var slot = Slots[slotIdx];
-            var s = slot.Stack; if (s == null || p.Cursor != null) return;
+            var s = slot.Stack; if (s == null || p.Cursor != null || !slot.CanTake(p)) return;
             var taken = slot.Take(button == 1 ? s.Count : 1);
             p.DropStack(taken, false);
             slot.OnTake(p, taken);
@@ -246,7 +255,7 @@ public abstract class Container
             var s = slot.Stack;
             if (slot.IsOutput)
             {
-                if (s != null && hot == null) { PInv.Main[button] = s.Copy(); slot.Inv.Set(slot.Index, null); slot.OnTake(p, s); PInv.Dirty = true; }
+                if (s != null && hot == null && slot.CanTake(p)) { PInv.Main[button] = s.Copy(); slot.Inv.Set(slot.Index, null); slot.OnTake(p, s); PInv.Dirty = true; }
                 return;
             }
             if (hot != null && !slot.CanPlace(hot)) return;
@@ -306,6 +315,7 @@ public abstract class Container
             }
             else if (cur == null)
             {
+                if (!slot.CanTake(p)) return;
                 int n = button == 0 ? s.Count : (s.Count + 1) / 2;
                 var taken = slot.Take(n);
                 p.Cursor = taken;
@@ -324,7 +334,7 @@ public abstract class Container
                     slot.Stack = cur; p.Cursor = s;
                 }
             }
-            else if (slot.IsOutput && s.CanStackWith(cur))
+            else if (slot.IsOutput && s.CanStackWith(cur) && slot.CanTake(p))
             {
                 if (s.Count + cur.Count <= cur.MaxStack)
                 {
@@ -447,6 +457,7 @@ public abstract class Container
 
     public virtual void OnClose(Player p)
     {
+        if (p.World.IsRemote) return; // kursor i zwrot przedmiotów rozlicza host
         if (CraftGrid != null)
         {
             for (int i = 0; i < CraftGrid.Size; i++)

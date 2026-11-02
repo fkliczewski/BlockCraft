@@ -5,7 +5,7 @@ using BlockCraft.World;
 
 // Punkty zaczepienia modułów rozbudowy do MC 1.8. Każdy moduł implementuje swoje metody częściowe (static partial void ...)
 // we własnych plikach, więc nie edytuje wspólnych list. Kolejność wywołań: tekstury -> bloki -> itemy -> receptury -> encje.
-// Moduły: Overworld (OW), Redstone (RS), NetherEnd (NE), Mobs (MO), Mechanics (ME).
+// Moduły: Overworld (OW), Redstone (RS), NetherEnd (NE), Mobs (MO), Mechanics (ME), Bl2 (pionek BL2: skrzynia Endu, doniczka, książki, bariera, statystyki).
 
 namespace BlockCraft.Render
 {
@@ -16,7 +16,9 @@ namespace BlockCraft.Render
         static partial void TexNetherEnd();
         static partial void TexMobs();
         static partial void TexMechanics();
-        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); }
+        static partial void TexBl2();
+        static partial void TexCommands();
+        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); TexBl2(); TexCommands(); }
     }
 }
 
@@ -29,7 +31,9 @@ namespace BlockCraft.World
         static partial void BlocksNetherEnd();
         static partial void BlocksMobs();
         static partial void BlocksMechanics();
-        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); }
+        static partial void BlocksBl2();
+        static partial void BlocksCommands();
+        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); BlocksBl2(); BlocksCommands(); }
     }
 }
 
@@ -42,7 +46,8 @@ namespace BlockCraft.Items
         static partial void ItemsNetherEnd();
         static partial void ItemsMobs();
         static partial void ItemsMechanics();
-        private static void ModuleItems() { ItemsOverworld(); ItemsRedstone(); ItemsNetherEnd(); ItemsMobs(); ItemsMechanics(); }
+        static partial void ItemsBl2();
+        private static void ModuleItems() { ItemsOverworld(); ItemsRedstone(); ItemsNetherEnd(); ItemsMobs(); ItemsMechanics(); ItemsBl2(); }
     }
 
     public static partial class Recipes
@@ -53,7 +58,8 @@ namespace BlockCraft.Items
         static partial void RecipesNetherEnd();
         static partial void RecipesMobs();
         static partial void RecipesMechanics();
-        private static void ModuleRecipes() { RecipesOverworld(); RecipesRedstone(); RecipesNetherEnd(); RecipesMobs(); RecipesMechanics(); }
+        static partial void RecipesBl2();
+        private static void ModuleRecipes() { RecipesOverworld(); RecipesRedstone(); RecipesNetherEnd(); RecipesMobs(); RecipesMechanics(); RecipesBl2(); }
     }
 }
 
@@ -68,11 +74,13 @@ namespace BlockCraft.Entities
         static partial void EntitiesNetherEnd();
         static partial void EntitiesMobs();
         static partial void EntitiesMechanics();
+        static partial void EntitiesBl2();
+        static partial void EntitiesCommands();
 
         public static void Init()
         {
             if (_init) return; _init = true;
-            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics();
+            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics(); EntitiesBl2(); EntitiesCommands();
         }
 
         /// <summary>Klucze encji, które są mobami (do /summon, jajek spawnu i spawnera).</summary>

@@ -1,12 +1,25 @@
-Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
+Stan integracji MC 1.8 z 2026-11-02: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
 
-# BlockCraft – checklista implementacji (klon Minecrafta 1.8 w .NET)
+## Aktualizacja 2026-11-02 - fala 2
+
+- [x] .NET 10, świat o wysokości 256, biomy i moby 1.8, portale Netheru/Endu, pogoda i struktury.
+- [x] Zaklinanie, kowadło, mikstury, mapy, fajerwerki, sztandary, osiągnięcia, wędkowanie, czaszki i latarnia.
+- [x] BL2 scalone: skrzynie Endu (osobny ekwipunek gracza), doniczki, bariera, edycja/podpis/kopiowanie książek, ekran statystyk.
+- [x] Po scaleniu BL2: Release bez błędów, selftest 1000 OK / 0 FAIL, `--autotest --bl2 --fps 60` zakończony OK.
+- [x] CMD scalone: komendy 1.8, selektory, blok poleceń, scoreboard, granica świata, tryb przygody.
+- [x] NET2 scalone: pęknięcia kopania innych graczy, jazda i smycze gościa, części smoka, wyposażenie u innych. Wspólny protokół 10.
+- [x] Końcowe testy po scaleniu fali 2: selftest 1262/0, pełny autotest i autotesty modułów OK, E2E dwóch procesów przez gry.fimson.pl OK.
+- [ ] Merge do main po akceptacji Filipa.
+
+Rejestracja wszystkich mobów i biomów nie oznacza pełnej zgodności każdej mechaniki, grafiki ani generacji z oryginałem. Raport opisuje ograniczenia; część liczników statystyk nadal nie ma wyzwalaczy.
+
+# BlockCraft - checklista implementacji (klon Minecrafta 1.8 w .NET)
 
 ## Narzędzia / technologie
 - .NET 8 (C#), jeden projekt gry `BlockCraft` + projekt testów `BlockCraft.Tests` (xUnit)
-- **OpenTK 4.x** – okno (GLFW), wejście (klawiatura/mysz), OpenGL 3.3 core
-- **StbImageWriteSharp** – zapis screenshotów PNG (F2 + autotesty wizualne)
-- **NAudio** (opcjonalnie) – proceduralnie syntezowane dźwięki
+- **OpenTK 4.x** - okno (GLFW), wejście (klawiatura/mysz), OpenGL 3.3 core
+- **StbImageWriteSharp** - zapis screenshotów PNG (F2 + autotesty wizualne)
+- **NAudio** (opcjonalnie) - proceduralnie syntezowane dźwięki
 - Wszystkie tekstury generowane proceduralnie w kodzie (16x16 pixel-art w stylu MC), font pixelowy ręcznie zdefiniowany (z polskimi znakami)
 - Sieć: Tailcat.Link 0.5.4 przez przekaźnik gier gry.fimson.pl:443 (region 304; do 2026-10-30 derp.fimson.pl), host w grze ("Otwórz w sieci") + dołączanie kodem lub zapamiętanym parowaniem; `--server` pozostaje atrapą
 - Testy: xUnit (logika) + tryb `--autotest` (uruchomienie gry, skrypt akcji, screenshoty do weryfikacji)
@@ -14,20 +27,20 @@ Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_I
 ## Stan prac (2026-10-16)
 Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 
-- Kod: ~17,2 tys. linii C# w `src/BlockCraft`; `dotnet build -c Release` → 0 błędów, 4 ostrzeżenia (m.in. CA2014 – `stackalloc` w pętli w `ChunkMesher.cs`)
-- Zbudowana gra w `BlockCraft_Gra/` (poza repo) uruchamia się – GL 3.3, Intel Iris Xe
+- Kod: ~17,2 tys. linii C# w `src/BlockCraft`; `dotnet build -c Release` → 0 błędów, 4 ostrzeżenia (m.in. CA2014 - `stackalloc` w pętli w `ChunkMesher.cs`)
+- Zbudowana gra w `BlockCraft_Gra/` (poza repo) uruchamia się - GL 3.3, Intel Iris Xe
 - **Następne kroki:**
   1. Multiplayer - moduł G działa przez Tailcat.Link; po scaleniu NE/OW podłączyć wymiary i pogodę przez `NetHooks` (opis: `docs/MC18_NET.md`)
-  2. Dźwięki proceduralne – synteza NAudio w `Audio/`, podpiąć pod `Sound.Play`
-  3. Projekt `BlockCraft.Tests` (xUnit) – przenieść przypadki z `SelfTest.cs`
+  2. Dźwięki proceduralne - synteza NAudio w `Audio/`, podpiąć pod `Sound.Play`
+  3. Projekt `BlockCraft.Tests` (xUnit) - przenieść przypadki z `SelfTest.cs`
   4. Drobne: ostrzeżenie CA2014, `/weather` i `/locate` to atrapy
 
-## Etap 1 – Fundament
+## Etap 1 - Fundament
 - [x] Projekt, okno, pętla gry (20 TPS logika + interpolowany render)
 - [x] Shadery, atlas tekstur, SpriteBatch 2D, font pixelowy
 - [x] Generator tekstur bloków / itemów / GUI / mobów
 
-## Etap 2 – Świat
+## Etap 2 - Świat
 - [x] Rejestr bloków (id + metadata), chunki 16x128x16, sekcje 16^3
 - [x] Generator terenu: szum (Perlin/Simplex), biomy las + pustynia, plaże, woda na poziomie 63, jaskinie, rudy (węgiel, żelazo, złoto, redstone, lapis, diament), bedrock
 - [x] Drzewa (dąb, brzoza) jak w MC, kwiaty, trawa, kaktusy, martwe krzaki, trzcina
@@ -38,7 +51,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 - [x] Woda i lawa (płynięcie, źródła), animowane tekstury
 - [x] Zapis/odczyt świata
 
-## Etap 3 – Gracz
+## Etap 3 - Gracz
 - [x] Fizyka MC (grawitacja, tarcie, skok, AABB), sprint (Ctrl / 2x W), kucanie (Shift + trzymanie krawędzi)
 - [x] Pływanie, drabiny, latanie w kreatywnym (2x spacja)
 - [x] Kamera F5 (1. os., 3. os. z tyłu, z przodu), bobbing, ręka Steve'a + trzymany item
@@ -46,7 +59,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 - [x] HP, głód, nasycenie, wyczerpanie (sprint/skok), regeneracja, obrażenia od upadku/topienia/lawy/kaktusa, śmierć + respawn
 - [x] Jedzenie (jabłka, mięso surowe/pieczone, chleb...) z animacją
 
-## Etap 4 – Itemy i GUI
+## Etap 4 - Itemy i GUI
 - [x] Ekwipunek (36 slotów + zbroja), hotbar, klik L/P, shift-klik, przeciąganie, klawisze 1-9, Q
 - [x] Crafting 2x2 w eq, stół 3x3, receptury shaped/shapeless
 - [x] Piec (paliwo, przetapianie, pieczenie), skrzynia
@@ -56,7 +69,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 - [x] Menu główne (panorama świata), wybór świata, tworzenie świata (tryb, typ, seed, komendy), ustawienia, sterowanie, pauza, ekran śmierci
 - [x] Czat + komendy: /time /gamemode /tp /give /kill /summon /setblock /fill /difficulty /gamerule /clear /seed /help /spawnpoint /say
 
-## Etap 5 – Moby
+## Etap 5 - Moby
 - [x] Renderer modeli z boxów (UV jak skiny MC), tekstury mobów
 - [x] AI + pathfinding A*, spawnowanie (światło ≤ 7, noc/jaskinie), despawn
 - [x] Zombie, szkielet (łuk, strzały), creeper (eksplozja), pająk (wspinanie), enderman (teleport, patrzenie)
@@ -64,7 +77,7 @@ Legenda: `[x]` zrobione, `[~]` częściowo / stub, `[ ]` nie rozpoczęte.
 - [x] Krowa (mleko, skóra), owca (wełna, nożyce, odrastanie), świnia, kurczak (jajka) + rozmnażanie i młode
 - [x] Dropy, łuk gracza, TNT
 
-## Etap 6 – Extra
+## Etap 6 - Extra
 - [x] Redstone: pył, pochodnia, dźwignia, przycisk, blok, lampa, repeater, TNT, tłok i lepki tłok, drzwi
 - [x] Multiplayer Tailcat.Link: host w grze, kod i zapamiętane parowanie, klient, chunki/bloki/TE/encje, modele i nicki graczy, kontenery, czat, ekwipunek, śmierć i respawn; test dwóch procesów przez prawdziwy przekaźnik (od 2026-10-31 gry.fimson.pl) i PNG z obu okien. Wymiary/pogoda wymagają integracji po scaleniu NE/OW; zbroja modelu i pęknięcia kopania innych graczy pozostają do dodania. Szczegóły: `docs/MC18_NET.md`.
 - [~] Dźwięki proceduralne  *(wywołania `PlaySound` są w całej grze, ale `Sound.Play` w `GameRender.cs` to pusty stub; folder `Audio/` pusty)*

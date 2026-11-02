@@ -50,6 +50,8 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private Texture2D _sunTex, _moonTex;
     public readonly List<Particle> Particles = new();
     public Action<string, double, double, double, float, float> SoundHook;
+    /// <summary>Modele bloków z tile entity rysowane co klatkę (np. tabliczki w 16 obrotach), w przebiegu encji.</summary>
+    public static Action<EntityRenderer, World.World, float, Vector3d> TileRenderHook;
     public int RenderedSections, TotalSections;
     public int RenderDistance = 8;
     public bool CloudsEnabled = true;
@@ -85,6 +87,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
 
     public void SetWorld(World.World w)
     {
+        if (World != w) Sound.StopWorldSounds();
         if (World != null) World.Listeners.Remove(this);
         World = w;
         lock (_jobLock) { _jobs.Clear(); _jobSet.Clear(); }
@@ -412,7 +415,21 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         }
         float sb = 1f - Math.Clamp(1f - (MathF.Cos(angle * MathF.PI * 2f) * 2f + 0.2f), 0, 1);
         SunBrightness = sb * 0.8f + 0.2f;
+        if (w.Dimension == DimensionId.Overworld)
+        {
+            float rain = w.RainAt(pt), thunder = w.ThunderAt(pt);
+            float gray = (SkyColor.X * .3f + SkyColor.Y * .59f + SkyColor.Z * .11f) * .6f;
+            SkyColor = Vector3.Lerp(SkyColor, new Vector3(gray), rain * .75f);
+            SkyColor *= 1 - thunder * .75f;
+            fog *= new Vector3(1 - rain * .5f, 1 - rain * .5f, 1 - rain * .4f) * (1 - thunder * .5f);
+            SunBrightness *= (1 - rain * 5f / 16f) * (1 - thunder * 5f / 16f);
+        }
         FogColor = fog; FogMode = 0;
+        if (w.Dimension == DimensionId.Overworld && w.Entities.OfType<LightningBolt>().Any(b => b.Flashing))
+        {
+            SkyColor = Vector3.Lerp(SkyColor, new Vector3(.8f, .8f, 1), .45f);
+            FogColor = Vector3.Lerp(FogColor, new Vector3(.8f, .8f, 1), .25f);
+        }
         FogEnd = RenderDistance * 16; FogStart = FogEnd * 0.75f;
         if (w.Dimension == DimensionId.Nether) { SkyColor = FogColor = new Vector3(.2f,.03f,.03f); FogStart = 0; FogEnd *= .5f; SunBrightness = 1; }
         else if (w.Dimension == DimensionId.End) { SkyColor = FogColor = new Vector3(.094f,.075f,.094f); SunBrightness = 1; }
@@ -466,13 +483,14 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             var inv = Matrix4.Invert(vp);
             _sky.Set("uInvViewProj", inv);
             _sky.Set("uSky", SkyColor); _sky.Set("uFog", FogColor);
-            _sky.Set("uSunset", SunsetColor(angle)); _sky.Set("uSunDir", sunDir);
+            _sky.Set("uSunset", SunsetColor(angle) * (1 - w.RainAt(pt))); _sky.Set("uSunDir", sunDir);
             Terrain.Bind(0); _sky.Set("uTex",0); _sky.Set("uDimension",(int)w.Dimension); _sky.Set("uEndLayer",(float)TextureGen.Layer("end_sky"));
             _skyQuad.DrawQuads();
             if (w.Dimension == DimensionId.Overworld)
             {
             // gwiazdy
             float starB = 1f - (MathF.Cos(angle * MathF.PI * 2f) * 2f + 0.25f); starB = Math.Clamp(starB, 0, 1); starB = starB * starB * 0.5f;
+            starB *= 1 - w.RainAt(pt);
             GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
             var rot = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90)) * Matrix4.CreateRotationX(angle * MathF.PI * 2f);
             rot = Matrix4.CreateRotationZ(angle * MathF.PI * 2f);
@@ -484,8 +502,8 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             // słońce i księżyc
             _sunSh.Use();
             var skyVp = view.ClearTranslation() * proj;
-            DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1));
-            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1));
+            DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
+            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             }
         }
@@ -536,28 +554,44 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
             er.RenderEntity(e, pt, cam_(cam), w, false);
         }
+        TileRenderHook?.Invoke(er, w, pt, cam);
         er.Flush(er.Skin, er.SkinTex);
         er.Flush(er.Terrain, Terrain);
+        er.FlushMaps();
+        er.FlushBanners();
 
         // --- cząsteczki ---
         RenderParticles(pt, cam);
         er.Flush(er.Terrain, Terrain);
 
         // --- pęknięcia ---
-        if (sel.HasValue && breakStage >= 0)
+        // własne kopanie i kopanie innych graczy (sieć: World.DestroyProgress)
+        var cracks = new List<(int x, int y, int z, int stage)>();
+        if (sel.HasValue && breakStage >= 0) cracks.Add((sel.Value.X, sel.Value.Y, sel.Value.Z, breakStage));
+        foreach (var (id, a) in w.DestroyProgress)
         {
-            var h = sel.Value;
+            if (viewer != null && id == viewer.Id) continue;
+            double cdx = a.X + .5 - cam.X, cdy = a.Y + .5 - cam.Y, cdz = a.Z + .5 - cam.Z;
+            if (cdx * cdx + cdy * cdy + cdz * cdz > 1024 || w.GetBlock(a.X, a.Y, a.Z) == 0) continue;
+            cracks.Add((a.X, a.Y, a.Z, a.Stage));
+        }
+        if (cracks.Count > 0)
+        {
             var boxes = new List<AABB>();
-            Block.Get(w.GetBlock(h.X, h.Y, h.Z)).GetSelectionBoxes(w, h.X, h.Y, h.Z, w.GetMeta(h.X, h.Y, h.Z), boxes);
             GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.DstColor, BlendingFactor.SrcColor);
             GL.Enable(EnableCap.PolygonOffsetFill); GL.PolygonOffset(-3f, -3f); GL.DepthMask(false);
             er.Terrain.Sky = 15; er.Terrain.Blk = 15; er.Terrain.Color = Vector4.One; er.Terrain.Overlay = Vector4.Zero;
             er.Terrain.FlatShade = true;
-            int layer = TextureGen.Layer("destroy_" + Math.Clamp(breakStage, 0, 9));
-            foreach (var b in boxes)
+            foreach (var h in cracks)
             {
-                var bb = b.Offset(h.X - cam.X, h.Y - cam.Y, h.Z - cam.Z).Grow(0.002);
-                CrackBox(er.Terrain, bb, layer);
+                boxes.Clear();
+                Block.Get(w.GetBlock(h.x, h.y, h.z)).GetSelectionBoxes(w, h.x, h.y, h.z, w.GetMeta(h.x, h.y, h.z), boxes);
+                int layer = TextureGen.Layer("destroy_" + Math.Clamp(h.stage, 0, 9));
+                foreach (var b in boxes)
+                {
+                    var bb = b.Offset(h.x - cam.X, h.y - cam.Y, h.z - cam.Z).Grow(0.002);
+                    CrackBox(er.Terrain, bb, layer);
+                }
             }
             er.Shader.Set("uSun", 1f);
             er.Flush(er.Terrain, Terrain);
@@ -577,6 +611,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
         // --- chmury ---
         if (CloudsEnabled && FogMode == 0 && w.Dimension == DimensionId.Overworld) RenderClouds(cam, vp, pt);
+        RenderWeather(cam, vp, pt);
 
         // --- obrys zaznaczenia ---
         if (sel.HasValue && sel.Value.Hit)
@@ -679,6 +714,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     private readonly Rng _pr = new(5);
     public void TickParticles()
     {
+        TickFireworks();
         var w = World;
         for (int i = Particles.Count - 1; i >= 0; i--)
         {
@@ -723,6 +759,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             b.Quad(rel - r + u, rel - r - u, rel + r - u, rel + r + u, p.U0, p.V0, p.U1, p.V1, 1f);
         }
         b.Color = Vector4.One;
+        RenderFireworks(pt, cam);
     }
 
     public void AddParticle(Vector3 pos, Vector3 vel, int layer, float size, int life, float gravity, Vector4 color, bool collide = true, bool emissive = false, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, bool grow = false)
@@ -843,5 +880,6 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         _chunk.Dispose(); _sky.Dispose(); _cloudSh.Dispose(); _line.Dispose(); _sunSh?.Dispose();
         _skyQuad.Dispose(); _sunMesh.Dispose(); _starMesh.Dispose(); _lineMesh.Dispose(); _cloudMesh?.Dispose();
         Entities.Dispose(); Terrain.Dispose(); _sunTex.Dispose(); _moonTex.Dispose();
+        _weatherTextures?.Dispose();
     }
 }

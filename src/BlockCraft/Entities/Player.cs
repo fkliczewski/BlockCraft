@@ -4,7 +4,7 @@ using BlockCraft.World;
 
 namespace BlockCraft.Entities;
 
-public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest }
+public enum GuiKind { Inventory, Crafting, Furnace, Chest, Brewing, Hopper = 20, Dispenser, TrappedChest, Enchanting = 30, Anvil, Beacon, SignEdit = 40 }
 
 public interface IPlayerHandler
 {
@@ -22,7 +22,7 @@ public partial class Player : LivingEntity
     public Container OpenContainer;
     public ItemStack Cursor;
     public IPlayerHandler Handler;
-    public int GameMode; // 0 przetrwanie, 1 kreatywny, 3 obserwator
+    public int GameMode; // 0 przetrwanie, 1 kreatywny, 2 przygoda, 3 obserwator
     public bool Flying, AllowFlying, Invulnerable;
     public float FlySpeed = 0.05f;
     public int FoodLevel = 20; public float Saturation = 5f, Exhaustion; public int FoodTimer; public int PrevFoodLevel = 20;
@@ -75,7 +75,9 @@ public partial class Player : LivingEntity
 
     public override void Tick()
     {
+        Title.Tick();
         if (IsRemoteControlled) { base.Tick(); return; }
+        if (NetPuppet) NetPuppetMove?.Invoke();
         if (Sleeping)
         {
             SleepTimer++; if (SleepTimer > 100) SleepTimer = 100;
@@ -83,8 +85,9 @@ public partial class Player : LivingEntity
         }
         else if (SleepTimer > 0) { SleepTimer++; if (SleepTimer >= 110) SleepTimer = 0; }
         base.Tick();
+        Bl2Stats.TickPlayer(this);
         if (Dead) return;
-        if (!World.IsRemote) FoodTick();
+        if (!World.IsRemote) { FoodTick(); MapLogic.TickPlayer(this); TickAchievements(); }
         UseItemTick();
         if (OnGround || InWater) PortalCooldown = 0;
         // podnoszenie przedmiotów
@@ -96,6 +99,7 @@ public partial class Player : LivingEntity
         double horiz = Math.Sqrt(dx * dx + dz * dz);
         if (horiz < 5)
         {
+            Bl2Stats.Moved(this, dx, dy, dz);
             if (InWater) AddExhaustion(0.015f * (float)Math.Sqrt(dx * dx + dy * dy + dz * dz));
             else if (OnGround) AddExhaustion((Sprinting ? 0.1f : 0.01f) * (float)horiz);
         }
@@ -138,6 +142,7 @@ public partial class Player : LivingEntity
     public override void Jump()
     {
         base.Jump();
+        Bl2Stats.Add(this, "stat.jump");
         AddExhaustion(Sprinting ? 0.8f : 0.2f);
     }
 
@@ -164,6 +169,7 @@ public partial class Player : LivingEntity
     protected override void OnFall(float distance)
     {
         if (AllowFlying || Flying) return;
+        Bl2Stats.Fell(this, distance);
         if (distance > 3)
         {
             int dmg = (int)Math.Ceiling(distance - 3 - (EffectLevel(Effect.JumpBoost) + 1));
@@ -257,6 +263,7 @@ public partial class Player : LivingEntity
         var s = ItemInUse; ItemInUse = null; ItemInUseCount = 0;
         if (s == null) return;
         var it = s.Item;
+        Bl2Stats.Used(this, s.Id);
         if (it.IsFood)
         {
             Eat(s);
@@ -288,13 +295,21 @@ public partial class Player : LivingEntity
     {
         float f = BowCharge;
         if (f < 0.1f) return;
-        bool hasArrow = Creative || Inventory.CountOf(I.Arrow) > 0;
+        var bow = Inventory.Selected;
+        bool infinite = Creative || EnchantHelper.GetLevel(bow, Ench.Infinity) > 0;
+        bool hasArrow = infinite || Inventory.CountOf(I.Arrow) > 0;
         if (!hasArrow) return;
-        var arrow = new ArrowEntity(World, this, f * 3f) { Critical = f >= 1f, PickupAllowed = !Creative };
+        var arrow = new ArrowEntity(World, this, f * 3f) { Critical = f >= 1f, PickupAllowed = !infinite };
+        // ItemBow.onPlayerStoppedUsing: Moc, Uderzenie, Płomień
+        int power = EnchantHelper.GetLevel(bow, Ench.Power), punch = EnchantHelper.GetLevel(bow, Ench.Punch);
+        if (power > 0) arrow.Damage += power * 0.5 + 0.5;
+        if (punch > 0) arrow.Knockback = punch;
+        if (EnchantHelper.GetLevel(bow, Ench.Flame) > 0) arrow.SetFire(100);
         if (NetShootHook != null) NetShootHook(f);
         else World.SpawnEntity(arrow);
         World.PlaySound("bow", X, Y, Z, 1f, 1f / (World.Rand.NextFloat() * 0.4f + 1.2f) + f * 0.5f);
-        if (!Creative) { Inventory.Consume(I.Arrow); DamageHeld(1); }
+        DamageHeld(1);
+        if (!infinite) Inventory.Consume(I.Arrow);
     }
     public Action<float> NetShootHook;
 
@@ -305,6 +320,7 @@ public partial class Player : LivingEntity
         if (s == null) return;
         if (s.DamageItem(amount) || s.Count <= 0)
         {
+            Bl2Stats.Add(this, Bl2Stats.Break + s.Id);
             Inventory.Selected = null;
             World.PlaySound("break", X, Y, Z, 0.8f, 0.8f + World.Rand.NextFloat() * 0.4f);
         }
@@ -326,12 +342,12 @@ public partial class Player : LivingEntity
         }
     }
 
-    public void OnCrafted(ItemStack s) { }
+    public void OnCrafted(ItemStack s) { Recipes.OnCraftedHook?.Invoke(this, s); AchievementList.Crafted(this, s); }
 
     // ---------- interakcje ----------
     public void SendMessage(string msg) => Handler?.OnMessage(msg);
 
-    public void OpenBlockGui(GuiKind kind, int x, int y, int z) => Handler?.OpenBlockGui(kind, x, y, z);
+    public void OpenBlockGui(GuiKind kind, int x, int y, int z) { Handler?.OpenBlockGui(kind, x, y, z); Bl2Stats.OpenedGui(this, kind, x, y, z); }
 
     public void CloseContainer()
     {
@@ -345,6 +361,7 @@ public partial class Player : LivingEntity
         if (s == null || s.Count <= 0) return;
         if (World.IsRemote) { NetDropHook?.Invoke(s); return; }
         var e = new ItemEntity(World, X, Y + EyeHeight - 0.3, Z, s.Copy());
+        e.Thrower = this;
         e.PickupDelay = 40;
         float yr = Yaw * MathUtil.Deg2Rad, pr = Pitch * MathUtil.Deg2Rad;
         float f = 0.3f;
@@ -409,7 +426,7 @@ public partial class Player : LivingEntity
                 if (xp > 0) World.SpawnXp(X, Y + 0.5, Z, xp);
                 XpLevel = 0; XpProgress = 0; XpTotal = 0;
             }
-            World.BroadcastMessage(DeathMessage);
+            if (World.Rules.ShowDeathMessages) World.BroadcastMessage(DeathMessage);
         }
         Handler?.OnDeath(DeathMessage);
     }
@@ -437,7 +454,9 @@ public partial class Player : LivingEntity
     {
         if (Sleeping) WakeUp();
         AddExhaustion(0.3f);
+        float before = Health;
         base.DamageEntity(src, amount);
+        Bl2Stats.Damaged(this, before - Health);
     }
 
     /// <summary>Atak wręcz na encję.</summary>
@@ -448,11 +467,27 @@ public partial class Player : LivingEntity
         if (target is not LivingEntity le || le.Dead) return;
         var held = Inventory.Selected;
         float dmg = EffectLogic.Melee(this, held?.Item?.AttackDamage ?? 1f);
-        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && MotionY < 0 && !Sprinting && !HasEffect(Effect.Blindness);
-        if (crit) dmg *= 1.5f;
-        int kb = Sprinting ? 1 : 0;
-        if (le.Attack(DamageSource.PlayerAttack(this), dmg))
+        // attackTargetEntityWithCurrentItem 1.8: premia zaklęcia po mnożniku krytyka, Odrzut i Zaklęty ogień z przedmiotu
+        float bonus = EnchantEffects.DamageBonus(held, EnchantEffects.CreatureOf(le));
+        int kb = EnchantHelper.GetLevel(held, Ench.Knockback) + (Sprinting ? 1 : 0);
+        if (dmg <= 0 && bonus <= 0) return;
+        // 1.8: krytyk bez warunku sprintu i prędkości pionowej (doszły w 1.9)
+        bool crit = FallDistance > 0 && !OnGround && !IsOnLadder() && !InWater && !HasEffect(Effect.Blindness) && RidingEntity == null;
+        if (crit && dmg > 0) dmg *= 1.5f;
+        dmg += bonus;
+        int fireAspect = EnchantHelper.GetLevel(held, Ench.FireAspect);
+        bool tempFire = false;
+        if (fireAspect > 0 && le.FireTicks <= 0) { tempFire = true; le.SetFire(1); }
+        bool hit = le.Attack(DamageSource.PlayerAttack(this), dmg);
+        if (hit) Bl2Stats.DealtDamage(this, dmg);
+        if (!hit && tempFire) le.FireTicks = 0;
+        if (hit)
         {
+            if (dmg >= 18) AwardAchievement("overkill");
+            if (bonus > 0) World.SpawnParticles(ParticleKind.Crit, le.X, le.Y + le.Height / 2, le.Z, 10);
+            EnchantEffects.ApplyArthropod(this, le);
+            if (fireAspect > 0) le.SetFire(fireAspect * 4);
+            else if (tempFire) le.FireTicks = 0;
             if (kb > 0)
             {
                 float yr = Yaw * MathUtil.Deg2Rad;

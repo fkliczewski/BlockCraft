@@ -13,6 +13,8 @@ public sealed partial class PlayerController
     public World.World W => _w ?? _g.World;
     public Player P => _p ?? _g.Player;
     public float BreakProgress; public int BreakX, BreakY, BreakZ = int.MinValue; private int _breakSoundTicks;
+    /// <summary>Pomiar do F3: ile ticków trwało kopanie ostatniego bloku i ile powinno wg wzoru 1.8.</summary>
+    public int BreakTicks, LastBreakTicks, LastBreakExpected; public string LastBreakKey = "";
     public int BlockHitDelay, RightClickDelay;
     public World.World.HitResult Hit; public Entity HitEntity;
     public bool LeftWasDown;
@@ -50,8 +52,8 @@ public sealed partial class PlayerController
     {
         if (b.Hardness < 0) return 0;
         if (b.Hardness == 0) return 1;
-        float f = b.GetDigSpeed(tool) * EffectLogic.Mining(p);
-        if (p.IsHeadInWater()) f /= 5f;
+        float f = EnchantEffects.Efficiency(p, tool, b.GetDigSpeed(tool)) * EffectLogic.Mining(p);
+        if (p.IsHeadInWater() && !EnchantEffects.AquaAffinity(p)) f /= 5f;
         if (!p.OnGround && !p.Flying) f /= 5f;
         return b.CanHarvest(tool) ? f / b.Hardness / 30f : f / b.Hardness / 100f;
     }
@@ -74,6 +76,7 @@ public sealed partial class PlayerController
         var b = Block.Get(W.GetBlock(x, y, z));
         if (b.Id == 0) return;
         var tool = p.Inventory.Selected;
+        if (!Cmd.WorldBorder.Of(W).Contains(W, x, z) || p.GameMode == 2 && !Cmd.Adventure.Allows(tool, "CanDestroy", b.Id)) { ResetBreak(); return; }
         if (p.Creative)
         {
             if (tool?.Item?.Tool == ToolType.Sword) return;
@@ -83,8 +86,9 @@ public sealed partial class PlayerController
             p.SwingArm();
             return;
         }
-        if (x != BreakX || y != BreakY || z != BreakZ) { BreakX = x; BreakY = y; BreakZ = z; BreakProgress = 0; b.OnClicked(W, x, y, z, p); }
-        BreakProgress += BreakDelta(p, b, tool);
+        if (x != BreakX || y != BreakY || z != BreakZ) { BreakX = x; BreakY = y; BreakZ = z; BreakProgress = 0; BreakTicks = 0; b.OnClicked(W, x, y, z, p); }
+        float delta = BreakDelta(p, b, tool);
+        BreakProgress += delta; BreakTicks++;
         p.SwingArm();
         if (_breakSoundTicks++ % 4 == 0)
         {
@@ -93,8 +97,10 @@ public sealed partial class PlayerController
         }
         if (BreakProgress >= 1f)
         {
+            LastBreakTicks = BreakTicks; LastBreakExpected = delta > 0 ? (int)Math.Ceiling(1f / delta - 1e-4f) : 0; LastBreakKey = b.Key;
             bool harvest = b.CanHarvest(tool);
             DestroyBlock(x, y, z, harvest);
+            if (harvest) Bl2Stats.Add(p, Bl2Stats.Mine + b.Id);
             ResetBreak();
             BlockHitDelay = 5;
             if (tool?.Item != null && tool.Item.IsTool && b.Hardness > 0) p.DamageHeld(tool.Item.Tool == ToolType.Sword ? 2 : 1);
@@ -107,6 +113,7 @@ public sealed partial class PlayerController
         var b = Block.Get(W.GetBlock(x, y, z));
         int meta = W.GetMeta(x, y, z);
         var tool = P.Inventory.Selected;
+        if (!P.Creative && b.Hardness < 0 || !Cmd.WorldBorder.Of(W).Contains(W, x, z) || P.GameMode == 2 && !Cmd.Adventure.Allows(tool, "CanDestroy", b.Id)) return;
         if (!P.Creative) b.OnDestroyedByPlayer(W, x, y, z, meta, P);
         // liście: ścinanie sąsiadów przyspiesza zanik
         if (b is LogBlock)
@@ -141,9 +148,9 @@ public sealed partial class PlayerController
             if (LeashKnot.TryTie(W, p, x, y, z)) { p.SwingArm(); return; }
             if (!p.Sneaking || held == null)
                 if (b.OnActivated(W, x, y, z, p)) { p.SwingArm(); return; }
-            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
+            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { if (p.ItemInUse == null) Bl2Stats.Used(p, held.Id); p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
         }
-        if (held != null) UseInAir(held);
+        if (held != null && UseInAir(held) && p.ItemInUse == null && held.Item?.ArmorSlot < 0) Bl2Stats.Used(p, held.Id);
     }
 
     private bool UseInAir(ItemStack held)
@@ -188,6 +195,7 @@ public sealed partial class PlayerController
         var h = W.RayCast(ex, ey, ez, lx, ly, lz, 5, true);
         if (!h.Hit) return false;
         int id = W.GetBlock(h.X, h.Y, h.Z);
+        if (!Cmd.WorldBorder.Of(W).Contains(W, h.X, h.Z) || p.GameMode == 2 && !Cmd.Adventure.Allows(held, "CanPlaceOn", id)) return false;
         if (held.Id == I.Bucket)
         {
             if ((id == B.Water || id == B.Lava) && W.GetMeta(h.X, h.Y, h.Z) == 0)
@@ -206,6 +214,7 @@ public sealed partial class PlayerController
         var tb = Block.Get(id);
         if (!tb.Replaceable || tb.IsLiquid && W.GetMeta(tx, ty, tz) == 0) { tx += Dir.X[h.Face]; ty += Dir.Y[h.Face]; tz += Dir.Z[h.Face]; }
         var at = Block.Get(W.GetBlock(tx, ty, tz));
+        if (!Cmd.WorldBorder.Of(W).Contains(W, tx, tz)) return false;
         if (!at.Replaceable && at.Id != 0) return false;
         if (at.Id != 0 && !at.IsLiquid) W.BreakBlock(tx, ty, tz, true);
         W.SetBlock(tx, ty, tz, held.Id == I.WaterBucket ? B.Water : B.Lava, 0);
@@ -218,6 +227,9 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (!Cmd.WorldBorder.Of(W).Contains(W, x, z) || !Cmd.WorldBorder.Of(W).Contains(W, x + Dir.X[face], z + Dir.Z[face])) return false;
+        if (p.GameMode == 2 && !Cmd.Adventure.Allows(held, "CanPlaceOn", id)) return false;
+        if (held.Id == B.CommandBlock && !p.Creative) return false;
         if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
         if (held.Id == I.SpawnEgg)
         {
@@ -283,6 +295,7 @@ public sealed partial class PlayerController
         var p = P; var it = held.Item;
         byte bid = (byte)it.BlockId;
         var nb = Block.Get(bid);
+        if (bid == B.CommandBlock && !p.Creative) return false;
         // płyty łączą się
         if (nb is SlabBlock slab && W.GetBlock(x, y, z) == bid)
         {
@@ -354,6 +367,9 @@ public sealed partial class PlayerController
         if (!Hit.Hit) return;
         var b = Block.Get(W.GetBlock(Hit.X, Hit.Y, Hit.Z));
         var s = b.PickStack(W.GetMeta(Hit.X, Hit.Y, Hit.Z));
+        if (Banners.IsBanner(b.Id) && W.GetTileEntity(Hit.X, Hit.Y, Hit.Z) is BannerTile banner) s = banner.ToItem();
+        if (b.Id==B.Skull&&W.GetTileEntity(Hit.X,Hit.Y,Hit.Z) is SkullTile skull) s=skull.ToItem();
+        if (b.Id == B.FlowerPot && W.GetTileEntity(Hit.X, Hit.Y, Hit.Z) is FlowerPotTile pot && !pot.Empty && Item.ById[pot.ItemId] != null) s = new ItemStack(pot.ItemId, 1, pot.Data);
         if (s == null || s.Item == null) return;
         var inv = P.Inventory;
         int slot = inv.FindSlot(s.Id, s.Item.MaxDamage > 0 ? -1 : s.Damage);

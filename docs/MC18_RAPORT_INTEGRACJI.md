@@ -1,5 +1,84 @@
 # Minecraft 1.8: raport integracji, 2026-10-30
 
+## Odzyskany Overworld, 2026-10-31
+
+Zabezpieczono niecommitowaną pracę Momo na mc18/overworld jako f55f692
+(wioski, twierdze, monumenty, lokatory i wzorce). Osobna gałąź przeszła
+167 testów; następnie scalono ją wraz z wcześniejszym terenem, dekoratorami,
+jaskiniami, kopalniami, lochami i świątyniami do feature/mc18.
+
+Wykryto brak wykonania planów encji struktur: istniały w cache generatora,
+ale znikały przed integracją chunka. Dodano jednorazowe tworzenie na wątku
+świata, przekazanie profesji wieśniaka, wariantu starszego strażnika oraz
+niezależnej kopii łupu wagonika. Testy sprawdzają brak powielania i zapis.
+Wszystkie testy scalonej gry: **499 OK / 0 FAIL**,
+`.modus/ow-population-selftest.log`; Release kompiluje się bez błędów.
+
+Dodano `--autotest --ow`. Przebieg kończy się `OW-TEST KONIEC: OK` i robi
+zrzuty wioski, chatki/świątyni i monumentu. Obejrzano wszystkie trzy: wioska
+i chatka są widoczne, ale kamera monumentu pokazuje głównie wodę. Ujęcie
+wymaga poprawy; sam znacznik OK nie jest dowodem weryfikacji wyglądu monumentu.
+Nadal do zrobienia: pogoda i jej zapis/sieć/render/dźwięki, spawn zwykłych
+strażników w monumentach i pełny autotest OW. Nie oznaczono całego OW jako
+ukończonego. Wydania BlockCraft_Gra jeszcze nie odświeżono o te zmiany.
+
+## Kontynuacja integracji, 2026-10-31
+
+Goście multiplayera mają teraz właściwe ekrany ekwipunku konia, kontenerów
+wagoników i handlu. Host wysyła opis kontenera i stan encji/ofert, odbiera
+wybór oferty z identyfikatorem okna i rozlicza zapłatę, wynik oraz limit użyć.
+Klient nie wylicza własnego wyniku handlu i nie zwraca sam przedmiotów przy
+zamykaniu GUI. Stanowiło to błąd przy zmianie okna z równoczesnym nadejściem
+nowej zawartości kursora; pierwszy zrzut testowy wykazał powielenie pszenicy.
+Poprawiono wspólny Container.OnClose i powtórzono test z asercją braku kopii.
+Host odrzuca błędne i spóźnione wybory, zamyka oddalone kontenery encji.
+Protokół podniesiono do **3**; host i goście potrzebują tego samego wydania.
+
+Weryfikacja: **467 OK / 0 FAIL** w `.modus/entity-windows-verified.log`.
+Test dwóch procesów przez `gry.fimson.pl` zakończony OK dla hosta i gościa:
+`.modus/entity-windows-e2e-fixed`. Sprawdza siodłanie przez GUI, odbiór
+ładunku wagonika, zmianę oferty, zapłatę i wyczerpanie oferty bez powielenia,
+a następnie wyrzucenie, powrót i zamknięcie sieci. Obejrzano zrzuty konia,
+wagonika i handlu; ostatni zrzut nie zawiera już powielonej pszenicy.
+Build/publish Release przechodzą, wydanie `BlockCraft_Gra` odświeżone.
+
+Testy układów redstone mają wyłączony naturalny spawn od początku scenariusza,
+aby obce moby nie popychały wagoników. Dopisano diagnostykę pozycji i meta
+w razie błędu odblokowania leja. To izolacja testu; nie zmieniono fizyki gry
+i nie uznano przypuszczenia o źródle wcześniejszej niestabilności za dowiedzione.
+Do dalszej integracji pozostają m.in. części smoka w protokole, jazda
+pojazdami przez sieć, OW i niedokończone mechaniki ME. Historyczne braki GUI
+w raportach poniżej zastępuje ta aktualizacja.
+
+## Priorytet audio, 2026-10-31
+
+Zgłoszenie: odgłosy nakładały się i robiły bardzo głośne. Mikser sumował
+do 32 głosów, a przepełnienie obcinał niezależnie w kanałach do -1/+1,
+co powodowało przesterowanie. Nie ograniczał duplikatów zdarzenia.
+
+Poprawiono mikser: 6 dB zapasu na wyjściu, wspólny limiter stereo do 0.65
+z natychmiastowym atakiem i powrotem 150 ms zamiast obcinania fali.
+Zduplikowane zgłoszenia tego samego efektu i tonu w tym samym miejscu
+w ciągu 33 ms są odrzucane; maksymalnie dwie kopie efektu jednego źródła.
+Osobne źródła i różne efekty pozostają równoczesne, nuty są wyłączone
+z tego ograniczenia. Zachowano suwaki użytkownika; nie zmieniano options.json.
+
+Dźwięki poza zasięgiem nie zajmują głosów. Zmiana świata od razu usuwa jego
+odgłosy, zostawiając muzykę. Świat w tle menu nie emituje efektów do miksera.
+Iloczyn głośności zdarzenia i wariantu jest ograniczany do 1.
+
+Weryfikacja: 13 testów audio, w tym 32 jednoczesne źródła, panorama stereo,
+powrót limitera, cisza, duplikaty, nuty, cykl życia i granice buforów.
+Pełny selftest: **456 OK / 0 FAIL**, `.modus/audio-final-selftest.log`.
+Uruchomiona gra: audio enabled=True, odtwarzanie testowych efektów potwierdzone
+aktywnymi głosami, pełny autotest zakończony `AUTOTEST DONE`.
+To testy cyfrowego sygnału i działania gry; nie wykonano odsłuchu głośników.
+Zaktualizowano wydanie `BlockCraft_Gra`.
+
+Wstępna weryfikacja sprzed poprawek wykazała niestabilność wcześniejszego testu
+toru aktywacyjnego (`relay-wave1-selftest.log`, 442 OK/1 FAIL). Ostatni przebieg
+przeszedł, ale problem pozostaje do osobnej diagnozy po priorytecie audio.
+
 Gałąź: `feature/mc18`. Kod pozostaje w C#/.NET 10. Ten raport zastępuje nieaktualne
 statusy "gotowe do scalenia" w planie poprzedniej sesji. Cały zakres MC 1.8 1:1
 NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy integracji.
@@ -66,9 +145,10 @@ NIE jest zakończony. Zakończono scalenie istniejących modułów i naprawy int
 
 ## Pierwsze niezakończone zadania
 
-1. MO: podłączyć GUI konia i handlu do multiplayera, uzupełnić oferty zależne
+1. MO: uzupełnić oferty zależne
    od przedmiotów ME i sprawdzić zgodność AI. Modele, spawn według biomu,
    wieśniacy, handel i ekwipunek konia już scalone - aktualizacja Tory poniżej.
+   GUI konia, handlu i wagoników podłączono do sieci 2026-10-31.
 2. NE: ukończyć podłączenie przywoływania Withera do prawdziwych czaszek ME;
    sprawdzić zgodność generatorów i układu fortec z oryginałem. Smok, kryształy,
    Wither i napisy są już scalone - patrz aktualizacja Hiro poniżej.
@@ -186,3 +266,581 @@ Sam raport Nami podaje 221 testów na jej gałęzi; 442 to wynik scalonego kodu.
 Nie testowano jazdy i odtwarzania relacji pasażera przez sieć. GUI kontenerów
 wagonika używa RsGui.Open (wymaga lokalnego Game), więc udane testy GUI
 jednoosobowego nie oznaczają obsługi kontenerów wagonika dla gościa sieciowego.
+
+## Kontynuacja OW po przekazaniu sesji, 2026-10-31
+
+Commit 272253a poprawia podwodną kamerę autotestu monumentu i weryfikuje
+gotowość wszystkich chunków jego obszaru. Przebieg `--autotest --ow`
+zakończył się OK: 12873 bloki prismarynu, 116 latarni, 8 bloków złota.
+Obejrzano zrzut monumentu: widoczna schodkowa bryła i szczyt pod wodą.
+Pierwsza próba kamery przy zewnętrznym narożniku była zbyt odległa i ciemna;
+ostateczna kamera jest bliżej szczytu. Nie zmieniano mgły ani geometrii gry.
+Dowody: `.modus/ow-monument-autotest.log`, `.modus/ow-monument-final/`.
+
+Dodano podstawę pogody według `World.updateWeather` z referencji 1.8:
+oddzielne zegary deszczu, burzy i wymuszonej dobrej pogody, płynne natężenie,
+przyciemnienie światła nieba, reset po śnie, komendę `/weather` z czasem
+w sekundach oraz zapis w opcjonalnym polu `level.json` (starsze zapisy działają).
+Stan przechodzi przez `NetHooks.WorldState`, klient wygładza opady samodzielnie,
+bez przełączania zegarów hosta. Podłączono hak opadów dla ognia i kotła;
+deszcz gasi płonące encje i uwzględnia dach, biom oraz temperaturę.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest: **516 OK, 0 FAIL**,
+w tym 15 nowych testów podstawy pogody i 2 testy komend pogody przez transport
+host-klient (`.modus/ow-weather-selftest.log`). Nie wykonano jeszcze testu
+pogody w dwóch graficznych oknach przez relay.
+
+To nie jest ukończenie OW: pozostały grafika i dźwięk opadów, pioruny,
+akumulacja śniegu/lód, dalsze interakcje z pogodą oraz naturalny spawn
+strażników w monumentach i wiedźm w chatkach. Wydanie `BlockCraft_Gra`
+nie zostało odświeżone o częściową implementację pogody. Pełna zgodność 1:1
+nie została potwierdzona. Dalsze braki ME i końcowa integracja pozostają otwarte.
+
+### OW: opady i interakcje powierzchniowe, dalsza kontynuacja 2026-10-31
+
+Dodano ruchome kolumny deszczu/śniegu przy kamerze, z odcięciem na powierzchni
+terenu i dachów, wyborem opadów według temperatury biomu i brakiem opadów na
+pustyni, w Netherze i Endzie. Pogoda odbarwia niebo i mgłę, przygasza słońce,
+księżyc i gwiazdy. Tekstury opadów są proceduralne 16×16, zgodnie z aktualnym
+atlasem BlockCraft; nie są oryginalnymi teksturami MC. Pełna zgodność wizualna
+1:1 nadal wymaga dopracowania.
+
+Deszcz odtwarza asset `ambient.weather.rain` przez jeden zapętlony głos
+w kategorii `weather`. Aktualizacja głośności nie dodaje kopii próbki; limit
+wejściowy wynosi 0.25, typowy cel 0.2 przed dotychczasowym zapasem 6 dB.
+Głośność łagodnie maleje pod dachem i przy końcu deszczu; głęboka jaskinia,
+śnieg i suchy biom są ciche. Wyjście ze świata czyści ambient. Dekodowanie
+próbki odbywa się poza blokadą miksera. Nie wykonano odsłuchu głośników.
+
+Dodano próby powierzchniowe w aktywnych chunkach: zamarzanie źródeł wody od
+brzegu, pojedyncza warstwa śniegu podczas opadów (bez piętrzenia), bez śniegu
+na lodzie. Zamarzanie nie wymaga opadów. Deszcz nawadnia pole uprawne;
+dach odcina to nawadnianie.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest: **529 OK, 0 FAIL**,
+w tym test 1000 aktualizacji pojedynczego ambientu, suwaka kategorii, końca
+opadów i zmiany świata oraz 9 testów śniegu/lodu/pól. Autotest `--ow`:
+równiny (316 kolumn deszczu, 1 głos), śnieżny biom (316 kolumn śniegu,
+0 głosów), pustynia i clear (0 kolumn, 0 głosów); `OW-TEST KONIEC: OK`.
+Scena pogody jest kontrolowanym fixture, nie dowodem naturalnej generacji
+biomów. Zrzuty deszczu/śniegu obejrzano i zmniejszono zbyt dużą gęstość
+pierwszej wersji. Dowody: `.modus/ow-precipitation-*.log`
+i `.modus/ow-precipitation-final/`.
+
+Pozostały pioruny (encja, efekty, dźwięk i sieć), naturalny spawn guardianów
+i wiedźm w strukturach, dokładniejsze odwzorowanie grafiki pogody i test
+pogody w dwóch oknach przez relay. Krok OW pozostaje w toku; wydanie
+BlockCraft_Gra jeszcze nie zostało odświeżone.
+
+### OW: pioruny, kontynuacja 2026-10-31
+
+Dodano encję `lightning_bolt` i alias `/summon LightningBolt`, naturalne
+uderzenia w aktywnych chunkach podczas burzy, kolejne błyski, ogień oraz
+obszar rażenia. Działają dotychczasowe reakcje MO: naładowanie creepera,
+świnia → zombie pigman i wieśniak → wiedźma. Steruje nimi wyłącznie host.
+Stan, liczba pozostałych błysków i ziarno geometrii przechodzą przez zapis
+encji i istniejący protokół. Klient nie losuje błysków ani nie nalicza obrażeń.
+Piorun jest chwilową encją, nie trafia do trwałego zapisu chunków.
+
+Cykl, obszar rażenia i cztery otoczki geometrii z dwiema gałęziami oparto na
+[EntityLightningBolt 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/entity/effect/EntityLightningBolt.java)
+i [RenderLightningBolt 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/client/renderer/entity/RenderLightningBolt.java).
+Zachowano Java Random dla geometrii. Sky/fog reagują na aktywny błysk.
+Świadoma różnica audio ze względu na priorytet użytkownika: grzmot ma zasięg
+64 bloków zamiast wartości głośności 10000 z referencji. Grzmot i cichy trzask
+grają raz na piorun, bez ponawiania przy kolejnych błyskach; obowiązuje
+dotychczasowy limiter miksera. Odsłuch głośników nadal niewykonany.
+
+Naprawiono brak `doFireTick` w parserze reguł, liście reguł, zapisie sesji
+i komunikatach ustawień hosta. Wyłączenie reguły blokuje rozpalanie bloków;
+nie wyłącza obrażeń ani podpalenia encji od uderzenia.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **543 OK, 0 FAIL**:
+11 nowych testów logiki oraz 3 sieciowe. `--autotest --ow` zakończony OK;
+obejrzano `ow_lightning.png` z widocznym pniem i gałęziami. Dowody w
+`.modus/ow-lightning-selftest.log`, `.modus/ow-lightning-autotest.log`
+i `.modus/ow-lightning-final/`. Jeden test początkowo zawiódł, bo creeper
+w scenie bez gracza znikał przed uderzeniem; nadano mu trwałość w fixture,
+bez zmiany zasad despawnu. Początkowy błąd kompilacji testu wynikał z użycia
+CustomName przez typ LivingEntity zamiast Mob i został poprawiony.
+
+OW pozostaje otwarty: naturalny spawn guardianów w monumentach i wiedźm
+w chatkach, dokładniejsze tekstury opadów i test pogody w dwóch graficznych
+oknach przez relay. Wydanie BlockCraft_Gra nie jest jeszcze odświeżone.
+
+### OW: spawn w strukturach, kontynuacja 2026-10-31
+
+Podłączono `ChunkProviderGenerate.getPossibleCreatures` do naturalnego spawnera:
+wewnątrz monumentu lista potworów zawiera zwykłego guardiana (waga 1, grupa
+2-4), a w chatce wyłącznie wiedźmę (waga 1, grupa 1-1). Kategorie zwierząt,
+wodnych i nietoperzy zachowują listy biomów. Guardian należy do limitu
+potworów, mimo że jego umieszczenie wymaga wody, a nie podłoża lądowego.
+Istniejące zasady światła, kolizji, odległości od graczy i limitów pozostają.
+
+Do planów dodano odrębne obszary spawnu. Monument używa oryginalnego pudła
+58×23×58 (Y 39-61); rozszerzony obszar fundamentów i karczowania nie zwiększa
+zasięgu spawnu. Chatka pomija podpory poniżej bazowego Y. Lista jest ponownie
+sprawdzana przy każdym przesunięciu grupy, z tożsamością SpawnListEntry
+(wiedźma ze struktury nie przenosi wagi 1 do zwykłej listy biomu). Superflat
+i inne wymiary nie dostają tych reguł. Obszary są cache'owane osobno;
+próba spawnu nie wyszukuje kopalń, twierdz ani wiosek.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **556 OK, 0 FAIL**,
+w tym 13 nowych sprawdzeń granic, list, kategorii i pełnego przebiegu
+`World.Tick → MobSpawner → utworzenie moba`. Te ostatnie używają kontrolowanych
+komór w rzeczywistych obszarach struktur seeda 12345, bez ręcznego spawnowania
+guardianów/wiedźm. Pierwsza komora wiedźm miała otwarte boki i zbyt dużo
+światła w południe (0 mobów); dodano ściany do fixture, nie zmieniano reguł
+oświetlenia. Log: `.modus/ow-structure-spawns-selftest.log`.
+
+Nie wykonano pomiaru zgodności tempa spawnu 1:1. Dotychczasowy spawner
+wciąż ogranicza próby potworów do 1/4 ze względów wydajnościowych.
+Pozostałe zadania OW: dokładniejsze tekstury opadów i test pogody w dwóch
+graficznych oknach przez relay. Końcowe wydanie i integracja pozostają otwarte.
+
+### OW: cykl i limity naturalnego spawnu, kontynuacja 2026-10-31
+
+Porównano MobSpawner z lokalną referencją
+[SpawnerAnimals 1.8.9](https://github.com/Marcelektro/MavenMCP-1.8.9/blob/master/src/main/java/net/minecraft/world/SpawnerAnimals.java)
+i `World.countEntities/isAnyPlayerWithinRangeAt`. Usunięto wcześniejsze
+pomijanie 3/4 prób potworów. Dla pojedynczego gracza licznik limitu obejmuje
+17×17 chunków (289), natomiast próby odbywają się w wewnętrznych 15×15 (225).
+Zachowano nietypową regułę 1.8: pierścień nie trafia do zbioru prób, więc dla
+dwóch graczy w tym samym miejscu licznik rośnie do 353, choć obszar prób
+pozostaje 225. Limit przestaje zależeć od liczby wczytanych chunków.
+
+Zgodnie z referencją próby są dozwolone przy liczbie mobów równej limitowi
+(`<=`), zatem cała grupa może go przekroczyć. Nazwane i oznaczone jako trwałe
+moby nie zajmują limitu; zwykłe zwierzęta nadal są liczone. Widzowie nie
+tworzą regionów i nie blokują prób w odległości 24 bloków. Odległość od spawnu
+świata uwzględnia Y. Nowy mob trafia od razu do świata, więc następny z grupy
+widzi jego kolizję. Pusta lista kończy próbę grupy, zamiast kontynuować losowanie.
+
+Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **569 OK, 0 FAIL**:
+11 nowych sprawdzeń regionów/liczenia/odległości oraz 2 testy pełnego spawnera
+przy dokładnie 70 potworach i po przekroczeniu limitu. Nadal przechodzą testy
+rzeczywistego naturalnego spawnu guardianów i wiedźm. Pełny `--autotest`
+zakończony `AUTOTEST DONE`; obejrzano ekran debug (54 FPS, 131 encji,
+97 wczytanych chunków w pojedynczym ujęciu - to nie jest benchmark wydajności).
+Log uruchomienia nadal zawiera 4 wcześniejsze braki tekstur przedmiotów:
+baked_potato, poisonous_potato, pumpkin_seeds i melon_seeds. Nie wynikają
+ze zmiany spawnera; pozostają do integracji itemów/ME.
+
+Dowody: `.modus/ow-spawn-cycle-selftest.log`, `.modus/ow-spawn-cycle-autotest.log`
+i `.modus/ow-spawn-cycle-final/`. Ograniczenia: próby nie wymuszają generacji
+niewczytanych chunków, RNG gry i kolejność HashSet nie są zgodne bitowo z JVM,
+nie porównano wszystkich warunków początkowego wyposażenia/grup. Nie deklaruje
+się całej symulacji mobów jako 1:1. Nadal otwarte są dokładniejsze tekstury opadów,
+test pogody w dwóch oknach przez relay, ME i końcowa integracja/wydanie.
+
+### OW: oryginalne tekstury opadów i dwa okna przez relay, 2026-10-31
+
+ClientAssets pobiera oficjalne metadane i klienta 1.8 z serwerów Mojang,
+weryfikuje SHA1 archiwum i wyciąga wyłącznie rain.png/snow.png. Cache jest
+w `%LOCALAPPDATA%/BlockCraft/assets/client-1.8`, poza repozytorium i wydaniem.
+Zapisy są atomowe, z osobnymi plikami tymczasowymi dla równoległych procesów.
+Pobieranie działa w tle; bez zasobów nadal działają proceduralne zamienniki.
+Dekoder PNG: StbImageSharp 2.30.16. Oryginalne obrazy mają rozmiar 64×256;
+tablica GPU ma 256×256, z powieleniem najbliższego texela w osi X, bez utraty
+szczegółów. Początkowe założenie kwadratowych PNG uruchomiło fallback;
+importer poprawiono dla prostokątnych tekstur i ponownie sprawdzono w grze.
+
+Przewijanie UV, Java Random per kolumna, orientację kolumn, przezroczystość
+i ruch śniegu dopasowano do `EntityRenderer.renderRainSnow` z referencji MCP.
+Opady używają osobnej tablicy GPU, bez ograniczenia do atlasu terenu 16×16.
+Zrzuty deszczu i śniegu obejrzano. `--autotest --ow`: wszystkie sceny OK,
+native=True, tex=256. SHA1 lokalnego klienta zgodny z metadanymi Mojang.
+Selftest: **569 OK, 0 FAIL**; Release: 0 błędów, 4 dotychczasowe ostrzeżenia.
+
+Uruchomiono dwa rzeczywiste procesy przez gry.fimson.pl. Gość potwierdził
+natężenie deszczu 1, 440 kolumn, dokładnie 1 głos deszczu, oryginalne tekstury,
+obecność pioruna od hosta, a następnie brak opadów i brak głosu po clear.
+Cały scenariusz host/join zakończył się OK, łącznie z kontenerami encji,
+handlem, wyrzuceniem, powrotem bez kodu i zamknięciem hosta. Obejrzano zrzuty
+gościa w deszczu i po clear (59/60 FPS w tych ujęciach, nie benchmark).
+
+Pierwszy przebieg zatrzymał się później na sprawdzeniu ładunku wagonika:
+plik sygnału gościa mógł wyprzedzić pakiet kliknięcia. Test czeka teraz także
+na rzeczywisty stan ekwipunku/kontenera hosta, z dotychczasowym limitem czasu.
+To naprawa synchronizacji testu, bez zmiany protokołu i mechanik kontenerów.
+Nieudany przebieg zachowany w `.modus/weather-relay-e2e-20261031-1`, udany
+w `.modus/weather-relay-e2e-20261031-2`. Inne dowody:
+`.modus/ow-native-weather-{build,selftest,autotest}.log`
+i `.modus/ow-native-weather-final/`.
+
+Etap funkcjonalnej integracji OW jest zakończony; nie oznacza to potwierdzenia
+całej gry jako 1:1. Pozostają wcześniejsze ograniczenia RNG/niezaładowanych
+chunków, testy wszystkich wariantów struktur i mobów, inne proceduralne
+tekstury oraz opisane odstępstwo audio grzmotu. BlockCraft_Gra nadal wymaga
+odświeżenia przy końcowej integracji. Następny etap: ME, potem finalne testy
+i raport wraz z problemami orkiestracji.
+
+### 2026-11-01 - ME-h 39c, sztandary
+
+Dokończono WIP poprzedniej sesji: 16 kolorów, stojące sztandary (16 obrotów),
+ścienne (4 kierunki), 38 wzorów plus baza. Crafting dodaje do 6 warstw;
+kopiowanie zachowuje wzorzec w siatce. Kocioł zdejmuje ostatnią warstwę,
+zachowując inne dane przedmiotu; tryb kreatywny daje wypraną kopię.
+Utrata podparcia upuszcza sztandar ze wzorami. Dane mają rejestr TE 63,
+zapisują się ze światem i przesyłają istniejącym protokołem tile entities.
+
+Model ModelBanner, falowanie, składanie masek banner_base/banner/* z lokalnego
+client.jar 1.8, cache tekstur LRU. Wzory widoczne również w ekwipunku i na
+modelu trzymanym w ręce. Obsłużono NBT BlockEntityTag.Base i Patterns.
+Reguły specjalnych receptur (w tym czarny wzór bez barwnika), Base NBT i prania
+sprawdzono bezpośrednio przez javap na klasach aoe, ajs, bci i aui oryginalnego
+klienta 1.8 z cache assetów. Nie dołączono żadnych assetów Mojang do repo.
+
+Walidacja: Release bez błędów (4 wcześniejsze ostrzeżenia); selftest zawiera
+testy wszystkich kolorów, receptur, kopiowania przez slot wyniku, limitu warstw,
+podparcia, kotła, zapisu/odczytu TE, kompozycji masek oraz stawiania przez gościa
+i aktualizacji wzorów na drugim końcu połączenia w pamięci. Autotest --me:
+ME-TEST KONIEC OK i AUTOTEST DONE, obejrzane me_16_sztandary.png oraz
+me_17_sztandar_w_rece.png w bin/Release/net10.0/autotest.
+
+Ograniczenia: ikona GUI jest płaskim odwzorowaniem płachty z drzewcem,
+nie pełnym portem transformacji perspektywy GUI Minecrafta. Bez client.jar
+wygląd masek jest proceduralnym przybliżeniem. Brak opisów poszczególnych
+warstw w podpowiedzi przedmiotu. Nie deklaruję pełnej zgodności grafiki 1:1.
+Nowego przebiegu dwóch okien przez publiczny relay dla samych sztandarów nie
+wykonano. Alfa 1.0 w BlockCraft_Gra i komputer brata pozostały nietknięte.
+
+### 2026-11-01 - ME-h 39d, system osiągnięć
+
+Dodano drzewo 34 osiągnięć z zależnościami i współrzędnymi AchievementList
+klienta 1.8 (javap tl). Reguła przyznawania wymaga odblokowanego rodzica;
+nie odkłada nagrody na później. Osobna kolejka powiadomień, zapis do istniejącego
+PlayerData.Achievements, odczyt bez ponownego pokazywania starych nagród.
+Menu pauzy zawiera ekran drzewa, przeciąganie i skalowanie kółkiem myszy.
+Ikony brakujących jeszcze przedmiotów pochodzą z client.jar, bez fikcyjnych
+rejestracji ich mechanik rozgrywki. Układ i wygląd tła/ramek nie są portem GUI 1:1.
+
+Wyzwalacze: otwarcie ekwipunku, podnoszenie drewna/skóry/diamentu/różdżki,
+crafting, piec, odbiór mikstury, zabicie potwora/Withera/ghasta odbitą kulą,
+snajper (50 bloków w poziomie), cios 18 obrażeń, jazda wagonikiem kilometr,
+upadek świni z jeźdźcem, rozmnażanie krów, przywołanie Withera, portale,
+darowanie diamentu, eksploracja biomów i sprawdzenie pełnej piramidy latarni.
+Lista wymaganych biomów odpowiada bazowym ID 0-39 bez 8,9,10,20 (arm.n).
+
+Protokół 7: S2C.Stats przenosi maskę 34 bitów; C2S.OpenInventory może zgłosić
+wyłącznie otwarcie ekwipunku. Nagrody rozgrywki przyznaje host. Pierwszy pakiet
+nie odtwarza historycznych popupów, kolejne informują tylko o nowych nagrodach.
+Klient nie może przesłać dowolnego identyfikatora nagrody do przyznania.
+
+Walidacja: Release bez błędów (4 wcześniejsze ostrzeżenia), 820 OK/0 FAIL;
+testy obejmują drzewo, zależności, rzeczywiste podnoszenie przedmiotów, crafting,
+odbiór pieca, zabójstwa, snajpera, darczyńcę diamentu, zapis JSON, synchronizację,
+brak podwójnych popupów i piramidę. Połączenie w pamięci sprawdza otwarcie
+ekwipunku gościa i nadpisanie sfałszowanego lokalnie stanu przez hosta.
+Autotest --me zakończony OK, obejrzane me_18_osiagniecia i me_19_drzewo_osiagniec.
+
+Wykryto zależności nieukończone w dotychczasowych modułach: ciasto, ryby,
+stawiane czaszki (typ + wywołanie Wither.TrySummon), pełna latarnia. Brak ich
+rejestracji uniemożliwia zwykłe zdobycie części nagród; to osobny krok 53 planu.
+Sprawdzenie piramidy jest przygotowane, ale pełna latarnia, jej GUI, efekty
+i zgodny z 1.8 obszar przyznawania nagrody wymagają tego kroku. Darczyńca
+diamentu jest obecnie śledzony w pamięci; nie utrzymuje się w upuszczonej encji
+po zapisie i ponownym wczytaniu świata. Te ograniczenia wykluczają deklarację
+pełnej zgodności osiągnięć 1:1. Wersji zainstalowanej u graczy nie podmieniano.
+
+### 2026-11-01 - ME-53a, ciasto i ryby
+
+Zarejestrowano I.CakeItem i B.Cake: receptura mleko/cukier/jajko/pszenica,
+stos 1, zwrot trzech wiader przy odbiorze, stawianie na litym podłożu,
+7 kęsów (+2 głodu, +0.4 nasycenia), zmniejszająca się bryła i kolizja,
+brak dropu przy zniszczeniu i utracie podparcia. Komparator daje 14,12,...,2.
+Zachowanie sprawdzone w bytecode BlockCake (aug) oryginalnego klienta 1.8.
+
+Zarejestrowano I.RawFish (dorsz/łosoś/błazenek/rozdymka) i I.CookedFish
+(dorsz/łosoś). Dorsz i łosoś zachowują meta w piecu, dają 0.35 XP; pozostałych
+dwóch ryb nie można piec. Wartości pokarmu i nasycenia wg FishType (ali)
+klienta 1.8; rozdymka uruchamia już istniejące efekty Trucizny IV (1200 ticków),
+Głodu III i Mdłości II (300 ticków). Warzenie rozdymki było już obsłużone.
+Tekstury cake_* i sześciu ryb z lokalnego client.jar, proceduralne zastępcze
+przy braku cache. Nie dodano assetów Mojang do repozytorium.
+
+Release OK (4 wcześniejsze ostrzeżenia), selftest 856 OK/0 FAIL, w tym receptura
+i zwrot wiader przez rzeczywisty slot wyniku, wszystkie kęsy/komparator,
+podparcie/drop, warianty ryb, wartości jedzenia, efekty i rzeczywisty piec.
+Test host/klient w pamięci: jeden kęs gościa rozliczony przez hosta, głód i meta
+zgodne po obu stronach. --autotest --me OK; obejrzano me_20_ciasto_7_kesow
+i me_21_ryby_ciasto_ikony. Nowego testu przez publiczny relay nie wykonywano.
+Osiągnięcia bakeCake i cookFish mają teraz dostępne zależności.
+
+Krok 53 podzielony na 54 (ten podetap), 55 wędkowanie, 56 czaszki i 57 latarnia.
+Krok zbiorczy pozostaje otwarty. Wędkowanie nadal nie jest podłączone do wędki;
+czaszek i latarni nie rejestrowano w ramach tego podetapu. Alfa 1.0 nietknięta.
+
+### 2026-11-01 - ME-53b, wędkowanie
+
+Wędka tworzy jedną encję fishing_hook przypisaną do gracza. Spławik jest
+autorytatywny na hoście: rzut z rozrzutem, kolizja z blokiem lub encją, wypór
+z pięciu warstw zanurzenia, utrata przy odłożeniu wędki/śmierci/zmianie wymiaru
+lub odległości ponad 32 bloki, wygaśnięcie po 1200 tickach utknięcia. Zwijanie
+kosztuje 0 (pusty), 1 (połów), 2 (blok), 3 (encja) trwałości; twórca jej nie traci.
+Holowany przedmiot lub mob dostaje prędkość w stronę gracza, połów daje 1-6 XP.
+
+Fazy: oczekiwanie 100-900 minus 100 ticków na poziom Przynęty, zbliżanie
+20-80, branie 10-30. Deszcz i brak widoku nieba zmieniają tempo. Plusk jest
+jednorazowy przy braniu; bez zapętlonego audio. Wagi ryb 60/25/2/13 oraz
+tablice śmieci/skarbów według ado oryginalnego klienta 1.8. Uwzględniono
+rzeczywisty wpływ Przynęty na szanse śmieci i skarbów w 1.8, Morską fortunę,
+zużyte narzędzia i losowe zaklęcia poziomu 30. Regułę uszkodzeń adp sprawdzono
+bezpośrednio przez javap. Dodano brakującą miskę (receptura 4 z desek) dla łupów.
+
+Renderer pokazuje spławik i żyłkę, a pierwsza osoba zmienia ikonę rzuconej wędki.
+Wędka i miska korzystają z oryginalnych tekstur w cache. Sieć używa istniejącego
+formatu encji i NetData z identyfikatorem wędkarza; usunięcie czyści powiązanie.
+Poprawiono testową pętlę wejścia, która podczas bezczynności zawsze wybierała
+slot 0: teraz utrzymuje faktycznie wybrany slot, jak gra.
+
+Release OK (4 wcześniejsze ostrzeżenia), selftest 873 OK/0 FAIL. Testy obejmują
+rzut, koszty zwijania, holowanie, branie przez rzeczywistą fizykę, powiązanie
+klienta, rozkład 20000 łupów, wszystkie typy ryb/skarbów i brak nagrody po
+ponownym zwinięciu. Test host/klient w pamięci sprawdza rzut gościa i usunięcie
+spławika po zwinięciu po obu stronach. --autotest --me OK, me_22_wedkowanie
+obejrzany. Nie wykonano nowego testu dwóch okien przez publiczny przekaźnik.
+
+Ograniczenia względem pełnego 1:1: grafika spławika i śladów ryby uproszczona,
+punkt mocowania żyłki przy ręce przybliżony, brak zmiany modelu wędki u innych
+graczy. Generator losowy świata pozostaje BlockCraft.Rng; nie potwierdzono
+identycznej sekwencji RNG Minecrafta ani kompletnego porównania trajektorii.
+Spławik nie jest utrwalany w zapisie świata. Czaszki i latarnia: nadal kroki56/57.
+
+### 2026-11-01 - ME-53c, czaszki
+
+Zarejestrowano B.Skull, I.SkullItem (5 wariantów) i TE64 SkullTile.
+Stawianie na podłodze (16 obrotów, yaw bez przesunięcia o 180 stopni), czterech
+ścianach i zamiana roślinnego bloku zastępowalnego według ItemSkull (anh).
+Nie można stawiać pod sufitem. Jak w 1.8, po postawieniu czaszki mogą wisieć
+bez podparcia. Kształty kolizji/zaznaczenia z BlockSkull (baj).
+Zniszczenie zachowuje typ i profil właściciela, respektuje bit bez dropu;
+środkowy przycisk wybiera właściwy wariant. TE usuwana wraz z blokiem.
+
+Profile SkullOwner (tekst albo compound z Name/Id/Properties) kopiowane,
+utrwalane ze światem i przesyłane istniejącym formatem tile entities.
+Modele głów, ikony i pięć natywnych tekstur mobów/gracza z client.jar.
+Ikony w GUI są renderowane do IconAtlas z tych samych modeli 3D (pięć
+warstw według typu), z korekcją osi Y istniejącego FBO.
+Głowy można nosić w slocie hełmu, widać je także na stojaku i w ręce.
+Nie dodawano pobierania skinów kont Mojang: profil gracza zachowuje dane,
+ale renderuje domyślną twarz Steve'a. To jawne ograniczenie odwzorowania.
+Transformacje modeli w GUI i ręce są dopasowane do renderera BlockCraft;
+nie są pełnym portem wszystkich pól display modeli Minecrafta 1.8.
+
+Wither.TrySummon sprawdza teraz rzeczywisty typ1 w SkullTile, zamiast każdego
+bloku B.Skull; użycie ostatniej właściwej czaszki automatycznie sprawdza wzór T.
+Test NE używa rzeczywistych bloków i typów zamiast zastępczych znaczników
+z jasnogłazu. Z naładowanego creepera może wypaść także czaszka Witherowego
+szkieleta, z limitem jednej dodatkowej głowy na creepera. Zwykły rzadki drop
+jest rozliczany osobno, więc może dać drugą czaszkę (tak samo jak afw.a(wh) w 1.8).
+Poprawiono szansę rzadkiego dropu przy Grabieży z 2.5%+0.5%/poziom na
+2.5%+1%/poziom (xm, afw oryginalnego klienta 1.8, zweryfikowane javap).
+
+Release OK, 896 selftest OK/0 FAIL. Testy: pięć typów, obrót, montaż,
+brak podparcia, profil z Properties i stare SkullOwner, zapis/odczyt TE,
+drop i usuwanie TE, bit bez dropu, zły środkowy typ blokuje Withera,
+automatyczne przywołanie w obu osiach i zużycie struktury, limit głów
+naładowanego creepera. Host/klient w pamięci: głowa gracza postawiona przez
+gościa ma zgodny typ i profil oraz koszt jednego przedmiotu.
+Autotest --me zakończony OK.
+Obejrzano me_23_czaszki, me_24_czaszka_w_rece i me_25_czaszka_na_glowie;
+ostateczne miniatury modeli mają widoczne twarze. Dowody z ostatniego
+przebiegu --me --fps60 zachowane w .modus/skulls-me-evidence.
+
+Dodatkowy szeroki --autotest --ne przy nieograniczonym FPS zgłosił 12 FAIL,
+choć przywołanie Withera z nowych czaszek przeszło. Oczekiwania w tym teście
+mają limity liczone w klatkach i przy ok.1500 FPS kończą się za wcześnie
+(np. Wither ma nadal nietykalność i 110 HP). Dowody zachowane w
+.modus/skulls-ne-evidence; osobny krok58 wymaga porównania i naprawy testu.
+Nie przedstawiać tego przebiegu jako zaliczenia całego modułu NE.
+Porównanie przy --fps60: cały --autotest --ne zakończony 0 błędów, łącznie
+z portalami, okiem Endu, smokiem, przywołaniem i walką z Witherem. Obejrzano
+ne_18_wither_spawn, dowody w .modus/skulls-ne60-evidence. Potwierdza to
+zależność testowych limitów od FPS; krok58 pozostaje do usunięcia tej zależności.
+
+### 2026-11-01 - ME-53d: latarnia (pauza na prośbę użytkownika)
+
+Zarejestrowano blok B.Beacon i TE65 BeaconTile, przedmiot blokowy oraz recepturę
+5 szkła + gwiazda Netheru + 3 obsydianu. Piramidy z mieszanych bloków żelaza,
+złota, diamentów i szmaragdów, poziomy 1-4, kontrola przesłonięcia kolumny.
+Reguły sprawdzone przez javap oryginalnego client.jar 1.8 (bck i acl;
+bytecode w .modus/beacon-18-bytecode.txt i beacon-dyes-18-bytecode.txt).
+Efekty Speed/Haste, Resistance/JumpBoost, Strength i dodatkowa Regeneration
+albo poziom II przy pełnej piramidzie. Czas 180 ticków, odświeżanie co 80,
+ambient, zasięg levels*10+10 i rozszerzenie pionowe w górę o wysokość świata.
+Osiągnięcie fullBeacon przy przejściu do czterech warstw, obszar
+x/z ±10, y od -9 do +5 względem latarni (AABB oryginalnego bck).
+Usunięto wcześniejsze skanowanie 41x41x41 wokół każdego gracza.
+
+GUI wyboru mocy, współdzielony slot opłaty z limitem jednej sztuki
+(szmaragd/diament/sztabka złota lub żelaza, także w creative), zwrot przez
+wyrzucenie niewykorzystanej opłaty po zamknięciu. Host weryfikuje okno,
+odległość, blok, piramidę, wybrane efekty i płatność. Nowy C2S.Beacon,
+protokół 8. TE zapisuje poziom i moce; nie zapisuje tymczasowego slotu opłaty,
+jak TileEntityBeacon 1.8. Render bloku z obsydianową podstawą i szklaną
+obudową, promień z sekcjami barwionymi szkłem/panelami i mieszaniem kolorów
+według tabeli owiec acl, obracany rdzeń i zewnętrzna warstwa.
+
+Walidacja: Release 0 błędów/4 wcześniejsze ostrzeżenia; selftest 926 OK/0 FAIL
+(.modus/beacon-selftest-final.txt). Obejmuje pełną wymianę host/klient w pamięci:
+GUI, opłatę, wybór, odrzucanie wyższego poziomu i ponownej zmiany bez opłaty.
+--autotest --me --fps 60: ME-TEST KONIEC: OK i AUTOTEST DONE.
+Obejrzane końcowe me_26_latarnia (piramida i kolory) i me_27_latarnia_gui
+(wszystkie przyciski i sloty, bez nakładania tekstu). Dowody i log zachowane
+w .modus/beacon-me-evidence. Brak testu nowego GUI przez publiczny relay.
+GUI używa polskich etykiet zamiast oryginalnego atlasu przycisków;
+render promienia korzysta z oświetlenia/mgły i mieszania BlockCraft,
+nie odtwarza oddzielnego additive pass vanilla. Bez deklaracji pełnej
+zgodności graficznej 1:1. Alfa 1.0, instalacje i komputer brata nietknięte.
+
+Użytkownik polecił: „zapisz stan prac i na teraz pauza”. Nie rozpoczęto kroku58.
+Następne: naprawić limity oczekiwania NE zależne od FPS (58), domknąć zbiorcze
+53/39/40 i przeprowadzić integrację41 wraz z aktualizacją README/CHECKLISTA.
+
+### 2026-11-02 - BL2 (mc18/blocks2): skrzynia Endu, doniczka, książki, bariera, statystyki
+
+Gałąź `mc18/blocks2` (od feature/mc18, commity 4b7780f, 1d8a8f9, 81c0016 i ten raport). Kod w osobnych plikach:
+`World/Blocks2/Bl2Blocks.cs`, `Items/Blocks2/Books.cs`, `Entities/Blocks2/Bl2Stats.cs`, `Gui/Blocks2/BookScreen.cs`,
+`Gui/Blocks2/StatsScreen.cs`, `Render/Blocks2/Bl2Render.cs`, `Net/Bl2Net.cs`, `Bl2SelfTest.cs`, `GameAutotestBl2.cs`.
+Nowe haki w `Modules.cs`: `TexBl2`, `BlocksBl2`, `ItemsBl2`, `RecipesBl2`, `EntitiesBl2` (po ME). TypeId TE: 80 skrzynia Endu,
+81 doniczka. GuiKind skrzyni Endu: `(GuiKind)70` (rejestracja w ContainerFactory). Protokół sieci podbity do 9:
+C2S.EditBook = 40, C2S.RequestStats = 41, S2C.Statistics = 40 (numery wysokie, żeby nie zderzyć się z innymi pionkami).
+
+- Skrzynia Endu (211): twardość 22.5, odporność setResistance(1000) zapisana w skali BlockCraft jako 600 (= 3000 / 5, jak
+  obsydian 1200), światło 7, kilof poziom 0, drop 8 obsydianu, jedwabny dotyk daje skrzynię, receptura 8 obsydianu + oko
+  Endu. Wspólny ekwipunek 27 slotów `Player.EnderInventory` (zapis w PlayerData.EnderItems), osobny dla każdego gracza,
+  blok nad skrzynią blokuje otwarcie, odejście dalej niż 8 bloków i zniszczenie zamyka GUI. Wieko jak TileEntityEnderChest
+  (0.1 na tick, 1 - (1-f)^3), dźwięki random.chestopen/chestclosed, 3 cząsteczki portalu w randomDisplayTick. W sieci host
+  liczy patrzących (numPlayersUsing w synchronizacji TE), klient animuje wieko własnym tickiem (świat klienta nie tickuje TE).
+- Doniczka (218, przedmiot 491): stawianie jak ItemReed na stałym podłożu, receptura 3 cegły, PPM wkłada kwiaty (oba
+  rodzaje z meta), sadzonki 6 drzew, grzyby, kaktus, martwy krzak, paproć; wyjąć można tylko niszcząc (jak 1.8). TE
+  ItemId + Data, drop doniczki i rośliny, wybór bloku daje roślinę, stare meta 1-13 (np. 7 w chatce czarownicy) zamieniane
+  na zawartość. Rośliny w przebiegu encji: dwie płaszczyzny 45 stopni (flower_pot_cross z rescale), kaktus jako prostopadłościan,
+  paproć barwiona kolorem trawy biomu.
+- Książka z piórem (486) i napisana książka (487): receptura książka + atrament (barwnik meta 0) + pióro, GuiScreenBook
+  (do 50 stron, 256 znaków i 128 pikseli wysokości na stronę, Enter = nowa linia, Ctrl+V), podpisywanie (tytuł do 16 znaków,
+  autor = nick), czytanie, NBT pages/title/author/generation/resolved, kopiowanie w craftingu (RecipeBookCloning: oryginał
+  zostaje, generacja 0 -> 1 -> 2, kopii kopii nie da się kopiować; hak KeepSlotHook łączony z hakiem sztandarów). Sieć:
+  C2S.EditBook jak MC|BEdit/MC|BSign, host sprawdza książkę w ręce i limity.
+- Bariera (220): niewidzialna, hardness -1, odporność 3600000, nic nie wypada, tylko /give; w kreatywnym z barierą w ręce
+  cząsteczka BARRIER (doVoidFogParticles: 1000 losowych bloków w promieniu 16 co tick, ikona przez 80 ticków).
+- Statystyki 1.8: 48 ogólnych w kolejności StatList (odległości wg addMovementStat/addMountedMovementStat, upadki od 2 bloków,
+  skoki, wyrzucone (Q), zadane/otrzymane obrażenia x10, śmierci, zabite moby/gracze, czas gry i od śmierci, interakcje z
+  blokami przez Player.OpenBlockGui, skrzynie Endu, doniczki, wyjścia z gry), bloki (stat.mineBlock tylko przy udanym
+  zbiorze), przedmioty (craftItem także z pieca, useItem, breakItem), moby z jajkiem spawnu (killEntity, entityKilledBy).
+  Zapis w PlayerData.Statistics. Ekran z menu pauzy (przycisk "Statystyki" obok "Osiągnięcia"): zakładki Ogólne / Bloki /
+  Przedmioty / Moby, sortowanie kolumn kliknięciem, przewijanie. W sieci liczy tylko host, klient prosi o kopię przy otwarciu.
+- Haki w plikach wspólnych (jedna linia każdy): Player (tick, ruch, skok, upadek, zniszczenie narzędzia, obrażenia, atak,
+  OpenBlockGui, FinishUsing), LivingEntity.OnDeath, PlayerController (kopanie, użycie, wybór bloku doniczki), Game (Q, tick
+  klienta, wyjście), Inventory (wyjście pieca), NetServer/NetClient/RemoteClient (pakiety, rozłączenie), Screens (menu pauzy).
+
+Testy: `dotnet build -c Release` 0 błędów (4 wcześniejsze ostrzeżenia); `--selftest` 1000 OK / 0 FAIL (74 nowe testy BL2,
+w tym host + gość w pamięci: skrzynia Endu gościa, wieko u klienta, doniczka, edycja i podpis książki, odrzucenie pakietu bez
+książki, statystyki u klienta, wyjście z gry); `--missing` bez EnderChest/FlowerPot/Barrier/WritableBook/WrittenBook/
+FlowerPotItem (zostaje tylko CommandBlock innego pionka); `--autotest --bl2`: BL2-TEST KONIEC: OK, 16 zrzutów bl2_*.png
+obejrzanych (skrzynie zamknięta/otwarta/obrócona, 8 doniczek, GUI skrzyni, cząsteczki bariery, edycja/podpis/czytanie
+książki, ikony, menu pauzy, 4 zakładki statystyk).
+
+Ograniczenia względem 1:1: tekstury skrzyni Endu, doniczki, ikon książek i bariery z client.jar 1.8, gdy jest w cache
+(inaczej proceduralne); skrzynia renderowana kaflami terenu ułożonymi z entity/chest/ender.png, nie modelem 64x64.
+GUI książki i statystyk rysowane prostokątami i tekstem (bez gui/book.png i ikon stats_icons.png). Strony książki trzymane
+jako zwykły tekst (1.8 zapisuje podpisane strony jako JSON), maks. stos napisanej książki 1 jak ItemEditableBook 1.8.
+Statystyki bez osiągnięcia "onARail" z odległości wagonikiem i bez części liczników należących do innych modułów
+(rozmnażanie, osadnicy, ciasto, kocioł, bloki nutowe, płyty, sztandary w kotle) - klucze i nazwy są, moduły mogą wołać
+`Bl2Stats.Add(gracz, "stat.cakeSlicesEaten")` itd. Użycie przedmiotów liczone w PlayerController/FinishUsing, nie w każdej
+klasie przedmiotu jak w 1.8 (łuk bez osobnego licznika przy strzale). Brak testu przez publiczny relay.
+
+### 2026-11-02 - integracja BL2 po przekazaniu sesji
+
+Scalono mc18/blocks2 (888cf16) do feature/mc18, commit scalenia 79cdd9e.
+Skrzynia Endu, doniczki, bariera, książki i statystyki przeszły Release
+(0 błędów, 4 dotychczasowe ostrzeżenia), selftest 1000/0 i autotest BL2.
+Obejrzano zrzuty skrzyń/doniczek, edycji książki i statystyk mobów.
+Dowody lokalne: .modus/integration-bl2-evidence.
+
+89d8d10 dodaje brakujące wyzwalacze stat.cakeSlicesEaten i stat.recordPlayed.
+Pięć nowych testów sprawdza rzeczywiste zjedzenie całego ciasta, odrzucenie
+kęsa u sytego gracza, włożenie płyty, zajętą szafę i brak naliczania u klienta.
+Zaklinanie miało już wyzwalacz stat.itemEnchanted. Selftest: 1005 OK / 0 FAIL,
+log .modus/integration-stats-selftest.txt. Pozostałe braki liczników z raportu
+BL2 nie są tym samym zamknięte.
+
+Pełny autotest ujawnił fałszywe oczekiwanie przy stawianiu: po wykopaniu liścia
+celownik trafiał dalej, a test sprawdzał nadal pierwsze wykopane pole.
+a51a72e sprawdza aktualny cel kontrolera oraz zużycie dokładnie jednej deski.
+Powtórzony --autotest --fps 60: kopanie/stawianie i wszystkie scenariusze RS OK,
+AUTOTEST DONE, brak FAIL/ERROR w logu tego przebiegu (19:35:19-19:35:48).
+Zrzut 06c_after_place obejrzany; dowody .modus/integration-full-retry-evidence.
+
+README i początek CHECKLISTA opisują obecny stan (548ba00).
+CMD i NET2 nadal pracują w osobnych worktree; nie zostały scalone w tej sesji.
+Przy scalaniu trzeba uzgodnić wersję i numery pakietów: BL2 używa protokołu9,
+C2S.EditBook40/RequestStats41 oraz S2C.Statistics40.
+Nie wydano jeszcze Alfa1.4 ani nie scalono do main. Alfa1.0 pozostaje bez zmian.
+
+### 2026-11-02 - CMD: komendy Minecraft 1.8
+
+Gałąź `mc18/commands` otrzymała nowy rdzeń komend, selektory `@p/@a/@r/@e`,
+parser Mojangson i JSON, komendy bloków/encji/świata oraz model scoreboardu
+i granicy świata. Dodano `/scoreboard`, `/stats`, `/trigger`, `/worldborder`,
+blok poleceń z TE89 i wagonik z blokiem poleceń. Blok reaguje na zbocze
+narastające redstone, udostępnia wynik komparatorowi oraz zapisuje `SuccessCount`,
+`LastOutput`, `trackOutput` i ustawienia statystyk. Edycja zdalna działa przez
+hosta po protokole 9 (C2S.CommandBlock 18, S2C.CommandUi 34).
+
+Scoreboard zapisuje cele, wyniki, drużyny, sloty wyświetlania i wiązania `/stats`
+w `data/scoreboard.dat`; wyświetla sidebar, listę Tab i wynik pod nazwą gracza.
+Granica świata obsługuje zmianę średnicy w czasie, obrażenia, kolizję, blokadę
+stawiania, render ściany i ostrzegawczą winietę, a stan zapisuje w
+`data/worldborder.dat`. Tryb przygody respektuje `CanDestroy` i `CanPlaceOn`
+w NBT przedmiotu i pokazuje te tagi w podpowiedzi.
+
+Weryfikacja: `dotnet build -c Release` zakończony zerem błędów i czterema
+wcześniejszymi ostrzeżeniami kompilatora. Pełny `--selftest`: 1108 OK, 0 FAIL;
+CMD-only: 182 OK, 0 FAIL. `--missing` nie zgłasza CommandBlock. `--autotest --cmd`
+zakończył się komunikatem `AUTOTEST DONE`; wykonano i obejrzano pięć zrzutów
+sidebaru, title, ściany granicy, edytora i impulsu redstone. Test pętli host-gość
+sprawdza uprawnienia i zasięg edycji, synchronizację scoreboardu/granicy/title,
+GUI oraz wyrzucenie gracza.
+
+Pozostałe różnice wobec klienta 1.8: tekst JSON parsuje `clickEvent`, `hoverEvent`
+i `insertion`, ale czat nie obsługuje interakcji. Kody fontu `k-o` są ignorowane.
+Cząstki używają najbliższego dostępnego rodzaju, a parametry prędkości i trybu
+nie odwzorowują wszystkich zachowań vanilla. `/entitydata` zapisuje tylko pola
+obsługiwane przez modele encji BlockCraft. Kryteria `stat.*` aktualizują się
+z dostępnych statystyk gracza. Część nazw slotów `/replaceitem` (enderchest,
+koń) nie ma jeszcze magazynu w tej implementacji. Wynik serca w HUD Tab i
+proceduralny render granicy są uproszczone. Test sieci używa pętli lokalnej,
+nie publicznego przekaźnika.
+
+Commity `b3407e9`, `5bb5dc7` i `c96deef` wypchnięto na `mc18/commands`.
+Gałąź nie została scalona z `feature/mc18`; integrację wykonuje master.
+Logi testów i obejrzane PNG pozostawiono w `.modus/cmd-evidence`.
+
+### 2026-11-02 - integracja fali 2: NET2 i CMD
+
+Scalono `mc18/net2` (5be1cf9) jako 0ceded8 oraz `mc18/commands` (c96deef, b7f3201)
+jako 32f07aa i commit raportu. Konflikty dotyczyły tylko numerów pakietów,
+haków modułów i zapisu gracza przy rozłączeniu:
+
+- wspólny `Protocol.Version = 10` (BL2, NET2 i CMD miały osobno 9);
+- S2C: 34 BlockBreakAnim i 35 EntityLinks (NET2), 36 CommandUi (CMD, przeniesione z 34),
+  40 Statistics (BL2); C2S: 18 CommandBlock, 40 EditBook, 41 RequestStats;
+- `RemovePuppet` zamyka okna i dopiero wtedy zapisuje gracza (NET2), licznik
+  `stat.leaveGame` z BL2 zostaje w `Disconnected`, `Shutdown` bez wcześniejszego `SavePlayers`;
+- `Modules.cs`: haki `*Bl2` i `*Commands` wołane po kolei, `LivingEntity.OnDeath` woła
+  `Bl2Stats.Killed` i `DeathHook` (scoreboard).
+
+Test `CMD sieć powód kick` w pełnym selfteście raz nie zdążył w 2 tickach (osobno
+przechodził 3/3); teraz czeka na rozłączenie do 50 ticków.
+
+Weryfikacja po scaleniu: Release 0 błędów (4 stare ostrzeżenia), `--selftest`
+1262 OK / 0 FAIL; `--autotest --fps 60` AUTOTEST DONE bez FAIL/ERROR; moduły
+`--cmd --bl2 --ne --me --mo --ow` z `--fps 60` 0 FAIL; `tools/dev/Test-Net.ps1`
+(dwa procesy przez gry.fimson.pl) host i gość OK z wszystkimi sygnałami NET2
+(pęknięcia, wytwarzanie, łódka). Obejrzane zrzuty: sidebar i edytor bloku poleceń,
+gracz zdalny u hosta. Dowody: `.modus/net-e2e-integracja-fala2`.
+
+`/replaceitem` dla slotów enderchest można teraz podpiąć do `Player.EnderInventory`
+z BL2 (niezrobione). Merge do `main` czeka na akceptację Filipa.

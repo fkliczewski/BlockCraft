@@ -102,7 +102,12 @@ public static partial class Registries
 {
     static partial void EntitiesMechanics()
     {
-        Tile(60, () => new BrewingStandTile()); Entity("me_potion", w => new AlchemyProjectile(w));
+        Tile(60, () => new BrewingStandTile()); Tile(61, () => new World.JukeboxTile()); EntitiesBoat(); EntitiesHanging(); EntitiesFireworks(); Tile(62, () => new World.SignTile()); Tile(63, () => new World.BannerTile()); WorldRenderer.TileRenderHook += Game.DrawSignBoards; Entity("me_potion", w => new AlchemyProjectile(w));
+        WorldRenderer.TileRenderHook += EntityRenderer.DrawBanners;
+        Tile(65,()=>new BeaconTile()); WorldRenderer.TileRenderHook += EntityRenderer.DrawBeacons; Tile(64,()=>new SkullTile());
+        WorldRenderer.TileRenderHook += EntityRenderer.DrawSkulls;
+        Entity("fishing_hook",w=>new FishingHook(w));
+        EntityRenderer.Custom[typeof(FishingHook)] = EntityRenderer.DrawFishingHook;
         EntityRenderer.Custom[typeof(AlchemyProjectile)] = (r, e, pt, pos, cam) =>
         {
             var p = (AlchemyProjectile)e; r.RenderBillboardSprite(p.Stack?.Item?.GetSprite(p.Stack) ?? TextureGen.Layer("item_potion"), pos, .25f, Vector4.One, cam);

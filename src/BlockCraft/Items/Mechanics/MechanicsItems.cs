@@ -19,5 +19,22 @@ public static partial class ItemRegistry
         BlockItem(I.BrewingStandItem, "brewing_stand", "Statyw alchemiczny", B.BrewingStand, Blocks.TabBrewing);
         BlockItem(I.CauldronItem, "cauldron", "Kocioł", B.Cauldron, Blocks.TabBrewing);
         Item.ById[I.GoldenApple].Variants = new[] { 0, 1 };
+        ItemsFood18();
+        Simple(I.Bowl,"bowl","Miska",Blocks.TabMaterials);
+        var skull=Simple(I.SkullItem,"skull_skeleton","Czaszka",Blocks.TabDecoration);
+        skull.Variants=new[]{0,1,2,3,4};skull.ArmorSlot=0;skull.NameFn=Skulls.Name;
+        skull.SpriteFn=s=>TextureGen.Layer("item_"+Skulls.Icons[Skulls.Type(s)]);
+        skull.UseOnBlock=(p,s,x,y,z,face,hx,hy,hz)=>Skulls.Place(p,s,x,y,z,face);
+        var rod = Simple(I.FishingRod, "fishing_rod", "Wędka", Blocks.TabTools, 1); rod.MaxDamage = 64; rod.Handheld = true;
+        rod.UseInAir=BlockCraft.Entities.FishingHook.Use;
+        ItemsUtility(); ItemsBoat(); ItemsSigns(); ItemsHanging(); ItemsMaps(); ItemsFireworks(); ItemsBanners();
+        Simple(I.EnchantedBook, "enchanted_book", "Zaklęta książka", Blocks.TabMisc, 1);
+        string[] keys = { "helmet", "chestplate", "leggings", "boots" }, names = { "Kolczy hełm", "Kolczy napierśnik", "Kolcze spodnie", "Kolcze buty" };
+        int[] points = { 2, 5, 4, 1 }, baseDur = { 11, 16, 15, 13 };
+        for (int s = 0; s < 4; s++)
+        {
+            var a = Simple(I.ChainHelmet + s, "chainmail_" + keys[s], names[s], Blocks.TabCombat, 1);
+            a.ArmorSlot = s; a.ArmorPoints = points[s]; a.ArmorMaterial = 4; a.MaxDamage = baseDur[s] * 15;
+        }
     }
 }

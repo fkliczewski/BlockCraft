@@ -1,4 +1,4 @@
-// node screens.mjs <srcDir> <outDir> [width] – zmniejsza zrzuty screen_*.png
+// node screens.mjs <srcDir> <outDir> [width] - zmniejsza zrzuty screen_*.png
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';

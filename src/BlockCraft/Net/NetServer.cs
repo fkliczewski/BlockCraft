@@ -64,6 +64,8 @@ public sealed partial class NetServer
             if (c.Conn.IsClosed) { Disconnected(c, c.Conn.CloseReason); continue; }
             int n = 0;
             while (n++ < 200 && c.Conn.TryReceive(out var f)) HandleFrame(c, f);
+            if (c.Conn.IsClosed) continue;
+            c.ProcessInputs();
             if (_tick - c.LastPacketTick > 20 * 45) c.Kick("Przekroczono czas oczekiwania");
         }
     }
@@ -71,6 +73,7 @@ public sealed partial class NetServer
     public void AfterTick()
     {
         UpdateEntityStates();
+        UpdateBreaks();
         bool teScan = _tick % 4 == 0;
         if (teScan) ScanTileEntities();
         foreach (var c in Clients.ToArray())
@@ -87,8 +90,8 @@ public sealed partial class NetServer
 
     public void Shutdown(string reason)
     {
-        SavePlayers();
         foreach (var c in Clients.ToArray()) { c.Kick(reason); RemovePuppet(c); }
+        SaveNames();
         foreach (var c in _pending) c.Kick(reason);
         Clients.Clear(); _pending.Clear();
         foreach (var (w, t) in _taps) w.Listeners.Remove(t);
@@ -111,7 +114,7 @@ public sealed partial class NetServer
     {
         Log.Info("Sieć: " + c.Name + " rozłączony: " + reason);
         Clients.Remove(c);
-        SavePlayer(c);
+        if (c.P != null) Entities.Bl2Stats.Add(c.P, "stat.leaveGame");
         RemovePuppet(c);
         Main.BroadcastMessage("§e" + c.Name + " opuścił grę");
     }
@@ -120,6 +123,8 @@ public sealed partial class NetServer
     {
         if (c.P == null) return;
         try { c.P.CloseContainer(); c.P.InventoryContainer.OnClose(c.P); } catch { }
+        // Kursor i siatka wracają do ekwipunku przed zapisem, inaczej przepadają po powrocie gracza.
+        SavePlayer(c);
         c.P.World.RemoveEntity(c.P);
     }
 
@@ -143,7 +148,7 @@ public sealed partial class NetServer
         switch (type)
         {
             case C2S.Login: Login(c, r.ReadInt32(), r.ReadString(), r.ReadByte()); break;
-            case C2S.Input: c.ApplyInput(NetInput.Read(r)); break;
+            case C2S.Input: c.QueueInput(NetInput.Read(r)); break;
             case C2S.Chat: Chat(c, r.ReadString()); break;
             case C2S.Click: c.Click(r.ReadByte(), r.ReadInt16(), r.ReadByte(), (ClickType)r.ReadByte()); break;
             case C2S.Distribute:
@@ -154,10 +159,19 @@ public sealed partial class NetServer
                     break;
                 }
             case C2S.CloseWindow: c.CloseWindow(r.ReadByte()); break;
+            case C2S.SelectRecipe: c.SelectRecipe(r.ReadByte(), r.ReadInt32()); break;
+            case C2S.Beacon: c.SetBeacon(r.ReadByte(), (Effect)r.ReadInt32(), (Effect)r.ReadInt32()); break;
+            case C2S.EnchantItem: c.EnchantItem(r.ReadByte(), r.ReadByte()); break;
+            case C2S.AnvilName: c.AnvilName(r.ReadByte(), r.ReadString()); break;
+            case C2S.UpdateSign: c.UpdateSign(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), new[] { r.ReadString(), r.ReadString(), r.ReadString(), r.ReadString() }); break;
+            case C2S.CommandBlock: Cmd.CommandBlocks.Update(c.P, r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadString(), r.ReadBoolean()); break;
             case C2S.CreativeSlot: c.CreativeSlot(r.ReadInt16(), r.ReadStack()); break;
             case C2S.CreativeDrop: { var s = r.ReadStack(); if (c.P.Creative && s != null) c.P.DropStack(s, false); break; }
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;
             case C2S.Respawn: c.Respawn(); break;
+            case C2S.OpenInventory: c.P.AwardAchievement("openInventory"); break;
+            case C2S.EditBook: c.EditBook(r); break;
+            case C2S.RequestStats: c.SendStatistics(); break;
             case C2S.KeepAlive: c.P.Ping = (int)Math.Clamp(Environment.TickCount64 - r.ReadInt64(), 0, 99999); break;
         }
     }
@@ -172,6 +186,7 @@ public sealed partial class NetServer
         var target = data != null && Main.Dimensions != null ? Main.Dimensions.Get((DimensionId)data.Dimension) : Main;
         if (target != Main) target.EnsureDimensionArea(MathUtil.FloorToInt(data.X), MathUtil.FloorToInt(data.Z), 32);
         var p = new Player(target) { Name = name, Handler = c, NetPuppet = true, IsLocal = false };
+        p.NetPuppetMove = c.ApplyQueuedMoves;
         if (data != null) p.FromData(data);
         else
         {
@@ -190,7 +205,6 @@ public sealed partial class NetServer
         Log.Info($"Sieć: zalogowano {name} ({c.Conn.PeerKey})");
     }
 
-    private static readonly HashSet<string> FreeCommands = new() { "help", "me", "say", "list", "seed", "tell", "msg" };
 
     private void Chat(RemoteClient c, string s)
     {
@@ -199,8 +213,6 @@ public sealed partial class NetServer
         if (s.Length > 256) s = s[..256];
         if (s.StartsWith("/"))
         {
-            string cmd = s[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant() ?? "";
-            if (!FreeCommands.Contains(cmd) && !Ops.Contains(c.Conn.PeerKey)) { c.OnMessage("§cTylko host i operatorzy mogą używać tej komendy."); return; }
             c.P.IsLocalOp = Ops.Contains(c.Conn.PeerKey);
             Log.Info($"[CHAT] {c.Name}: {s}");
             _actor = null;
@@ -289,7 +301,8 @@ public sealed partial class NetServer
         public int Qx, Qy, Qz; public byte Yaw, Pitch, Flags;
         public long EquipHash = -1; public byte[] Data; public int NetData;
         public bool Dead; public int HurtTime;
-        public bool Moved, EquipChanged, DataChanged;
+        public bool Moved, EquipChanged, DataChanged, LinksChanged;
+        public EntityLinkIds Links = EntityLinkIds.None;
         public readonly List<(EntityEventKind kind, float arg)> Events = new();
     }
 
@@ -302,7 +315,8 @@ public sealed partial class NetServer
         foreach (var w in _taps.Keys)
             foreach (var e in w.Entities)
             {
-                if (e.Removed) continue;
+                // części smoka nie są wysyłane: klient tworzy własne z ID wyliczonym z ID smoka (NetLinks.DragonPartId)
+                if (e.Removed || e is DragonPart) continue;
                 alive.Add(e);
                 bool fresh = !_ents.TryGetValue(e, out var s);
                 if (fresh) _ents[e] = s = new EntState();
@@ -314,6 +328,8 @@ public sealed partial class NetServer
                 long eh = EquipHash(e);
                 s.EquipChanged = eh != s.EquipHash && !fresh; s.EquipHash = eh;
                 s.DataChanged = false;
+                var links = NetLinks.Of(e);
+                s.LinksChanged = links != s.Links; s.Links = links;
                 int nd = e.NetData;
                 if (fresh || dataTick || nd != s.NetData)
                 {
@@ -410,6 +426,8 @@ public sealed partial class NetServer
 
     // ================= zdarzenia świata =================
 
+    internal static readonly HashSet<string> OwnerPredicted = new() { "eat", "drink", "burp", "fall_big", "fall_small", "splash", "game.player.swim" };
+
     private sealed class WorldTap : IWorldListener
     {
         private readonly NetServer _s; private readonly World.World _w;
@@ -424,7 +442,9 @@ public sealed partial class NetServer
             double r = Math.Max(16, 16 * volume);
             foreach (var c in _s.Clients)
             {
-                if (c == _s._actor || c.P?.World != _w || c.P.DistanceSq(x, y, z) > r * r) continue;
+                if (c == _s._actor && !LivingEntity.UnpredictedSound || c.P?.World != _w || c.P.DistanceSq(x, y, z) > r * r) continue;
+                // dźwięki gracza, które jego klient odtworzył już sam (jedzenie, upadek, plusk) - inaczej słychać echo z opóźnieniem sieci
+                if (OwnerPredicted.Contains(name) && c.P.DistanceSq(x, y, z) < 0.01) continue;
                 var bw = c.Out.Begin(S2C.Sound);
                 bw.Write(name); bw.Write(x); bw.Write(y); bw.Write(z); bw.Write(volume); bw.Write(pitch);
                 c.Out.End();
@@ -435,6 +455,8 @@ public sealed partial class NetServer
             foreach (var c in _s.Clients)
             {
                 if (c == _s._actor || c.P?.World != _w || c.P.DistanceSq(x, y, z) > 48 * 48) continue;
+                // okruchy jedzenia przy ustach gracza: jego klient wyświetlił je sam (Player.UseItemTick)
+                if (kind == ParticleKind.BlockBreak && data < 0 && c.P.DistanceSq(x, y - c.P.EyeHeight + 0.1, z) < 0.01) continue;
                 var bw = c.Out.Begin(S2C.Particles);
                 bw.Write((byte)kind); bw.Write(x); bw.Write(y); bw.Write(z); bw.Write(count); bw.Write(data);
                 c.Out.End();

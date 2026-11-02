@@ -198,7 +198,7 @@ public sealed partial class ChunkMesher
         return true;
     }
 
-    // wektory osi na ścianie (u, v) w kierunku narastania – do AO
+    // wektory osi na ścianie (u, v) w kierunku narastania - do AO
     private static readonly int[][] FaceVerts =
     {
         // każda ściana: 4 wierzchołki (x,y,z) w jednostkach bloku, kolejność przeciwnie do wskazówek patrząc z zewnątrz
@@ -335,7 +335,7 @@ public sealed partial class ChunkMesher
     // ---------------- płyny ----------------
     private float FluidHeightAt(int x, int y, int z, byte id)
     {
-        // wysokość w narożniku (x,z) – średnia 4 komórek
+        // wysokość w narożniku (x,z) - średnia 4 komórek
         float sum = 0; int n = 0;
         for (int k = 0; k < 4; k++)
         {
@@ -540,7 +540,7 @@ public sealed partial class ChunkMesher
         for (int f = 0; f < 6; f++)
         {
             bool flush = f switch { 0 => y0 <= 0, 1 => y1 >= 1, 2 => z0 <= 0, 3 => z1 >= 1, 4 => x0 <= 0, _ => x1 >= 1 };
-            // płaskie (zerowej grubości) – tylko ściany prostopadłe
+            // płaskie (zerowej grubości) - tylko ściany prostopadłe
             if (x0 == x1 && f < 4) continue;
             if (z0 == z1 && (f < 2 || f > 3)) continue;
             if (y0 == y1 && f > 1) continue;

@@ -7,6 +7,7 @@ namespace BlockCraft.Entities;
 public sealed class ItemEntity : Entity
 {
     public ItemStack Stack;
+    public Player Thrower;
     public int PickupDelay;
     public int Lifetime;
     public float Bob;
@@ -52,11 +53,18 @@ public sealed class ItemEntity : Entity
         int before = Stack.Count;
         if (p.Inventory.Add(Stack))
         {
+            AchievementList.PickedUp(p, Stack);
+            if (Stack.Id == I.Diamond && Thrower != null && Thrower != p) Thrower.AwardAchievement("diamondsToYou");
             p.Handler?.OnPickup(this, p);
             World.PlaySound("pop", X, Y, Z, 0.2f, ((World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.7f + 1f) * 2f);
             Kill();
         }
-        else if (Stack.Count != before) p.Handler?.OnPickup(this, p);
+        else if (Stack.Count != before)
+        {
+            AchievementList.PickedUp(p, Stack);
+            if (Stack.Id == I.Diamond && Thrower != null && Thrower != p) Thrower.AwardAchievement("diamondsToYou");
+            p.Handler?.OnPickup(this, p);
+        }
     }
 
     public override void Save(BinaryWriter bw) { base.Save(bw); bw.WriteStack(Stack); bw.Write(Lifetime); bw.Write(PickupDelay); }
@@ -121,15 +129,44 @@ public sealed class FallingBlockEntity : Entity
         MoveWithCollision(MotionX, MotionY, MotionZ);
         MotionX *= 0.98; MotionY *= 0.98; MotionZ *= 0.98;
         if (World.IsRemote) return;
+        if (MotionY < 0) _fall -= (float)MotionY / 0.98f;
         if (OnGround)
         {
             int bx = MathUtil.FloorToInt(X), by = MathUtil.FloorToInt(Y + 0.01), bz = MathUtil.FloorToInt(Z);
             var at = Block.Get(World.GetBlock(bx, by, bz));
             Kill();
-            if (at.Replaceable || at.Id == 0) World.SetBlock(bx, by, bz, BlockId, Meta);
-            else World.DropItem(X, Y + 0.5, Z, new ItemStack(BlockId));
+            bool broken = HurtEntities && Land(_fall);
+            if (broken) return; // całkiem zniszczone kowadło znika
+            if (at.Replaceable || at.Id == 0)
+            {
+                World.SetBlock(bx, by, bz, BlockId, Meta);
+                if (BlockId == B.Anvil) World.PlaySound("random.anvil_land", bx + .5, by + .5, bz + .5, .3f, World.Rand.NextFloat() * .1f + .9f);
+            }
+            else World.DropItem(X, Y + 0.5, Z, new ItemStack(BlockId, 1, Block.Get(BlockId).DropMeta(Meta)));
         }
-        else if (Age > 600) { Kill(); World.DropItem(X, Y, Z, new ItemStack(BlockId)); }
+        else if (Age > 600) { Kill(); World.DropItem(X, Y, Z, new ItemStack(BlockId, 1, Block.Get(BlockId).DropMeta(Meta))); }
+    }
+
+    /// <summary>EntityFallingBlock.hurtEntities (kowadło): 2 za blok ponad pierwszy, maks. 40.</summary>
+    public bool HurtEntities;
+    private float _fall;
+
+    /// <summary>EntityFallingBlock.fall z 1.8. True = kowadło rozpadło się (uszkodzenie powyżej 2).</summary>
+    private bool Land(float distance)
+    {
+        int i = (int)MathF.Ceiling(distance - 1f);
+        if (i <= 0) return false;
+        bool anvil = BlockId == B.Anvil;
+        var src = new DamageSource(anvil ? "anvil" : "fallingBlock", this);
+        foreach (var e in World.GetEntitiesInBox(BoundingBox, this).ToList())
+            if (e.CanBeAttacked) e.Attack(src, Math.Min(MathF.Floor(i * 2f), 40f));
+        if (anvil && World.Rand.NextFloat() < .05f + i * .05f)
+        {
+            int dmg = (Meta >> 2 & 3) + 1;
+            if (dmg > 2) return true;
+            Meta = Meta & 3 | dmg << 2;
+        }
+        return false;
     }
     public override void Save(BinaryWriter bw) { base.Save(bw); bw.Write(BlockId); bw.Write(Meta); }
     public override void Load(BinaryReader br) { base.Load(br); BlockId = br.ReadByte(); Meta = br.ReadInt32(); }
@@ -173,6 +210,7 @@ public sealed class ArrowEntity : Entity
     public bool InGround; public int InGroundTicks; public int Shake;
     public double Damage = 2.0;
     public bool Critical, PickupAllowed = true;
+    public int Knockback; // Uderzenie (knockbackStrength)
     private int _gx, _gy, _gz; private byte _gid;
     public ArrowEntity(World.World w) : base(w) { Width = 0.5f; Height = 0.5f; StepHeight = 0; }
     public ArrowEntity(World.World w, LivingEntity shooter, float velocity) : this(w)
@@ -228,10 +266,12 @@ public sealed class ArrowEntity : Entity
             float speed = (float)len;
             int dmg = (int)Math.Ceiling(speed * Damage);
             if (Critical) dmg += World.Rand.Next(dmg / 2 + 2);
+            if (FireTicks > 0 && target is not Enderman) target.SetFire(5);
             if (target.Attack(DamageSource.Arrow(this, Shooter ?? this), dmg))
             {
+                // EntityArrow 1.8: dodatkowy odrzut tylko z Uderzenia, płonąca strzała podpala (poza endermanem)
                 double h = Math.Sqrt(MotionX * MotionX + MotionZ * MotionZ);
-                if (h > 0 && target is LivingEntity) { target.MotionX += MotionX * 0.6 / h * 0.6; target.MotionY += 0.1; target.MotionZ += MotionZ * 0.6 / h * 0.6; }
+                if (Knockback > 0 && h > 0 && target is LivingEntity) { target.MotionX += MotionX * Knockback * 0.6 / h; target.MotionY += 0.1; target.MotionZ += MotionZ * Knockback * 0.6 / h; }
                 World.PlaySound("arrow_hit", X, Y, Z, 1f, 1.2f / (World.Rand.NextFloat() * 0.2f + 0.9f));
                 Kill();
             }
@@ -401,7 +441,8 @@ public static class Explosion
             float dmg = (float)((impact * impact + impact) / 2 * 8 * r2 + 1);
             if (e.CanBeAttacked) e.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
             else if (e is ItemEntity || e is XpOrbEntity) { e.Kill(); continue; }
-            e.MotionX += ex * impact; e.MotionY += ey * impact; e.MotionZ += ez * impact;
+            double push = Items.EnchantEffects.BlastKnockback(e, impact);
+            e.MotionX += ex * push; e.MotionY += ey * push; e.MotionZ += ez * push;
         }
         // niszczenie bloków
         var drops = new List<ItemStack>();

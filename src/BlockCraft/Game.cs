@@ -38,6 +38,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private double _lastTime;
     private int _fps, _fpsCount; private double _fpsTimer;
+    /// <summary>F3: ticki gry i przyrost czasu świata na sekundę (w 1.8 oba po 20).</summary>
+    private int _tps, _dayRate; private long _tpsLastTick, _tpsLastDay;
     private bool _leftDown, _rightDown, _middlePressed;
     private bool _leftPressed, _rightPressed;
     private int _lastFwdTap = -100, _lastJumpTap = -100; private long _tickCount;
@@ -66,8 +68,12 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
         _showcase = args.Contains("--showcase");
         Settings = Settings.Load();
-        VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
+        int fps = Array.IndexOf(args, "--fps");
+        if (fps >= 0 && fps + 1 < args.Length && int.TryParse(args[fps + 1], out int f) && f > 0) _fpsOverride = f;
+        VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
     }
+    /// <summary>--fps N (testy): VSync wyłączony i limit N klatek, bez zapisu do ustawień.</summary>
+    private readonly int _fpsOverride;
 
     protected override void OnLoad()
     {
@@ -80,7 +86,13 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         Sound.Init(Settings);
-        Renderer.SoundHook = (n, x, y, z, v, p) => Sound.Play(n, x, y, z, v, p);
+        Renderer.SoundHook = (n, x, y, z, v, p) =>
+        {
+            if (World == null || !_sessionStarted) return;
+            // szafa grająca: "record:cat" gra płytę w bloku x,y,z, "record:" ją zatrzymuje
+            if (n.StartsWith("record:")) { if (n.Length > 7) Sound.PlayRecord(n[7..], x, y, z); else Sound.StopRecord(x, y, z); return; }
+            Sound.Play(n, x, y, z, v, p);
+        };
         UpdateGuiScale();
         ApplySettings();
         StartMenuWorld();
@@ -94,7 +106,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= ustawienia / GUI =================
     public void ApplySettings()
     {
-        VSync = Settings.VSync ? VSyncMode.On : VSyncMode.Off;
+        VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
         ChunkMesher.SmoothLighting = Settings.SmoothLighting;
         bool fancyChanged = ChunkMesher.FancyLeaves != Settings.FancyGraphics;
         ChunkMesher.FancyLeaves = Settings.FancyGraphics;
@@ -103,7 +115,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer.CloudsEnabled = Settings.Clouds;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
-        if (World != null) World.Difficulty = (Difficulty)Settings.Difficulty;
+        if (World != null && Client == null) World.Difficulty = (Difficulty)Settings.Difficulty; // gość: trudność ustala host
         if (fancyChanged || _lastSmooth != Settings.SmoothLighting) MarkAllDirty();
         _lastSmooth = Settings.SmoothLighting;
         UpdateGuiScale();
@@ -209,9 +221,11 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         var w = new World.World(level.Seed, (WorldType)level.Type, false)
         {
             Name = level.Name, AllowCheats = level.AllowCheats, Hardcore = level.Hardcore, DayTime = level.DayTime, TotalTime = level.Time,
-            Difficulty = (Difficulty)level.Difficulty, Storage = storage
+            Difficulty = (Difficulty)level.Difficulty, Storage = storage, DefaultGameMode = level.GameMode
         };
-        foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString(), out _);
+        foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString().ToLowerInvariant(), out _);
+        if (level.RuleValues != null) foreach (var kv in level.RuleValues) w.Rules.Set(kv.Key, kv.Value, out _, true);
+        w.RestoreWeather(level.Weather);
         if (isNew || (level.SpawnX == 0 && level.SpawnY == 0 && level.SpawnZ == 0))
         {
             var sp = w.Generator.FindSpawn();
@@ -266,16 +280,20 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         try
         {
             var home = Dimensions?.Get(DimensionId.Overworld) ?? World;
+            Items.MapStore.Of(home).SaveAll();
             _level.DayTime = home.DayTime; _level.Time = home.TotalTime;
+            _level.Weather = home.Weather;
             _level.SpawnX = home.SpawnX; _level.SpawnY = home.SpawnY; _level.SpawnZ = home.SpawnZ;
             _level.Difficulty = (int)World.Difficulty;
-            _level.GameMode = Player.GameMode;
+            _level.GameMode = home.DefaultGameMode;
             _level.Player = Player.ToData();
             _level.Rules = new Dictionary<string, bool>
             {
                 ["doDaylightCycle"] = World.Rules.DoDaylightCycle, ["keepInventory"] = World.Rules.KeepInventory, ["doMobSpawning"] = World.Rules.DoMobSpawning,
-                ["mobGriefing"] = World.Rules.MobGriefing, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
+                ["mobGriefing"] = World.Rules.MobGriefing, ["doFireTick"] = World.Rules.DoFireTick, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
             };
+            _level.RuleValues = home.Rules.ToStrings();
+            Commands.SaveState(home);
             _storage.SaveLevel(_level);
             Dimensions.SaveAll();
         }
@@ -284,6 +302,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     public void QuitToTitle()
     {
+        if (Player != null) Bl2Stats.Add(Player, "stat.leaveGame");
         NetShutdown();
         SaveWorld();
         Dimensions?.Dispose(); Dimensions = null;
@@ -306,6 +325,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= IPlayerHandler =================
     public void OpenBlockGui(GuiKind kind, int x, int y, int z)
     {
+        if (kind == GuiKind.SignEdit) { if (Client == null) SetScreen(new Gui.SignEditScreen(x, y, z)); return; }
         if (Client != null) return; // klient sieciowy: okno otworzy host (S2C.OpenWindow)
         var p = Player;
         var c = ContainerFactory.Create(World, p, kind, x, y, z);
@@ -401,6 +421,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             case Keys.Escape: SetScreen(new PauseScreen()); break;
             case Keys.E:
                 if (p.Spectator) break;
+                if (Client != null) { Client.Out.Begin(Net.C2S.OpenInventory); Client.Out.End(); }
+                else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
                 break;
             case Keys.T: _ignoreNextChar = true; SetScreen(new ChatScreen("")); break;
@@ -414,6 +436,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                     if (s != null && !p.Spectator)
                     {
                         Client?.SendDrop(ctrl);
+                        Bl2Stats.Add(p, "stat.drop");
                         var drop = ctrl ? s.Copy() : s.CopyWith(1);
                         s.Count -= drop.Count; if (s.Count <= 0) p.Inventory.Selected = null;
                         p.DropStack(drop, false); p.SwingArm();
@@ -441,7 +464,12 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         double now = _clock.Elapsed.TotalSeconds;
         double dt = Math.Min(0.25, now - _lastTime); _lastTime = now;
         _fpsTimer += dt; _fpsCount++;
-        if (_fpsTimer >= 1) { _fps = _fpsCount; _fpsCount = 0; _fpsTimer -= 1; }
+        if (_fpsTimer >= 1)
+        {
+            _fps = _fpsCount; _fpsCount = 0; _fpsTimer -= 1;
+            _tps = (int)(_tickCount - _tpsLastTick); _tpsLastTick = _tickCount;
+            long day = World?.DayTime ?? 0; _dayRate = (int)(day - _tpsLastDay); _tpsLastDay = day;
+        }
         _acc += dt;
         int n = 0;
         while (_acc >= 0.05 && n < 10) { _acc -= 0.05; n++; try { Tick(); } catch (Exception ex) { Log.Error("Tick: " + ex); } }
@@ -456,9 +484,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         else if (_showcase) ShowcaseFrame();
         if (_screenshotRequested) { _screenshotRequested = false; TakeScreenshot(null); }
         SwapBuffers();
-        if (!Settings.VSync && Settings.MaxFps < 1000)
+        int maxFps = _fpsOverride > 0 ? _fpsOverride : Settings.MaxFps;
+        if ((!Settings.VSync || _fpsOverride > 0) && maxFps < 1000)
         {
-            double target = 1.0 / Settings.MaxFps;
+            double target = 1.0 / maxFps;
             double spent = _clock.Elapsed.TotalSeconds - now;
             if (spent < target) Thread.Sleep((int)((target - spent) * 1000));
         }
@@ -524,6 +553,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (!p.Dead && p.Removed) { }
         UpdateDimensionChunks();
         Renderer.TickAnimations();
+        Items.ItemAnimations.Tick(World, Player);
+        Bl2ClientTick();
         Renderer.TickParticles();
         // ekwipowanie
         _prevEquip = _equip;

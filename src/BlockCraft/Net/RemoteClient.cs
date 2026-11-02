@@ -7,7 +7,7 @@ using BlockCraft.World;
 namespace BlockCraft.Net;
 
 /// <summary>Zdalny gracz po stronie hosta: połączenie, jego Player (NetPuppet) i wszystko, co klient już dostał.</summary>
-public sealed class RemoteClient : IPlayerHandler
+public sealed partial class RemoteClient : IPlayerHandler
 {
     public readonly NetServer Server;
     public readonly INetConnection Conn;
@@ -71,7 +71,7 @@ public sealed class RemoteClient : IPlayerHandler
         var w = Out.Begin(S2C.Settings);
         w.Write((byte)W.Difficulty); w.Write(W.Hardcore); w.Write(W.AllowCheats);
         var rules = new (string, bool)[] { ("doDaylightCycle", W.Rules.DoDaylightCycle), ("keepInventory", W.Rules.KeepInventory), ("doMobSpawning", W.Rules.DoMobSpawning),
-            ("mobGriefing", W.Rules.MobGriefing), ("naturalRegeneration", W.Rules.NaturalRegeneration) };
+            ("mobGriefing", W.Rules.MobGriefing), ("naturalRegeneration", W.Rules.NaturalRegeneration), ("doFireTick", W.Rules.DoFireTick) };
         w.Write((byte)rules.Length);
         foreach (var (n, v) in rules) { w.Write(n); w.Write(v); }
         Out.End();
@@ -79,7 +79,7 @@ public sealed class RemoteClient : IPlayerHandler
     }
 
     private long SettingsHash() => (long)W.Difficulty * 1000 + (W.Hardcore ? 100 : 0) + (W.AllowCheats ? 200 : 0)
-        + (W.Rules.DoDaylightCycle ? 1 : 0) + (W.Rules.KeepInventory ? 2 : 0) + (W.Rules.DoMobSpawning ? 4 : 0) + (W.Rules.MobGriefing ? 8 : 0) + (W.Rules.NaturalRegeneration ? 16 : 0);
+        + (W.Rules.DoDaylightCycle ? 1 : 0) + (W.Rules.KeepInventory ? 2 : 0) + (W.Rules.DoMobSpawning ? 4 : 0) + (W.Rules.MobGriefing ? 8 : 0) + (W.Rules.NaturalRegeneration ? 16 : 0) + (W.Rules.DoFireTick ? 32 : 0);
 
     // ================= wejście od klienta =================
 
@@ -90,17 +90,8 @@ public sealed class RemoteClient : IPlayerHandler
         if (i.TeleportAck > _ackTeleport) _ackTeleport = i.TeleportAck;
         // host przesunął gracza od ostatniego ruchu klienta (komenda, perła, łóżko) - ten ruch jest już nieaktualny
         double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
-        if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) SendTeleport();
-        if (_ackTeleport >= TeleportId && !p.Sleeping && !p.Dead)
-        {
-            double dx = i.X - p.X, dy = i.Y - p.Y, dz = i.Z - p.Z;
-            if (double.IsFinite(i.X + i.Y + i.Z) && dx * dx + dy * dy + dz * dz < 100 * 100)
-            {
-                p.NetApplyMove(i.X, i.Y, i.Z, i.Yaw, i.Pitch, i.OnGround);
-                LastX = p.X; LastY = p.Y; LastZ = p.Z;
-            }
-            else SendTeleport();
-        }
+        if (!Riding && hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) SendTeleport();
+        if (i.TeleportAck >= TeleportId && !p.Sleeping && !p.Dead) _inMoves.Enqueue(i);
         p.Sneaking = i.Sneaking; p.Sprinting = i.Sprinting; p.IsJumping = i.Jumping;
         p.Flying = i.Flying && p.AllowFlying;
         p.MoveForward = Math.Clamp((int)i.Forward, -1, 1); p.MoveStrafe = Math.Clamp((int)i.Strafe, -1, 1);
@@ -116,7 +107,7 @@ public sealed class RemoteClient : IPlayerHandler
             if (dist <= Ctrl.Reach + 1.5 && i.HitFace is >= 0 and < 6)
                 Ctrl.Hit = new World.World.HitResult { Hit = true, X = i.HitX, Y = i.HitY, Z = i.HitZ, Face = i.HitFace, HitX = hx, HitY = hy, HitZ = hz, Distance = dist };
         }
-        else if (i.HitKind == 2 && W.EntityById.TryGetValue(i.HitEntity, out var e) && e != p && !e.Removed && e.DistanceSq(ex, ey, ez) < 8 * 8)
+        else if (i.HitKind == 2 && ResolveEntity(i.HitEntity) is { } e && e != p && !e.Removed && NetLinks.DistanceSqToBox(e, ex, ey, ez) < 6.5 * 6.5)
             Ctrl.HitEntity = e;
 
         Server.SetActor(this);
@@ -135,6 +126,48 @@ public sealed class RemoteClient : IPlayerHandler
             QueueBlockState(i.HitX, i.HitY, i.HitZ);
             if (i.RightPressed || i.RightDown) QueueBlockState(i.HitX + Dir.X[i.HitFace], i.HitY + Dir.Y[i.HitFace], i.HitZ + Dir.Z[i.HitFace]);
         }
+    }
+
+    // Ruchy klienta przychodzą przez przekaźnik paczkami (0, 2, 1, 3 na tick). Host nakłada je w ticku gracza po PrevTick,
+    // jeden na tick, z małym buforem: gracz u hosta porusza się płynnie, ma animację chodu i nie przeskakuje.
+    private readonly Queue<NetInput> _inMoves = new();
+    private readonly Queue<NetInput> _inputs = new();
+    private const int MoveBuffer = 2;
+
+    /// <summary>Wejście od klienta czeka w kolejce: host wykonuje je w stałym tempie (jedno na tick), jak klient je wysłał.
+    /// Bez tego paczki z przekaźnika dawały serie uderzeń kilofa i nakładające się dźwięki.</summary>
+    public int PendingInputs => _inputs.Count;
+    public void QueueInput(NetInput i) { if (_inputs.Count < 100) _inputs.Enqueue(i); }
+
+    public void ProcessInputs()
+    {
+        int n = _inputs.Count > MoveBuffer + 1 ? _inputs.Count - MoveBuffer : Math.Min(1, _inputs.Count);
+        for (int k = 0; k < n; k++) ApplyInput(_inputs.Dequeue());
+    }
+
+    internal void ApplyQueuedMoves()
+    {
+        var p = P;
+        if (p == null || _inMoves.Count == 0) return;
+        int n = _inMoves.Count; // tempo pilnuje już kolejka wejść
+        Server.SetActor(this);
+        try
+        {
+            for (int k = 0; k < n && _inMoves.Count > 0; k++)
+            {
+                var i = _inMoves.Dequeue();
+                if (i.TeleportAck < TeleportId || p.Sleeping || p.Dead) continue;
+                // w pojeździe pozycję wyznacza pojazd hosta; klient podaje tylko kierunek patrzenia (C0CPacketInput + C05PacketPlayerLook)
+                if (Riding) { p.Yaw = i.Yaw; p.Pitch = i.Pitch; LastX = p.X; LastY = p.Y; LastZ = p.Z; continue; }
+                double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
+                if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) { SendTeleport(); return; }
+                double dx = i.X - p.X, dy = i.Y - p.Y, dz = i.Z - p.Z;
+                if (!double.IsFinite(i.X + i.Y + i.Z) || dx * dx + dy * dy + dz * dz >= 100 * 100) { SendTeleport(); return; }
+                p.NetApplyMove(i.X, i.Y, i.Z, i.Yaw, i.Pitch, i.OnGround);
+                LastX = p.X; LastY = p.Y; LastZ = p.Z;
+            }
+        }
+        finally { Server.SetActor(null); }
     }
 
     private Container WindowById(byte win) => win == 0 ? P.InventoryContainer : win == _windowId && P.OpenContainer == _window ? _window : null;
@@ -183,6 +216,7 @@ public sealed class RemoteClient : IPlayerHandler
         s.Count -= drop.Count;
         if (s.Count <= 0) P.Inventory.Selected = null;
         P.DropStack(drop, false);
+        Bl2Stats.Add(P, "stat.drop");
         P.SwingArm();
     }
 
@@ -206,6 +240,12 @@ public sealed class RemoteClient : IPlayerHandler
 
     public void OpenBlockGui(GuiKind kind, int x, int y, int z)
     {
+        if (kind == GuiKind.SignEdit)
+        {
+            _signEdit = (x, y, z);
+            var sw = Out.Begin(S2C.OpenSignEditor); sw.Write(x); sw.Write(y); sw.Write(z); Out.End();
+            return;
+        }
         var c = ContainerFactory.Create(W, P, kind, x, y, z);
         if (c == null) return;
         if (P.OpenContainer != null) P.CloseContainer();
@@ -227,6 +267,7 @@ public sealed class RemoteClient : IPlayerHandler
 
     private void OpenWindow(int kind, int x, int y, int z, Container c)
     {
+        if (kind < 0) kind = c is HorseContainer ? -2 : c is MerchantContainer ? -3 : c is RsContainer ? -4 : -1;
         _windowId = (byte)(_windowId % 100 + 1);
         _window = c;
         _winHash = new long[c.Slots.Count];
@@ -241,7 +282,46 @@ public sealed class RemoteClient : IPlayerHandler
             w.Write((short)s.Index); w.Write((short)s.X); w.Write((short)s.Y);
             w.Write((byte)((s.IsOutput ? 1 : 0) | ((s.ArmorType + 1) << 1)));
         }
+        if (kind == -2) ((HorseContainer)c).Horse.Save(w);
+        else if (kind == -3) { ((MerchantContainer)c).Villager.Save(w); w.Write(((MerchantContainer)c).Index); }
+        else if (kind == -4) w.Write((byte)((RsContainer)c).Kind);
+        _merchantState = null;
         Out.End();
+    }
+
+    public void SetBeacon(byte window,Effect primary,Effect secondary)
+    {
+        if(P.Dead||WindowById(window) is not BeaconContainer c||!c.StillValid(P))return;
+        if(c.Confirm(P,primary,secondary))ForceSync();
+    }
+    public void EnchantItem(byte window, int button)
+    {
+        if (P.Dead || WindowById(window) is not EnchantingContainer c || !c.StillValid(P)) return;
+        if (c.Enchant(P, button)) ForceSync();
+    }
+
+    private (int x, int y, int z)? _signEdit;
+
+    /// <summary>C12PacketUpdateSign: tylko tabliczka otwarta temu graczowi, w zasięgu.</summary>
+    public void UpdateSign(int x, int y, int z, string[] lines)
+    {
+        if (P.Dead || _signEdit != (x, y, z) || P.DistanceSq(x + .5, y + .5, z + .5) > 64 * 64) return;
+        _signEdit = null;
+        if (W.GetTileEntity(x, y, z) is not SignTile t) return;
+        for (int i = 0; i < 4; i++) t.Lines[i] = Signs.Filter(i < lines.Length ? lines[i] : "");
+    }
+
+    public void AnvilName(byte window, string name)
+    {
+        if (P.Dead || WindowById(window) is not AnvilContainer c || !c.StillValid(P)) return;
+        c.SetName(name); ForceSync();
+    }
+
+    public void SelectRecipe(byte window, int index)
+    {
+        if (P.Dead || WindowById(window) is not MerchantContainer c || !c.StillValid(P)
+            || index < 0 || index >= c.Villager.Recipes.Count) return;
+        c.SetIndex(index); ForceSync();
     }
 
     // ================= wysyłka po ticku =================
@@ -250,6 +330,8 @@ public sealed class RemoteClient : IPlayerHandler
     {
         _ticks++;
         if (W != _world) ChangeWorld();
+        SyncSelfLinks();
+        if (Riding) { LastX = P.X; LastY = P.Y; LastZ = P.Z; }
         // teleport (komenda, łóżko, odrodzenie, perła...) - pozycja zmieniona przez hosta
         double ddx = P.X - LastX, ddy = P.Y - LastY, ddz = P.Z - LastZ;
         if (ddx * ddx + ddy * ddy + ddz * ddz > 1e-6) SendTeleport();
@@ -264,10 +346,12 @@ public sealed class RemoteClient : IPlayerHandler
         FlushBlocks();
         if (teScan) SendTiles();
         TrackEntities();
+        SendSelfEvents();
         SendStats();
         if (_ticks % 100 == 0) ForceSync();
         SyncInventory();
         SyncWindow();
+        if (_ticks % 2 == 0) SendMaps();
         if (W.TotalTime - _lastTimeSent >= 20 || W.TotalTime < _lastTimeSent)
         {
             _lastTimeSent = W.TotalTime;
@@ -289,6 +373,7 @@ public sealed class RemoteClient : IPlayerHandler
     private void SendTeleport()
     {
         TeleportId++;
+        _inMoves.Clear();
         var w = Out.Begin(S2C.Teleport);
         w.Write(TeleportId); w.Write(P.X); w.Write(P.Y); w.Write(P.Z); w.Write(P.Yaw); w.Write(P.Pitch);
         Out.End();
@@ -376,7 +461,7 @@ public sealed class RemoteClient : IPlayerHandler
 
     private void TrackEntities()
     {
-        _seen.Clear(); _moves.Clear();
+        _seen.Clear(); _moves.Clear(); _links.Clear();
         double range = Math.Min(ViewDistance * 16, 96);
         foreach (var e in W.Entities)
         {
@@ -391,8 +476,10 @@ public sealed class RemoteClient : IPlayerHandler
                 _tracked[e.Id] = e;
                 Spawn(e, st);
                 _moves.Add((e, st));
+                if (!st.Links.IsNone) _links.Add((e.Id, st.Links));
                 continue;
             }
+            if (st.LinksChanged) _links.Add((e.Id, st.Links));
             if (st.Moved) _moves.Add((e, st));
             if (st.EquipChanged) Equip(e);
             if (st.DataChanged && st.Data != null)
@@ -408,6 +495,9 @@ public sealed class RemoteClient : IPlayerHandler
             foreach (var (e, s) in _moves) { w.Write(e.Id); w.Write(s.Qx); w.Write(s.Qy); w.Write(s.Qz); w.Write(s.Yaw); w.Write(s.Pitch); w.Write(s.Flags); }
             Out.End();
         }
+        // po spawnach i ruchach: pojazd i jeździec są już u klienta
+        foreach (var (id, l) in _links) NetServer.WriteLinks(Out, id, l);
+        _links.Clear();
         if (_tracked.Count > _seen.Count)
         {
             var gone = _tracked.Keys.Where(id => !_seen.Contains(id)).ToList();
@@ -443,11 +533,12 @@ public sealed class RemoteClient : IPlayerHandler
         using (var bw = new BinaryWriter(ms))
         {
             bw.Write(P.Health); bw.Write(P.MaxHealth); bw.Write(P.FoodLevel); bw.Write(P.Saturation);
-            bw.Write(P.XpLevel); bw.Write(P.XpProgress); bw.Write(P.XpTotal); bw.Write(P.Air);
+            bw.Write(P.XpLevel); bw.Write(P.XpProgress); bw.Write(P.XpTotal); bw.Write(P.Air); bw.Write(P.EnchantmentSeed);
             bw.Write((byte)P.GameMode); bw.Write(P.FireTicks > 0); bw.Write(P.Dead); bw.Write(P.Sleeping);
             bw.Write(P.HasSpawn); bw.Write(P.SpawnX); bw.Write(P.SpawnY); bw.Write(P.SpawnZ);
             bw.Write((byte)P.Effects.Count);
             foreach (var ef in P.Effects.Values) { bw.Write((int)ef.Id); bw.Write(ef.Duration / 20); bw.Write(ef.Amplifier); }
+            bw.Write(P.AchievementBits);
         }
         var bytes = ms.ToArray();
         if (_lastStats != null && bytes.AsSpan().SequenceEqual(_lastStats) && _ticks % 40 != 0) return;
@@ -481,8 +572,15 @@ public sealed class RemoteClient : IPlayerHandler
         }
     }
 
+    private byte[] _merchantState;
     private void SyncWindow()
     {
+        var current = P.OpenContainer;
+        if (current is BeaconContainer bc && !bc.StillValid(P)
+            || current is HorseContainer hc && !hc.StillValid(P)
+            || current is MerchantContainer mc && !mc.StillValid(P)
+            || current is RsContainer rc && rc.Inv is Entity e && (e.Removed || e.Dead || e.World != W || e.DistanceSq(P) > 64))
+            P.CloseContainer();
         if (P.OpenContainer != _window)
         {
             if (P.OpenContainer == null)
@@ -494,6 +592,21 @@ public sealed class RemoteClient : IPlayerHandler
         }
         var c = _window;
         if (c == null) return;
+        if (c is MerchantContainer merchant)
+        {
+            using var data = new MemoryStream();
+            using (var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(merchant.Index); writer.Write(merchant.Villager.Recipes.Count);
+                foreach (var offer in merchant.Villager.Recipes) offer.Save(writer);
+            }
+            var state = data.ToArray();
+            if (_merchantState == null || !state.AsSpan().SequenceEqual(_merchantState))
+            {
+                _merchantState = state;
+                var writer = Out.Begin(S2C.MerchantOffers); writer.Write(_windowId); writer.Write(state); Out.End();
+            }
+        }
         var changed = new List<int>();
         for (int i = 0; i < c.Slots.Count; i++)
         {

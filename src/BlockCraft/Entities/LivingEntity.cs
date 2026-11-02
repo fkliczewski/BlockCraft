@@ -133,7 +133,7 @@ public abstract partial class LivingEntity : Entity
         // tonięcie
         if (IsHeadInWater() && !CanBreatheUnderwater && !HasEffect(Effect.WaterBreathing) && !(this is Player { Invulnerable: true }))
         {
-            Air--;
+            Air = Items.EnchantEffects.DecreaseAir(this, Air);
             if (Air <= -20)
             {
                 Air = 0;
@@ -223,9 +223,10 @@ public abstract partial class LivingEntity : Entity
         if (InWater && !IsFlyingNow)
         {
             double py = Y;
-            MoveFlying(strafe, forward, 0.02f);
+            var (fr, acc) = Items.EnchantEffects.WaterMovement(this, 0.8f, 0.02f, GetSpeed());
+            MoveFlying(strafe, forward, acc);
             MoveWithCollision(MotionX, MotionY, MotionZ);
-            MotionX *= 0.8; MotionY *= 0.8; MotionZ *= 0.8;
+            MotionX *= fr; MotionY *= 0.8; MotionZ *= fr;
             MotionY -= 0.02;
             if (CollidedH && IsOffsetFree(MotionX, MotionY + 0.6 - Y + py, MotionZ)) MotionY = 0.3;
         }
@@ -304,6 +305,12 @@ public abstract partial class LivingEntity : Entity
         if (World.IsRemote) return false; // na kliencie obrażenia liczy host
         if (Dead || Health <= 0 || IsInvulnerableTo(src)) return false;
         if (src.IsFire && (ImmuneToFire || HasEffect(Effect.FireResistance))) return false;
+        // 1.8: hełm przyjmuje część uderzenia kowadła albo spadającego bloku
+        if (src.Type is "anvil" or "fallingBlock" && this is Player { Inventory.Armor: var arm } && arm[0] != null)
+        {
+            if (arm[0].DamageItem((int)(amount * 4 + World.Rand.NextFloat() * amount * 2))) arm[0] = null;
+            amount *= .75f;
+        }
         if (HurtResistantTime > 10)
         {
             if (amount <= LastDamage) return false;
@@ -328,14 +335,21 @@ public abstract partial class LivingEntity : Entity
         }
         if (src.Attacker is LivingEntity a) { LastAttacker = a; LastAttackerTime = 100; }
         if (src.Attacker is Player) RecentlyHitByPlayer = 100;
+        // Ciernie: trafienie wręcz (gracz, potwór) albo strzałą (applyThornEnchantments)
+        if (src.Type is "mob" or "player" or "arrow" && src.Attacker != null && src.Attacker != this) Items.EnchantEffects.ApplyThorns(this, src.Attacker);
         if (Health <= 0) OnDeath(src);
         return true;
     }
 
     protected virtual void OnHurt(DamageSource src)
     {
-        World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f);
+        UnpredictedSound = true;
+        try { World.PlaySound(HurtSound, X, Y + Height / 2, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
+        finally { UnpredictedSound = false; }
     }
+
+    /// <summary>Sieć: dźwięk, którego klient sam nie odtwarza (obrażenia, śmierć liczy host) - idzie też do gracza-sprawcy akcji.</summary>
+    [ThreadStatic] public static bool UnpredictedSound;
 
     public virtual string HurtSound => "game.neutral.hurt";
     public virtual string DeathSound => "game.neutral.die";
@@ -349,6 +363,7 @@ public abstract partial class LivingEntity : Entity
             OnArmorDamaged(amount);
         }
         if (src.Type is not ("outOfWorld" or "kill") && HasEffect(Effect.Resistance)) amount *= Math.Max(0, 1 - .2f * (EffectLevel(Effect.Resistance) + 1));
+        amount = Items.EnchantEffects.ApplyProtection(this, src, amount);
         float absorbed = Math.Min(Absorption, amount); Absorption -= absorbed;
         Health = Math.Max(0, Health - (amount - absorbed));
     }
@@ -368,12 +383,17 @@ public abstract partial class LivingEntity : Entity
     {
         if (Dead) return;
         Dead = true;
+        AchievementList.Killed(this, src);
+        Bl2Stats.Killed(this, src);
+        DeathHook?.Invoke(this, src);
         Health = 0;
-        World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f);
+        UnpredictedSound = true;
+        try { World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f); }
+        finally { UnpredictedSound = false; }
         if (!World.IsRemote && this is not Player)
         {
             bool byPlayer = RecentlyHitByPlayer > 0;
-            DropLoot(byPlayer, FireTicks > 0);
+            if (World.Rules.DoMobLoot) DropLoot(byPlayer, FireTicks > 0);
             if (byPlayer && XpValue > 0) World.SpawnXp(X, Y + 0.5, Z, XpValue);
         }
     }

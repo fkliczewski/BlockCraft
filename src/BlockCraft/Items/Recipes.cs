@@ -79,6 +79,7 @@ public static partial class Recipes
                 return new ItemStack(a.Id, 1, Math.Max(0, max - dur));
             }
         }
+        foreach (var special in Special) { var sr = special(grid, gw, gh); if (sr != null) return sr; }
         foreach (var r in All)
         {
             if (r.Shapeless)

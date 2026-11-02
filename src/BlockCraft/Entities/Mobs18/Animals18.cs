@@ -357,7 +357,7 @@ public sealed class Bat : Mob
 public sealed class Squid : Mob
 {
     public float BodyPitch,PrevBodyPitch,BodyRoll,PrevBodyRoll,Tentacle,PrevTentacle;
-    private float _rot,_rotSpeed,_speed; private double _rx,_ry,_rz;
+    private float _rot,_rotSpeed,_speed,_rollSpeed; private double _rx,_ry,_rz;
     public Squid(World.World w):base(w) { Width=Height=.95f; MaxHealth=Health=10; _rotSpeed=1f/(w.Rand.NextFloat()+1f)*.2f; }
     public override string TypeKey=>"squid";
     public override string DisplayName=>"Kałamarnica";
@@ -374,14 +374,14 @@ public sealed class Squid : Mob
         if(_rot>MathF.PI*2) { _rot-=MathF.PI*2; if(World.Rand.Next(10)==0) _rotSpeed=1f/(World.Rand.NextFloat()+1f)*.2f; }
         if(InWater) {
             Air=300;
-            if(_rot<MathF.PI) { float f=_rot/MathF.PI; Tentacle=MathF.Sin(f*f*MathF.PI)*MathF.PI*.25f; if(f>.75) _speed=1f; }
-            else { Tentacle=0; _speed*=.9f; }
+            if(_rot<MathF.PI) { float f=_rot/MathF.PI; Tentacle=MathF.Sin(f*f*MathF.PI)*MathF.PI*.25f; if(f>.75) { _speed=1f; _rollSpeed=1f; } else _rollSpeed*=.8f; }
+            else { Tentacle=0; _speed*=.9f; _rollSpeed*=.99f; }
             MotionX=_rx*_speed; MotionY=_ry*_speed; MotionZ=_rz*_speed;
             double h=Math.Sqrt(MotionX*MotionX+MotionZ*MotionZ);
             BodyYaw+=(-(float)Math.Atan2(MotionX,MotionZ)*MathUtil.Rad2Deg-BodyYaw)*.1f; Yaw=BodyYaw;
-            BodyRoll+=MathF.PI*_rotSpeed*1.5f;
+            BodyRoll+=MathF.PI*_rollSpeed*1.5f; // 1.8 squidYaw: w stopniach, mnożnik rotateSpeed (nie rotationVelocity)
             BodyPitch+=(-(float)Math.Atan2(h,MotionY)*MathUtil.Rad2Deg-BodyPitch)*.1f;
-            if(Age%50==0||World.Rand.Next(50)==0||!InWater||_rx==0&&_ry==0&&_rz==0) {
+            if(World.Rand.Next(50)==0||!InWater||_rx==0&&_ry==0&&_rz==0) {
                 float a=World.Rand.NextFloat()*MathF.PI*2;
                 _rx=MathF.Cos(a)*.2f; _ry=-.1f+World.Rand.NextFloat()*.2f; _rz=MathF.Sin(a)*.2f;
             }

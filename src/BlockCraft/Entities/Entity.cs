@@ -12,6 +12,8 @@ public sealed class DamageSource
     public bool BypassArmor;
     public bool IsExplosion;
     public bool IsFire;
+    /// <summary>DamageSource.isProjectile z 1.8 (strzały, kule ognia, rzucane przedmioty).</summary>
+    public bool IsProjectile => Type is "arrow" or "fireball" or "thrown";
     public DamageSource(string type, Entity src = null, Entity attacker = null) { Type = type; Source = src; Attacker = attacker ?? src; }
 
     public static readonly DamageSource Fall = new("fall") { BypassArmor = true };
@@ -114,7 +116,7 @@ public abstract class Entity
     public virtual bool CanBeCollidedWith => false;
     public virtual bool CanBeAttacked => false;
 
-    public AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
+    public virtual AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
 
     public void SetPosition(double x, double y, double z) { X = x; Y = y; Z = z; }
     public void SetPositionAndPrev(double x, double y, double z) { X = PrevX = x; Y = PrevY = y; Z = PrevZ = z; }
@@ -144,14 +146,15 @@ public abstract class Entity
         UpdateFluidState();
         if (FireTicks > 0)
         {
-            if (InWater) FireTicks = 0;
+            if (InWater || World.IsRainingAt(MathUtil.FloorToInt(X), MathUtil.FloorToInt(Y), MathUtil.FloorToInt(Z))
+                || World.IsRainingAt(MathUtil.FloorToInt(X), MathUtil.FloorToInt(Y + Height), MathUtil.FloorToInt(Z))) FireTicks = 0;
             else
             {
                 if (FireTicks % 20 == 0 && this is LivingEntity le) le.Attack(DamageSource.OnFire, 1f);
                 FireTicks--;
             }
         }
-        if (InLava) { if (this is LivingEntity le2) { le2.Attack(DamageSource.Lava, 4f); } FireTicks = Math.Max(FireTicks, 300); FallDistance *= 0.5f; }
+        if (InLava) { if (this is LivingEntity le2) { le2.Attack(DamageSource.Lava, 4f); } SetFire(15); FallDistance *= 0.5f; }
         if (Y < -64) OnVoid();
     }
 
@@ -188,7 +191,7 @@ public abstract class Entity
 
     private void ApplyFlow(AABB bb)
     {
-        if (this is Player p && p.Flying) return;
+        if (this is Player p && (p.Flying || p.NetPuppet)) return; // gość: prąd liczy jego klient
         double fx = 0, fz = 0; int n = 0;
         for (int x = MathUtil.FloorToInt(bb.MinX); x <= MathUtil.FloorToInt(bb.MaxX); x++)
             for (int y = MathUtil.FloorToInt(bb.MinY); y <= MathUtil.FloorToInt(bb.MaxY); y++)
@@ -371,7 +374,14 @@ public abstract class Entity
 
     public virtual void OnCollideWithPlayer(Player p) { }
     /// <summary>Uderzenie pioruna (MC: onStruckByLightning) - domyślnie 5 obrażeń od ognia i podpalenie; creeper, świnia, wieśniak nadpisują.</summary>
-    public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); FireTicks = Math.Max(FireTicks, 160); }
+    public virtual void OnStruckByLightning(Entity bolt) { if (this is LivingEntity le) le.Attack(new DamageSource("lightningBolt", bolt) { IsFire = true }, 5f); SetFire(8); }
+    /// <summary>Entity.setFire z 1.8: Ochrona przed ogniem skraca podpalenie istot.</summary>
+    public void SetFire(int seconds)
+    {
+        int t = seconds * 20;
+        if (this is LivingEntity le) t = Items.EnchantEffects.FireTime(le, t);
+        if (FireTicks < t) FireTicks = t;
+    }
     public virtual bool Interact(Player p) => false;
     /// <summary>Gracz uderza encję, która nie jest żywa (np. odbicie kuli ognia). True = obsłużone.</summary>
     public virtual bool AttackedByPlayer(Player p) => false;

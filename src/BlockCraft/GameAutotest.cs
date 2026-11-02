@@ -11,6 +11,10 @@ public sealed partial class Game
 {
     private readonly Queue<(int frames, Func<bool> action)> _steps = new();
     private int _waitFrames;
+    /// <summary>Krok czeka też na ticki gry (klatki/3, czyli tyle, ile przy 60 FPS): przy VSync 144 Hz albo bez limitu
+    /// sama liczba klatek dawała za mało ticków i testy redstone/lejów padały losowo.</summary>
+    private long _waitTick;
+    private long _evalTick = -1; private int _evalCount;
     private string _shotDir;
 
     private void Shot(string name) => TakeScreenshot(Path.Combine(_shotDir, name + ".png"));
@@ -26,6 +30,11 @@ public sealed partial class Game
         if (Environment.GetEnvironmentVariable("BC_AUTOTEST") == "rs") { AutotestRedstone(true); return; }
         if (_args.Contains("--ne")) { SetupAutotestNetherEnd(); return; }
         if (_args.Contains("--mo")) { SetupAutotestMobs(); return; }
+        if (_args.Contains("--ow")) { SetupAutotestOverworld(); return; }
+        if (_args.Contains("--me")) { SetupAutotestMechanics(); return; }
+        if (_args.Contains("--cmd")) { SetupAutotestCommands(); return; }
+        if (_args.Contains("--snd")) { SetupAutotestSound(); return; }
+        if (_args.Contains("--bl2")) { SetupAutotestBl2(); return; }
         int t0 = 0;
         WaitUntil(() => HasMenuWorld && Renderer.PendingMeshes < 20 || ++t0 > 600);
         Step(30, () => Shot("01_title"));
@@ -65,6 +74,7 @@ public sealed partial class Game
         Step(10, () => Shot("09_inventory"));
         // kopanie i stawianie przez kontroler (jak myszką)
         int mx = 0, my = 0, mz = 0; byte before = 0;
+        int px = 0, py = 0, pz = 0, planksBefore = 0; bool placeHit = false;
         Step(5, () =>
         {
             SetScreen(null);
@@ -80,12 +90,22 @@ public sealed partial class Game
             byte now = World.GetBlock(mx, my, mz);
             Log.Info($"AUTOTEST mine: {(now != before ? "OK" : "FAIL")} ({Block.Get(before).Key} -> {Block.Get(now).Key}), inv dirt={Player.Inventory.CountOf(B.Dirt)}");
             Player.Inventory.SelectedSlot = 1;
-            _rightPressed = true;
+            // Po wykopaniu liścia promień trafia dalej. Sprawdzamy pole kliknięcia,
+            // nie zakładamy, że nowa deska zastąpi pierwszy wykopany blok.
+            Ctrl.UpdateTarget(1f);
+            var hit = Ctrl.Hit;
+            placeHit = hit.Hit;
+            px = hit.X; py = hit.Y; pz = hit.Z;
+            if (placeHit && !Block.Get(World.GetBlock(px, py, pz)).Replaceable)
+            { px += Dir.X[hit.Face]; py += Dir.Y[hit.Face]; pz += Dir.Z[hit.Face]; }
+            planksBefore = Player.Inventory.CountOf(B.OakPlanks);
+            Ctrl.TickRight(true);
         });
         Step(10, () =>
         {
-            byte now = World.GetBlock(mx, my, mz);
-            Log.Info($"AUTOTEST place: {(now == B.OakPlanks ? "OK" : "FAIL")} ({Block.Get(now).Key}), planks left={Player.Inventory.CountOf(B.OakPlanks)}");
+            byte now = World.GetBlock(px, py, pz);
+            int left = Player.Inventory.CountOf(B.OakPlanks);
+            Log.Info($"AUTOTEST place: {(placeHit && now == B.OakPlanks && left == planksBefore - 1 ? "OK" : "FAIL")} ({Block.Get(now).Key} at {px} {py} {pz}), planks left={left}");
             Shot("06c_after_place");
         });
         Step(5, () =>
@@ -195,6 +215,7 @@ public sealed partial class Game
         }
         if (_steps.Count == 0) return;
         if (_waitFrames > 0) { _waitFrames--; return; }
+        if (_tickCount < _waitTick) return;
         var (frames, act) = _steps.Peek();
         bool ok;
         try { ok = act(); }
@@ -205,6 +226,13 @@ public sealed partial class Game
             ok = true;
         }
         if (_steps.Count == 0) return;
-        if (ok) { _steps.Dequeue(); if (_steps.Count > 0) _waitFrames = _steps.Peek().frames; }
+        if (!ok)
+        {
+            // Liczniki limitów w WaitUntil (++t > N) liczą wywołania. Najwyżej 3 sprawdzenia na tick gry, czyli tyle,
+            // ile przy 60 FPS: przy ~1500 FPS bez limitu oczekiwania kończyły się po ułamku zamierzonego czasu.
+            if (_tickCount != _evalTick) { _evalTick = _tickCount; _evalCount = 0; }
+            if (++_evalCount >= 3) _waitTick = _tickCount + 1;
+        }
+        if (ok) { _evalCount = 0; _steps.Dequeue(); if (_steps.Count > 0) { _waitFrames = _steps.Peek().frames; _waitTick = _tickCount + (_waitFrames + 2) / 3; } }
     }
 }

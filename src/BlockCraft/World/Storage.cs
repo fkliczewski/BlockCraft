@@ -45,6 +45,7 @@ public sealed partial class PlayerData
 
 public sealed class LevelData
 {
+    public WeatherData Weather { get; set; }
     public string Name { get; set; }
     public long Seed { get; set; }
     public int Type { get; set; }
@@ -58,6 +59,8 @@ public sealed class LevelData
     public bool Hardcore { get; set; }
     public int Difficulty { get; set; } = 2;
     public Dictionary<string, bool> Rules { get; set; } = new();
+    /// <summary>Wszystkie reguły 1.8 jako tekst (randomTickSpeed, własne reguły); nowsze niż Rules.</summary>
+    public Dictionary<string, string> RuleValues { get; set; }
     public PlayerData Player { get; set; }
     public DateTime LastPlayed { get; set; }
     public int Version { get; set; } = 1;

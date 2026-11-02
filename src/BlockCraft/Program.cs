@@ -40,6 +40,7 @@ public static class Program
                 }
                 EnsureConsole(); return SelfTest.Run(args);
             }
+            if (args.Contains("--missing")) return MissingReport.Run(args);
             if (args.Contains("--server")) { EnsureConsole(); return Net.DedicatedServer.Run(args); }
             using var game = new Game(args);
             game.Run();

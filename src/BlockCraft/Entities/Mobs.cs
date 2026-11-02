@@ -16,7 +16,9 @@ public abstract partial class Mob : LivingEntity
 
     protected Mob(World.World w) : base(w) { Nav = new Navigator(this); Health = MaxHealth; }
 
-    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = 1; }
+    /// <summary>MC 1.8 EntityLiving.setAIMoveSpeed: prędkość trafia też do moveForward, więc przyspieszenie to speed^2
+    /// (krowa 0.2 -> ok. 1.8 bloku/s). Wcześniej MoveForward = 1 dawało moby 5 razy za szybkie i 5 razy częstsze kroki.</summary>
+    public void SetMoveSpeed(float s) { AiMoveSpeed = s; MoveForward = s; }
 
     public virtual string LivingSound => null;
     public virtual int LivingSoundInterval => 80;
@@ -26,7 +28,9 @@ public abstract partial class Mob : LivingEntity
         IdleTime++;
         MoveForward = 0; MoveStrafe = 0; IsJumping = false;
         if (InWater && World.Rand.NextFloat() < 0.8f) IsJumping = true;
-        if (LivingSound != null && World.Rand.Next(1000) < LivingSoundTimer++) { LivingSoundTimer = -LivingSoundInterval; World.PlaySound(LivingSound, X, Y + EyeHeight, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
+        // LivingSound bywa losowe (nietoperz, wilk): jeden odczyt, inaczej drugi mógł dać null i przerwać tick świata
+        string living = LivingSound;
+        if (living != null && World.Rand.Next(1000) < LivingSoundTimer++) { LivingSoundTimer = -LivingSoundInterval; World.PlaySound(living, X, Y + EyeHeight, Z, 1f, (World.Rand.NextFloat() - World.Rand.NextFloat()) * 0.2f + 1f); }
         if (!TickMobControl()) Think();
         Nav.Tick();
         if (InWater && !Nav.HasPath) IsJumping = true;
@@ -97,6 +101,7 @@ public abstract class Animal : Mob
 {
     public int GrowingAge; // <0 młode
     public int InLove;
+    public Player LoveCause;
     protected int PanicTicks;
     protected Animal Mate; protected int MateTicks;
     public override bool Persistent => true;
@@ -165,6 +170,7 @@ public abstract class Animal : Mob
                     child.SetPositionAndPrev(X, Y, Z);
                     child.Yaw = Yaw;
                     World.SpawnEntity(child);
+                    if(this is Cow) (LoveCause ?? Mate.LoveCause)?.AwardAchievement("breedCow");
                     GrowingAge = 6000; Mate.GrowingAge = 6000; InLove = 0; Mate.InLove = 0; MateTicks = 0; Mate.MateTicks = 0;
                     World.SpawnParticles(ParticleKind.Heart, X, Y + Height, Z, 7);
                     World.SpawnXp(X, Y, Z, 1 + World.Rand.Next(7));
@@ -206,7 +212,7 @@ public abstract class Animal : Mob
         if (IsBreedingItem(held))
         {
             if (IsBaby) { GrowingAge = Math.Min(0, GrowingAge + (-GrowingAge) / 10); }
-            else if (GrowingAge == 0 && InLove <= 0) { InLove = 600; }
+            else if (GrowingAge == 0 && InLove <= 0) { InLove = 600; LoveCause = p; }
             else return false;
             if (!p.Creative) { held.Count--; if (held.Count <= 0) p.Inventory.Selected = null; p.Inventory.Dirty = true; }
             World.SpawnParticles(ParticleKind.Heart, X, Y + Height, Z, 3);
@@ -255,6 +261,11 @@ public class Cow : Animal
 
 public sealed partial class Pig : Animal
 {
+    protected override void OnFall(float distance)
+    {
+        if(distance>5) Rider?.AwardAchievement("flyPig");
+        base.OnFall(distance);
+    }
     public Pig(World.World w) : base(w) { Width = 0.9f; Height = 0.9f; MaxHealth = 10; Health = 10; MoveSpeed = 0.25; }
     public override string TypeKey => "pig";
     public override string DisplayName => "Świnia";

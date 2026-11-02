@@ -40,12 +40,19 @@ public static class GuiDraw
     {
         var it = s.Item; if (it == null) return "?";
         string t = s.Name;
+        // rzadkość 1.8: zaklęty przedmiot RARE (aqua), zaklęta książka UNCOMMON (żółta)
+        if (it.LoreFn != null) t += "\n§7" + it.LoreFn(s);
+        if ((s.Tag?.GetList("ench")?.Count ?? 0) > 0) t = "§b" + t;
+        else if ((s.Tag?.GetList("StoredEnchantments")?.Count ?? 0) > 0) t = "§e" + t;
+        foreach (var key in new[] { "ench", "StoredEnchantments" })
+            foreach (var kv in EnchantHelper.GetAll(s, key)) t += "\n§7" + EnchantHelper.Name(kv.Key) + " " + EnchantHelper.Roman(kv.Value);
         if (s.Id == I.Potion) foreach (var effect in Potions.Effects(s)) t += "\n" + EffectLogic.Name(effect.Id) + " " + EnchantHelper.Roman(effect.Amplifier + 1) + (EffectLogic.Instant(effect.Id) ? "" : " (" + EffectLogic.Time(effect) + ")");
         if (it.ArmorSlot >= 0) t += "\n§9+" + it.ArmorPoints + " Pancerz";
         if (it.IsTool && it.AttackDamage > 1) t += "\n§9+" + it.AttackDamage + " Obrażenia od ataku";
         if (it.IsFood) t += "\n§7Głód: +" + it.Hunger;
         if (it.MaxDamage > 0) t += $"\n§7Wytrzymałość: {it.MaxDamage - s.Damage} / {it.MaxDamage}";
         if (adv) t += $"\n§8#{s.Id}" + (s.Damage > 0 && it.MaxDamage == 0 ? "/" + s.Damage : "");
+        t += Cmd.Adventure.Tooltip(s);
         return t;
     }
 }
@@ -94,7 +101,7 @@ public class ContainerScreen : Screen
         }
         else if (C is ChestContainer cc) sb.Text(cc.Title, Left + 8, Top + 6, 0xFF404040, false);
         if (C is not ChestContainer && C is not PlayerContainer) sb.Text("Ekwipunek", Left + 8, Top + C.Height - 96 + 2, 0xFF404040, false);
-        else sb.Text("Ekwipunek", Left + 8, Top + 72, 0xFF404040, false);
+        else if (C is ChestContainer) sb.Text("Ekwipunek", Left + 8, Top + 72, 0xFF404040, false);
     }
 
     private void DrawArmorGhost(int x, int y, int slot)

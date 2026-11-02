@@ -126,8 +126,10 @@ public abstract partial class Mob
     public override void OnDeath(DamageSource src)
     {
         if(Dead) return;
-        if(!World.IsRemote && src.Attacker is Creeper c && c.Charged && c.HeadsDropped==0 && this!=c && this is Zombie or Skeleton or Creeper)
-        { c.HeadsDropped++; Drop(I.SkullItem,1,this is Skeleton?0:this is Zombie?2:4); }
+        if(!World.IsRemote && src.Attacker is Creeper c && c.Charged && c.HeadsDropped==0 && this!=c && this is Zombie or Skeleton or WitherSkeleton or Creeper)
+        {
+            c.HeadsDropped++;Drop(I.SkullItem,1,this is WitherSkeleton?1:this is Skeleton?0:this is Zombie?2:4);
+        }
         if(LeashHolder!=null) { Drop(I.Lead,1); LeashHolder=null; }
         if(Saddled) Drop(I.Saddle,1);
         Saddled=false;
