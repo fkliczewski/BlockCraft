@@ -24,6 +24,7 @@ public static partial class SelfTest
         public Func<NetInput, NetInput> Hold, Once;
         public Player P => Host.Player;
         public World.World W => Host.World;
+        public void CloseWindow() { P.CloseContainer(); Host.SetScreen(null); }
         public T Find<T>(int id) where T : Entity => W != null && W.EntityById.TryGetValue(id, out var e) ? e as T : null;
     }
 
@@ -267,7 +268,7 @@ public static partial class SelfTest
 
         // koń z siodłem
         var horse = new Horse(rig.Hw) { Tamed = true };
-        horse.Inv.Set(0, new ItemStack(I.Saddle));
+        horse.Inv.Set(0, new ItemStack(I.Saddle)); horse.Saddled = true;
         horse.SetPositionAndPrev(12.5, gy + 1, 4.5); rig.Hw.AddEntityNow(horse);
         rig.Move(A, 10.5, gy + 1, 4.5);
         rig.Step(30);
@@ -279,7 +280,7 @@ public static partial class SelfTest
         A.P.MoveForward = 1; A.P.Yaw = 0;
         rig.Step(30);
         var ch = A.Find<Horse>(horse.Id);
-        Check(horse.Z - hz0 > 1.5 && ch != null && Math.Abs(A.P.Z - ch.Z) < 1, "Sieć2: gość kieruje koniem", $"przesunięcie {horse.Z - hz0:F2}");
+        Check(horse.Z - hz0 > 1.5 && ch != null && Math.Abs(A.P.Z - ch.Z) < 1, "Sieć2: gość kieruje koniem", $"przesunięcie {horse.Z - hz0:F2}, gość fwd {pa.MoveForward} koń fwd {horse.MoveForward} speed {horse.AiMoveSpeed}/{horse.MoveSpeed} siodło {horse.Saddled} oswojony {horse.Tamed} ziemia {horse.OnGround} rider {horse.Rider?.Name} rear {horse.RearTicks}");
         Check(rc.TeleportId == tp0, "Sieć2: jazda konno bez teleportów", (rc.TeleportId - tp0).ToString());
         A.P.MoveForward = 0; A.P.Sneaking = true; rig.Step(3); A.P.Sneaking = false; rig.Step(6);
         Check(pa.RidingMob == null && horse.Rider == null && A.P.RidingMob == null && ch?.Rider == null, "Sieć2: zsiadanie z konia");
@@ -362,10 +363,7 @@ public static partial class SelfTest
         rig.Step(4);
         Player Seen() => Bg.Find<Player>(pa.Id);
         Check(Seen()?.Inventory.Selected?.Id == I.DiamondSword && Seen()?.Inventory.Armor[0]?.Id == I.IronHelmet, "Sieć2: inni widzą przedmiot w ręce i zbroję gościa");
-        A.Hold = i => { i.RightDown = true; return i; };
-        rig.Step(4);
-        Check(Seen()?.ItemInUse?.Id == I.DiamondSword, "Sieć2: blokowanie mieczem widoczne u innych");
-        A.Hold = null; rig.Step(3);
+        // blokowania mieczem nie ma w grze jednoosobowej (żaden przedmiot nie ma UseAction.Block); renderer ma już pozę na ten przypadek
         A.P.Sneaking = true; rig.Step(3);
         Check(Seen()?.Sneaking == true && pa.Sneaking, "Sieć2: skradanie widoczne u innych");
         A.P.Sneaking = false; rig.Step(3);
@@ -407,6 +405,7 @@ public static partial class SelfTest
     {
         Console.WriteLine("-- Sieć2: GUI i bloki u gościa");
         int gy = rig.Gy;
+        A.Client.ActivateHooks(); // dwóch klientów w jednym procesie: kliknięcia okien idą od gościa A
         rig.Move(A, 8.5, gy + 1, 8.5);
         // piec: paliwo, postęp i wynik
         rig.Hw.SetBlock(10, gy + 1, 8, B.Furnace);
@@ -421,8 +420,9 @@ public static partial class SelfTest
         rig.Step(170);
         Check(cf?.Slots[2].Stack?.Id == I.IronIngot, "Sieć2: wynik pieca u gościa");
         if (cf != null) { cf.Click(2, 0, ClickType.QuickMove, A.P); rig.Step(4); }
-        Check(pa.Inventory.CountOf(I.IronIngot) == 1 && A.P.Inventory.CountOf(I.IronIngot) == 1 && fte.Slots[2] == null, "Sieć2: odbiór z pieca rozliczony przez hosta");
-        A.P.CloseContainer(); rig.Step(3);
+        Check(pa.Inventory.CountOf(I.IronIngot) == 1 && A.P.Inventory.CountOf(I.IronIngot) == 1 && fte.Slots[2] == null, "Sieć2: odbiór z pieca rozliczony przez hosta",
+            $"host {pa.Inventory.CountOf(I.IronIngot)} gość {A.P.Inventory.CountOf(I.IronIngot)} wyjście {fte.Slots[2]?.Count} okno {pa.OpenContainer?.GetType().Name}/{A.P.OpenContainer?.GetType().Name} kursor {pa.Cursor?.Id} zajęte {pa.Inventory.Main.Count(x => x != null)}/{A.P.Inventory.Main.Count(x => x != null)} [{string.Join(",", pa.Inventory.Main.Select(x => x?.Id ?? 0))}]");
+        A.CloseWindow(); rig.Step(3);
 
         // statyw alchemiczny: czas warzenia
         rig.Hw.SetBlock(10, gy + 1, 9, B.BrewingStand);
@@ -434,7 +434,7 @@ public static partial class SelfTest
         var cbt = A.W.GetTileEntity(10, gy + 1, 9) as BrewingStandTile;
         Check(A.P.OpenContainer is BrewingContainer && bte.BrewTime is > 0 and < 400 && cbt?.BrewTime is > 0 and < 400, "Sieć2: czas warzenia u gościa",
             $"host {bte.BrewTime} gość {cbt?.BrewTime}");
-        A.P.CloseContainer(); rig.Step(3);
+        A.CloseWindow(); rig.Step(3);
 
         // stół rzemieślniczy: siatka i wynik liczy host
         rig.Hw.SetBlock(11, gy + 1, 8, B.CraftingTable);
@@ -444,12 +444,14 @@ public static partial class SelfTest
         if (A.P.OpenContainer is WorkbenchContainer wb)
         {
             wb.Click(1, 0, ClickType.Pickup, A.P); rig.Step(4);
-            Check(wb.Slots[0].Stack?.Id == B.OakPlanks && wb.Slots[0].Stack.Count == 4, "Sieć2: wynik wytwarzania u gościa");
+            var hwb = pa.OpenContainer as WorkbenchContainer;
+            Check(wb.Slots[0].Stack?.Id == B.OakPlanks && wb.Slots[0].Stack.Count == 4, "Sieć2: wynik wytwarzania u gościa",
+                $"gość {wb.Slots[0].Stack?.Id}x{wb.Slots[0].Stack?.Count} siatka {wb.Slots[1].Stack?.Id}; host {hwb?.Slots[0].Stack?.Id} siatka {hwb?.Slots[1].Stack?.Id} kursor {pa.Cursor?.Id}/{A.P.Cursor?.Id} okno {pa.OpenContainer?.GetType().Name}/{A.P.OpenContainer?.GetType().Name} [{string.Join(",", pa.Inventory.Main.Select(x => x?.Id ?? 0))}]");
             wb.Click(0, 0, ClickType.QuickMove, A.P); rig.Step(4);
             Check(pa.Inventory.CountOf(B.OakPlanks) == 4 && A.P.Inventory.CountOf(B.OakPlanks) == 4, "Sieć2: wytwarzanie gościa rozliczone przez hosta");
         }
         else Check(false, "Sieć2: GUI stołu rzemieślniczego u gościa", A.P.OpenContainer?.GetType().Name);
-        A.P.CloseContainer(); rig.Step(3);
+        A.CloseWindow(); rig.Step(3);
 
         // podajnik
         rig.Hw.SetBlock(12, gy + 1, 8, B.Dropper);
@@ -457,7 +459,7 @@ public static partial class SelfTest
         pa.OpenBlockGui(GuiKind.Dispenser, 12, gy + 1, 8);
         rig.Step(4);
         Check(A.P.OpenContainer is RsContainer { Title: "Podajnik" } && A.P.OpenContainer.Slots.Count == 45, "Sieć2: GUI podajnika u gościa", A.P.OpenContainer?.Title);
-        A.P.CloseContainer(); rig.Step(3);
+        A.CloseWindow(); rig.Step(3);
 
         // mapa: gość tworzy mapę, host rysuje i przesyła piksele
         pa.Inventory.Main[5] = new ItemStack(I.EmptyMap); pa.Inventory.SelectedSlot = 5; A.P.Inventory.SelectedSlot = 5;
@@ -494,7 +496,7 @@ public static partial class SelfTest
             for (int z = 0; z < 25; z++)
             {
                 // siatka 24 x 8 x 3 piętra co 1 blok: przedmioty się nie łączą i nikt ich nie podnosi
-                var it = new ItemEntity(rig.Hw, x + .5, gy + 1 + (z / 8) * 1.5, 24.5 + (z % 8), new ItemStack(B.Stone, 1));
+                var it = new ItemEntity(rig.Hw, x + .5, gy + 1 + (z / 8) * 1.5, 24.5 + (z % 8), new ItemStack(z / 8 == 0 ? B.Stone : z / 8 == 1 ? B.Dirt : B.Cobblestone, 1));
                 it.SetPositionAndPrev(x + .5, gy + 1 + (z / 8) * 1.5, 24.5 + (z % 8));
                 it.PickupDelay = 32767;
                 rig.Hw.AddEntityNow(it); items.Add(it);
@@ -509,12 +511,12 @@ public static partial class SelfTest
             worst = Math.Max(worst, swAfter.Elapsed.TotalMilliseconds);
             rig.Step(1);
         }
-        int seen = A.W.Entities.OfType<ItemEntity>().Count();
+        int seen = A.W.Entities.OfType<ItemEntity>().Count(), onHost = rig.Hw.Entities.OfType<ItemEntity>().Count();
         long kb = (rig.Server.BytesSent - bytes0) / 1024;
-        Console.WriteLine($"    600 przedmiotów: najdłuższy AfterTick {worst:F1} ms, {kb} KB do 2 gości w 60 tickach, gość widzi {seen}");
-        Check(seen >= 590, "Sieć2: gość dostaje 600 encji", seen.ToString());
+        Console.WriteLine($"    600 przedmiotów: najdłuższy AfterTick {worst:F1} ms, {kb} KB do 2 gości w 60 tickach, gość widzi {seen} z {onHost} u hosta");
+        Check(onHost > 500 && seen == onHost, "Sieć2: gość dostaje wszystkie z ok. 600 encji", $"{seen}/{onHost}");
         Check(worst < 40, "Sieć2: wysyłka 600 encji mieści się w ticku", $"{worst:F1} ms");
-        foreach (var it in items) it.Kill();
+        foreach (var it in rig.Hw.Entities.OfType<ItemEntity>().ToList()) it.Kill();
         rig.Step(4);
         Check(!A.W.Entities.OfType<ItemEntity>().Any(), "Sieć2: usunięcie 600 encji u gościa");
 
@@ -579,6 +581,23 @@ public static partial class SelfTest
         var pa = rig.Puppet(A);
         pa.SetGameMode(0);
         rig.Step(3);
+        // portal Endu i powrót przez portal w Endzie
+        rig.Hw.SetBlock(24, gy + 1, 4, B.EndPortal);
+        rig.Step(2);
+        rig.Move(A, 24.5, gy + 1, 4.5);
+        for (int k = 0; k < 40 && A.W.Dimension != DimensionId.End; k++) rig.Step();
+        Check(A.W.Dimension == DimensionId.End && pa.World.Dimension == DimensionId.End, "Sieć2: gość przechodzi do Endu",
+            $"gość {A.W.Dimension} host {pa.World.Dimension} {pa.X:F2},{pa.Y:F2},{pa.Z:F2} blok {rig.Hw.GetBlock(24, gy + 1, 4)}");
+        rig.Step(30);
+        var end = pa.World;
+        int ex = MathUtil.FloorToInt(pa.X) + 1, ey = MathUtil.FloorToInt(pa.Y), ez = MathUtil.FloorToInt(pa.Z);
+        end.SetBlock(ex, ey, ez, B.EndPortal);
+        rig.Step(2);
+        rig.Move(A, ex + .5, ey, ez + .5);
+        for (int k = 0; k < 40 && A.W.Dimension != DimensionId.Overworld; k++) rig.Step();
+        rig.Step(30);
+        Check(A.W.Dimension == DimensionId.Overworld && pa.World == rig.Hw && Math.Abs(pa.X - (rig.Hw.SpawnX + .5)) < 3,
+            "Sieć2: powrót z Endu do punktu odrodzenia w Overworldzie", $"{A.W.Dimension} {pa.X:F1},{pa.Z:F1}");
         // portal Netheru w ramie z obsydianu; gość stoi w nim 80 ticków jak w trybie przetrwania
         DimensionPortals.BuildFrame(rig.Hw, 20, gy + 1, 4, 1);
         bool lit = DimensionPortals.Ignite(rig.Hw, 20, gy + 1, 4);
@@ -608,22 +627,6 @@ public static partial class SelfTest
         }
         Check(portal != null && A.W.Dimension == DimensionId.Overworld && pa.World == rig.Hw, "Sieć2: gość wraca portalem do Overworldu", $"portal {portal}, gość {A.W.Dimension}");
         rig.Step(20);
-        // portal Endu i powrót przez portal w Endzie
-        rig.Hw.SetBlock(24, gy + 1, 4, B.EndPortal);
-        rig.Step(2);
-        rig.Move(A, 24.5, gy + 1, 4.5);
-        for (int k = 0; k < 40 && A.W.Dimension != DimensionId.End; k++) rig.Step();
-        Check(A.W.Dimension == DimensionId.End && pa.World.Dimension == DimensionId.End, "Sieć2: gość przechodzi do Endu");
-        rig.Step(30);
-        var end = pa.World;
-        int ex = MathUtil.FloorToInt(pa.X) + 1, ey = MathUtil.FloorToInt(pa.Y), ez = MathUtil.FloorToInt(pa.Z);
-        end.SetBlock(ex, ey, ez, B.EndPortal);
-        rig.Step(2);
-        rig.Move(A, ex + .5, ey, ez + .5);
-        for (int k = 0; k < 40 && A.W.Dimension != DimensionId.Overworld; k++) rig.Step();
-        rig.Step(30);
-        Check(A.W.Dimension == DimensionId.Overworld && pa.World == rig.Hw && Math.Abs(pa.X - (rig.Hw.SpawnX + .5)) < 3,
-            "Sieć2: powrót z Endu do punktu odrodzenia w Overworldzie", $"{A.W.Dimension} {pa.X:F1},{pa.Z:F1}");
         // po podróżach gość nadal stawia bloki
         rig.Hw.SetBlock(24, gy + 1, 4, B.Air);
         pa.Inventory.Main[0] = new ItemStack(B.Stone, 2); pa.Inventory.SelectedSlot = 0; A.P.Inventory.SelectedSlot = 0;

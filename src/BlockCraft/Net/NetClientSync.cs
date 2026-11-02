@@ -1,4 +1,5 @@
 using BlockCraft.Entities;
+using BlockCraft.Items;
 using BlockCraft.World;
 
 namespace BlockCraft.Net;
@@ -55,6 +56,10 @@ public sealed partial class NetClient
         if (W != null && W.EntityById.TryGetValue(id, out var e) && e is EnderDragon { Parts: { } parts })
             foreach (var part in parts) W.RemoveEntity(part);
     }
+
+    /// <summary>Haki kliknięć w kontenerach są statyczne (jedno okno gry = jeden klient); test z kilkoma klientami
+    /// w jednym procesie przełącza je na wskazanego klienta.</summary>
+    internal void ActivateHooks() { Container.NetClickHook = ClickHook; Container.NetDistributeHook = DistributeHook; }
 
     private void ResetSync() { _linkState.Clear(); _linkPending.Clear(); W?.DestroyProgress.Clear(); }
 
