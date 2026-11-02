@@ -13,6 +13,8 @@ public sealed partial class PlayerController
     public World.World W => _w ?? _g.World;
     public Player P => _p ?? _g.Player;
     public float BreakProgress; public int BreakX, BreakY, BreakZ = int.MinValue; private int _breakSoundTicks;
+    /// <summary>Pomiar do F3: ile ticków trwało kopanie ostatniego bloku i ile powinno wg wzoru 1.8.</summary>
+    public int BreakTicks, LastBreakTicks, LastBreakExpected; public string LastBreakKey = "";
     public int BlockHitDelay, RightClickDelay;
     public World.World.HitResult Hit; public Entity HitEntity;
     public bool LeftWasDown;
@@ -84,8 +86,9 @@ public sealed partial class PlayerController
             p.SwingArm();
             return;
         }
-        if (x != BreakX || y != BreakY || z != BreakZ) { BreakX = x; BreakY = y; BreakZ = z; BreakProgress = 0; b.OnClicked(W, x, y, z, p); }
-        BreakProgress += BreakDelta(p, b, tool);
+        if (x != BreakX || y != BreakY || z != BreakZ) { BreakX = x; BreakY = y; BreakZ = z; BreakProgress = 0; BreakTicks = 0; b.OnClicked(W, x, y, z, p); }
+        float delta = BreakDelta(p, b, tool);
+        BreakProgress += delta; BreakTicks++;
         p.SwingArm();
         if (_breakSoundTicks++ % 4 == 0)
         {
@@ -94,6 +97,7 @@ public sealed partial class PlayerController
         }
         if (BreakProgress >= 1f)
         {
+            LastBreakTicks = BreakTicks; LastBreakExpected = delta > 0 ? (int)Math.Ceiling(1f / delta - 1e-4f) : 0; LastBreakKey = b.Key;
             bool harvest = b.CanHarvest(tool);
             DestroyBlock(x, y, z, harvest);
             if (harvest) Bl2Stats.Add(p, Bl2Stats.Mine + b.Id);

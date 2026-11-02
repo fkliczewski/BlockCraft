@@ -399,7 +399,9 @@ public sealed partial class Game
         string[] facing = { "południe (+Z)", "zachód (-X)", "północ (-Z)", "wschód (+X)" };
         var lines = new List<string>
         {
-            $"BlockCraft 1.0 ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
+            $"BlockCraft {GameVersion.Name} ({_fps} fps, {Renderer.PendingMeshes} oczek. mesh)",
+            $"Tempo: {_tps} TPS, czas świata +{_dayRate}/s (w 1.8: 20 i 20){(Server != null ? ", HOST" : Client != null ? ", GOŚĆ" : "")}",
+            Ctrl.LastBreakTicks > 0 ? $"Ostatnie kopanie: {Ctrl.LastBreakKey} {Ctrl.LastBreakTicks} t = {Ctrl.LastBreakTicks / 20.0:F2} s (wzór 1.8: {Ctrl.LastBreakExpected} t)" : "Ostatnie kopanie: -",
             $"C: {Renderer.RenderedSections}/{Renderer.TotalSections} sekcji, E: {w.Entities.Count}, P: {Renderer.Particles.Count}",
             $"Chunki: {w.Chunks.Count} załad., {w.ChunkManager?.PendingCount ?? 0} w kolejce",
             "",

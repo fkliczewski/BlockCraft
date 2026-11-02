@@ -38,6 +38,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private double _lastTime;
     private int _fps, _fpsCount; private double _fpsTimer;
+    /// <summary>F3: ticki gry i przyrost czasu świata na sekundę (w 1.8 oba po 20).</summary>
+    private int _tps, _dayRate; private long _tpsLastTick, _tpsLastDay;
     private bool _leftDown, _rightDown, _middlePressed;
     private bool _leftPressed, _rightPressed;
     private int _lastFwdTap = -100, _lastJumpTap = -100; private long _tickCount;
@@ -462,7 +464,12 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         double now = _clock.Elapsed.TotalSeconds;
         double dt = Math.Min(0.25, now - _lastTime); _lastTime = now;
         _fpsTimer += dt; _fpsCount++;
-        if (_fpsTimer >= 1) { _fps = _fpsCount; _fpsCount = 0; _fpsTimer -= 1; }
+        if (_fpsTimer >= 1)
+        {
+            _fps = _fpsCount; _fpsCount = 0; _fpsTimer -= 1;
+            _tps = (int)(_tickCount - _tpsLastTick); _tpsLastTick = _tickCount;
+            long day = World?.DayTime ?? 0; _dayRate = (int)(day - _tpsLastDay); _tpsLastDay = day;
+        }
         _acc += dt;
         int n = 0;
         while (_acc >= 0.05 && n < 10) { _acc -= 0.05; n++; try { Tick(); } catch (Exception ex) { Log.Error("Tick: " + ex); } }
