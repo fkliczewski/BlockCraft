@@ -415,6 +415,7 @@ public sealed class NetClient
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
             case S2C.MapData: MapSync.Read(r); break;
+            case S2C.Statistics: Bl2Net.ReadStatistics(P, r); break;
             case S2C.OpenSignEditor:
                 {
                     int sx = r.ReadInt32(), sy = r.ReadInt32(), sz = r.ReadInt32();

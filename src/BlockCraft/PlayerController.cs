@@ -95,6 +95,7 @@ public sealed partial class PlayerController
         {
             bool harvest = b.CanHarvest(tool);
             DestroyBlock(x, y, z, harvest);
+            if (harvest) Bl2Stats.Add(p, Bl2Stats.Mine + b.Id);
             ResetBreak();
             BlockHitDelay = 5;
             if (tool?.Item != null && tool.Item.IsTool && b.Hardness > 0) p.DamageHeld(tool.Item.Tool == ToolType.Sword ? 2 : 1);
@@ -141,9 +142,9 @@ public sealed partial class PlayerController
             if (LeashKnot.TryTie(W, p, x, y, z)) { p.SwingArm(); return; }
             if (!p.Sneaking || held == null)
                 if (b.OnActivated(W, x, y, z, p)) { p.SwingArm(); return; }
-            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
+            if (held != null && UseOnBlock(held, x, y, z, Hit.Face, Hit.HitX - x, Hit.HitY - y, Hit.HitZ - z)) { if (p.ItemInUse == null) Bl2Stats.Used(p, held.Id); p.SwingArm(); p.Inventory.Dirty = true; GolemBuilder.AfterPlace(W, x, y, z, Hit.Face); return; }
         }
-        if (held != null) UseInAir(held);
+        if (held != null && UseInAir(held) && p.ItemInUse == null && held.Item?.ArmorSlot < 0) Bl2Stats.Used(p, held.Id);
     }
 
     private bool UseInAir(ItemStack held)
@@ -356,6 +357,7 @@ public sealed partial class PlayerController
         var s = b.PickStack(W.GetMeta(Hit.X, Hit.Y, Hit.Z));
         if (Banners.IsBanner(b.Id) && W.GetTileEntity(Hit.X, Hit.Y, Hit.Z) is BannerTile banner) s = banner.ToItem();
         if (b.Id==B.Skull&&W.GetTileEntity(Hit.X,Hit.Y,Hit.Z) is SkullTile skull) s=skull.ToItem();
+        if (b.Id == B.FlowerPot && W.GetTileEntity(Hit.X, Hit.Y, Hit.Z) is FlowerPotTile pot && !pot.Empty && Item.ById[pot.ItemId] != null) s = new ItemStack(pot.ItemId, 1, pot.Data);
         if (s == null || s.Item == null) return;
         var inv = P.Inventory;
         int slot = inv.FindSlot(s.Id, s.Item.MaxDamage > 0 ? -1 : s.Damage);

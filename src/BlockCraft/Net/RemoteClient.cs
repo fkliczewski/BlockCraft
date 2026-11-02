@@ -214,6 +214,7 @@ public sealed partial class RemoteClient : IPlayerHandler
         s.Count -= drop.Count;
         if (s.Count <= 0) P.Inventory.Selected = null;
         P.DropStack(drop, false);
+        Bl2Stats.Add(P, "stat.drop");
         P.SwingArm();
     }
 
