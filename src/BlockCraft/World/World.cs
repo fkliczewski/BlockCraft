@@ -16,27 +16,89 @@ public interface IWorldListener
     void OnEntityRemoved(Entity e);
 }
 
+/// <summary>GameRules z MC 1.8: wszystkie reguły jako tekst (jak w MC), typowane pola dla szybkiego odczytu w grze.
+/// /gamerule może też tworzyć własne reguły (dowolna nazwa), jak w 1.8.</summary>
 public sealed class GameRules
 {
     public bool DoDaylightCycle = true, KeepInventory = false, DoMobSpawning = true, MobGriefing = true, DoFireTick = true, NaturalRegeneration = true;
-    public bool DoEntityDrops = true;
-    public bool Set(string name, string value, out string error)
+    public bool DoEntityDrops = true, DoMobLoot = true, DoTileDrops = true, CommandBlockOutput = true, LogAdminCommands = true;
+    public bool SendCommandFeedback = true, ShowDeathMessages = true, ReducedDebugInfo = false;
+    public int RandomTickSpeed = 3;
+    /// <summary>Reguły spoza listy 1.8 utworzone komendą (nazwa -> wartość).</summary>
+    public readonly Dictionary<string, string> Custom = new();
+
+    public static readonly string[] Names = { "commandBlockOutput", "doDaylightCycle", "doEntityDrops", "doFireTick", "doMobLoot", "doMobSpawning",
+        "doTileDrops", "keepInventory", "logAdminCommands", "mobGriefing", "naturalRegeneration", "randomTickSpeed", "reducedDebugInfo",
+        "sendCommandFeedback", "showDeathMessages" };
+
+    private static string Canon(string name) => Names.FirstOrDefault(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Ustawia regułę z kontrolą typu reguł wbudowanych (Set) albo tworzy własną (create).</summary>
+    public bool Set(string name, string value, out string error, bool create = false)
     {
         error = null;
-        if (!bool.TryParse(value, out bool v)) { error = "Wartość musi być true/false"; return false; }
-        switch (name.ToLowerInvariant())
+        string c = Canon(name);
+        if (c == null)
         {
-            case "dodaylightcycle": DoDaylightCycle = v; return true;
-            case "keepinventory": KeepInventory = v; return true;
-            case "domobspawning": DoMobSpawning = v; return true;
-            case "mobgriefing": MobGriefing = v; return true;
-            case "dofiretick": DoFireTick = v; return true;
-            case "naturalregeneration": NaturalRegeneration = v; return true;
-            case "doentitydrops": DoEntityDrops = v; return true;
-            default: error = "Nieznana reguła: " + name; return false;
+            if (!create) { error = "Nieznana reguła: " + name; return false; }
+            Custom[name] = value; return true;
         }
+        if (c == "randomTickSpeed")
+        {
+            // GameRules.Value.setValue: liczba albo 0, gdy tekst nie jest liczbą
+            RandomTickSpeed = int.TryParse(value, out int n) ? n : 0; return true;
+        }
+        bool v = value == "true";
+        if (!bool.TryParse(value, out bool parsed)) { if (!create) { error = "Wartość musi być true/false"; return false; } }
+        else v = parsed;
+        switch (c)
+        {
+            case "commandBlockOutput": CommandBlockOutput = v; break;
+            case "doDaylightCycle": DoDaylightCycle = v; break;
+            case "doEntityDrops": DoEntityDrops = v; break;
+            case "doFireTick": DoFireTick = v; break;
+            case "doMobLoot": DoMobLoot = v; break;
+            case "doMobSpawning": DoMobSpawning = v; break;
+            case "doTileDrops": DoTileDrops = v; break;
+            case "keepInventory": KeepInventory = v; break;
+            case "logAdminCommands": LogAdminCommands = v; break;
+            case "mobGriefing": MobGriefing = v; break;
+            case "naturalRegeneration": NaturalRegeneration = v; break;
+            case "reducedDebugInfo": ReducedDebugInfo = v; break;
+            case "sendCommandFeedback": SendCommandFeedback = v; break;
+            case "showDeathMessages": ShowDeathMessages = v; break;
+        }
+        return true;
     }
-    public static readonly string[] Names = { "doDaylightCycle", "keepInventory", "doMobSpawning", "mobGriefing", "doFireTick", "naturalRegeneration", "doEntityDrops" };
+
+    /// <summary>Wartość reguły jako tekst albo null, gdy nie istnieje.</summary>
+    public string Get(string name)
+    {
+        string c = Canon(name);
+        if (c == null) return Custom.TryGetValue(name, out var v) ? v : null;
+        return c switch
+        {
+            "randomTickSpeed" => RandomTickSpeed.ToString(),
+            "commandBlockOutput" => B(CommandBlockOutput), "doDaylightCycle" => B(DoDaylightCycle), "doEntityDrops" => B(DoEntityDrops),
+            "doFireTick" => B(DoFireTick), "doMobLoot" => B(DoMobLoot), "doMobSpawning" => B(DoMobSpawning), "doTileDrops" => B(DoTileDrops),
+            "keepInventory" => B(KeepInventory), "logAdminCommands" => B(LogAdminCommands), "mobGriefing" => B(MobGriefing),
+            "naturalRegeneration" => B(NaturalRegeneration), "reducedDebugInfo" => B(ReducedDebugInfo), "sendCommandFeedback" => B(SendCommandFeedback),
+            _ => B(ShowDeathMessages)
+        };
+    }
+    private static string B(bool v) => v ? "true" : "false";
+
+    public IEnumerable<string> AllNames => Names.Concat(Custom.Keys);
+    public Dictionary<string, string> ToStrings() => AllNames.ToDictionary(n => n, n => Get(n));
+
+    /// <summary>Kopia reguł z Overworldu do innego wymiaru (bez doMobSpawning, którym steruje DimensionSet).</summary>
+    public void CopyFrom(GameRules o)
+    {
+        bool spawn = DoMobSpawning;
+        foreach (var n in Names) Set(n, o.Get(n), out _);
+        Custom.Clear(); foreach (var kv in o.Custom) Custom[kv.Key] = kv.Value;
+        DoMobSpawning = spawn;
+    }
 }
 
 public enum Difficulty { Peaceful = 0, Easy = 1, Normal = 2, Hard = 3 }
@@ -226,7 +288,7 @@ public sealed partial class World : IBlockAccess
         int meta = GetMeta(x, y, z);
         var b = Block.ById[id];
         PlayEffectBreak(x, y, z, id, meta);
-        if (drop && !IsRemote && !b.IsLiquid)
+        if (drop && !IsRemote && !b.IsLiquid && Rules.DoTileDrops)
         {
             var list = new List<ItemStack>();
             var silk = Items.EnchantHelper.GetLevel(tool, Items.Ench.SilkTouch) > 0 ? b.SilkTouchStack(meta) : null;
@@ -483,6 +545,7 @@ public sealed partial class World : IBlockAccess
             TickTileEntities();
             if (Rules.DoMobSpawning) Spawner.Tick();
             CheckSleeping();
+            TickCommands();
         }
         for (int i = 0; i < Entities.Count; i++)
         {
@@ -534,7 +597,7 @@ public sealed partial class World : IBlockAccess
             for (int s = 0; s < Chunk.Sections; s++)
             {
                 if (c.SectionCounts[s] == 0) continue;
-                for (int k = 0; k < 3; k++)
+                for (int k = 0; k < Rules.RandomTickSpeed; k++)
                 {
                     int r = Rand.Next(4096);
                     int lx = r & 15, lz = (r >> 4) & 15, ly = (r >> 8) + s * 16;
@@ -583,6 +646,7 @@ public sealed partial class World : IBlockAccess
                     }
                 }
             }
+        AddBorderBoxes(box, res);
         return res;
     }
 

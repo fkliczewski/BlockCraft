@@ -52,6 +52,7 @@ public static class GuiDraw
         if (it.IsFood) t += "\n§7Głód: +" + it.Hunger;
         if (it.MaxDamage > 0) t += $"\n§7Wytrzymałość: {it.MaxDamage - s.Damage} / {it.MaxDamage}";
         if (adv) t += $"\n§8#{s.Id}" + (s.Damage > 0 && it.MaxDamage == 0 ? "/" + s.Damage : "");
+        t += Cmd.Adventure.Tooltip(s);
         return t;
     }
 }

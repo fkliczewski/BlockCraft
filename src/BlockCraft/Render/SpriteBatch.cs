@@ -198,6 +198,7 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
             if (c == '§' && i + 1 < s.Length)
             {
                 char k = char.ToLowerInvariant(s[++i]);
+                if (k is >= 'k' and <= 'o') continue;
                 int idx = "0123456789abcdef".IndexOf(k);
                 uint nc = idx >= 0 ? (Hex(Codes[idx], (int)(a * 255))) : color;
                 col = isShadow ? Shadow(nc) : nc;

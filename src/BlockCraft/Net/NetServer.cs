@@ -164,6 +164,7 @@ public sealed partial class NetServer
             case C2S.EnchantItem: c.EnchantItem(r.ReadByte(), r.ReadByte()); break;
             case C2S.AnvilName: c.AnvilName(r.ReadByte(), r.ReadString()); break;
             case C2S.UpdateSign: c.UpdateSign(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), new[] { r.ReadString(), r.ReadString(), r.ReadString(), r.ReadString() }); break;
+            case C2S.CommandBlock: Cmd.CommandBlocks.Update(c.P, r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadString(), r.ReadBoolean()); break;
             case C2S.CreativeSlot: c.CreativeSlot(r.ReadInt16(), r.ReadStack()); break;
             case C2S.CreativeDrop: { var s = r.ReadStack(); if (c.P.Creative && s != null) c.P.DropStack(s, false); break; }
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;
@@ -204,7 +205,6 @@ public sealed partial class NetServer
         Log.Info($"Sieć: zalogowano {name} ({c.Conn.PeerKey})");
     }
 
-    private static readonly HashSet<string> FreeCommands = new() { "help", "me", "say", "list", "seed", "tell", "msg" };
 
     private void Chat(RemoteClient c, string s)
     {
@@ -213,8 +213,6 @@ public sealed partial class NetServer
         if (s.Length > 256) s = s[..256];
         if (s.StartsWith("/"))
         {
-            string cmd = s[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant() ?? "";
-            if (!FreeCommands.Contains(cmd) && !Ops.Contains(c.Conn.PeerKey)) { c.OnMessage("§cTylko host i operatorzy mogą używać tej komendy."); return; }
             c.P.IsLocalOp = Ops.Contains(c.Conn.PeerKey);
             Log.Info($"[CHAT] {c.Name}: {s}");
             _actor = null;

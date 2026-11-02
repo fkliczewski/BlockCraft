@@ -385,6 +385,7 @@ public abstract partial class LivingEntity : Entity
         Dead = true;
         AchievementList.Killed(this, src);
         Bl2Stats.Killed(this, src);
+        DeathHook?.Invoke(this, src);
         Health = 0;
         UnpredictedSound = true;
         try { World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f); }
@@ -392,7 +393,7 @@ public abstract partial class LivingEntity : Entity
         if (!World.IsRemote && this is not Player)
         {
             bool byPlayer = RecentlyHitByPlayer > 0;
-            DropLoot(byPlayer, FireTicks > 0);
+            if (World.Rules.DoMobLoot) DropLoot(byPlayer, FireTicks > 0);
             if (byPlayer && XpValue > 0) World.SpawnXp(X, Y + 0.5, Z, XpValue);
         }
     }

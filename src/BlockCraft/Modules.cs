@@ -17,7 +17,8 @@ namespace BlockCraft.Render
         static partial void TexMobs();
         static partial void TexMechanics();
         static partial void TexBl2();
-        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); TexBl2(); }
+        static partial void TexCommands();
+        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); TexBl2(); TexCommands(); }
     }
 }
 
@@ -31,7 +32,8 @@ namespace BlockCraft.World
         static partial void BlocksMobs();
         static partial void BlocksMechanics();
         static partial void BlocksBl2();
-        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); BlocksBl2(); }
+        static partial void BlocksCommands();
+        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); BlocksBl2(); BlocksCommands(); }
     }
 }
 
@@ -73,11 +75,12 @@ namespace BlockCraft.Entities
         static partial void EntitiesMobs();
         static partial void EntitiesMechanics();
         static partial void EntitiesBl2();
+        static partial void EntitiesCommands();
 
         public static void Init()
         {
             if (_init) return; _init = true;
-            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics(); EntitiesBl2();
+            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics(); EntitiesBl2(); EntitiesCommands();
         }
 
         /// <summary>Klucze encji, które są mobami (do /summon, jajek spawnu i spawnera).</summary>

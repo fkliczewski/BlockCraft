@@ -32,6 +32,7 @@ public sealed partial class Game
         if (_args.Contains("--mo")) { SetupAutotestMobs(); return; }
         if (_args.Contains("--ow")) { SetupAutotestOverworld(); return; }
         if (_args.Contains("--me")) { SetupAutotestMechanics(); return; }
+        if (_args.Contains("--cmd")) { SetupAutotestCommands(); return; }
         if (_args.Contains("--snd")) { SetupAutotestSound(); return; }
         if (_args.Contains("--bl2")) { SetupAutotestBl2(); return; }
         int t0 = 0;

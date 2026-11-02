@@ -35,6 +35,7 @@ public enum C2S : byte
     UpdateSign = 15,    // int x,y,z, 4 x string
     Beacon = 17, // byte okno, int primary, int secondary; rozlicza host
     OpenInventory = 16, // otwarcie lokalnego ekwipunku; wyłącznie wyzwalacz openInventory
+    CommandBlock = 18,  // int x,y,z,entityId (-1 blok), string komenda, bool trackOutput
     EditBook = 40,      // BL2: bool podpis, string tytuł, short n, n x string strona (MC|BEdit / MC|BSign); rozlicza host
     RequestStats = 41,  // BL2: prośba o statystyki (C16 REQUEST_STATS)
 }
@@ -78,6 +79,7 @@ public enum S2C : byte
     BlockBreakAnim = 34,// int id kopiącego, int x,y,z, sbyte etap pęknięcia 0-9 (-1 koniec); świat odbiorcy (S25PacketBlockBreakAnim)
     EntityLinks = 35,   // int id, int pojazd (RidingEntity), int wierzchowiec (Player.RidingMob / Mob.Vehicle), int trzymający smycz; -1 brak (S1BPacketEntityAttach)
     Statistics = 40,    // BL2: int len, bajty (int n, n x (string klucz, int wartość)) - S37PacketStatistics
+    CommandUi = 36,     // byte rodzaj: 0 tytul, 1 edytor bloku polecen
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>
