@@ -13,3 +13,6 @@ node_modules/
 
 # Modus Operandi (stan lokalny)
 .modus/
+
+# mTiles workspace state
+.agents/skills/mtiles-database/
