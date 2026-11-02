@@ -697,3 +697,56 @@ zgodności graficznej 1:1. Alfa 1.0, instalacje i komputer brata nietknięte.
 Użytkownik polecił: „zapisz stan prac i na teraz pauza”. Nie rozpoczęto kroku58.
 Następne: naprawić limity oczekiwania NE zależne od FPS (58), domknąć zbiorcze
 53/39/40 i przeprowadzić integrację41 wraz z aktualizacją README/CHECKLISTA.
+
+### 2026-11-02 - BL2 (mc18/blocks2): skrzynia Endu, doniczka, książki, bariera, statystyki
+
+Gałąź `mc18/blocks2` (od feature/mc18, commity 4b7780f, 1d8a8f9, 81c0016 i ten raport). Kod w osobnych plikach:
+`World/Blocks2/Bl2Blocks.cs`, `Items/Blocks2/Books.cs`, `Entities/Blocks2/Bl2Stats.cs`, `Gui/Blocks2/BookScreen.cs`,
+`Gui/Blocks2/StatsScreen.cs`, `Render/Blocks2/Bl2Render.cs`, `Net/Bl2Net.cs`, `Bl2SelfTest.cs`, `GameAutotestBl2.cs`.
+Nowe haki w `Modules.cs`: `TexBl2`, `BlocksBl2`, `ItemsBl2`, `RecipesBl2`, `EntitiesBl2` (po ME). TypeId TE: 80 skrzynia Endu,
+81 doniczka. GuiKind skrzyni Endu: `(GuiKind)70` (rejestracja w ContainerFactory). Protokół sieci podbity do 9:
+C2S.EditBook = 40, C2S.RequestStats = 41, S2C.Statistics = 40 (numery wysokie, żeby nie zderzyć się z innymi pionkami).
+
+- Skrzynia Endu (211): twardość 22.5, odporność setResistance(1000) zapisana w skali BlockCraft jako 600 (= 3000 / 5, jak
+  obsydian 1200), światło 7, kilof poziom 0, drop 8 obsydianu, jedwabny dotyk daje skrzynię, receptura 8 obsydianu + oko
+  Endu. Wspólny ekwipunek 27 slotów `Player.EnderInventory` (zapis w PlayerData.EnderItems), osobny dla każdego gracza,
+  blok nad skrzynią blokuje otwarcie, odejście dalej niż 8 bloków i zniszczenie zamyka GUI. Wieko jak TileEntityEnderChest
+  (0.1 na tick, 1 - (1-f)^3), dźwięki random.chestopen/chestclosed, 3 cząsteczki portalu w randomDisplayTick. W sieci host
+  liczy patrzących (numPlayersUsing w synchronizacji TE), klient animuje wieko własnym tickiem (świat klienta nie tickuje TE).
+- Doniczka (218, przedmiot 491): stawianie jak ItemReed na stałym podłożu, receptura 3 cegły, PPM wkłada kwiaty (oba
+  rodzaje z meta), sadzonki 6 drzew, grzyby, kaktus, martwy krzak, paproć; wyjąć można tylko niszcząc (jak 1.8). TE
+  ItemId + Data, drop doniczki i rośliny, wybór bloku daje roślinę, stare meta 1-13 (np. 7 w chatce czarownicy) zamieniane
+  na zawartość. Rośliny w przebiegu encji: dwie płaszczyzny 45 stopni (flower_pot_cross z rescale), kaktus jako prostopadłościan,
+  paproć barwiona kolorem trawy biomu.
+- Książka z piórem (486) i napisana książka (487): receptura książka + atrament (barwnik meta 0) + pióro, GuiScreenBook
+  (do 50 stron, 256 znaków i 128 pikseli wysokości na stronę, Enter = nowa linia, Ctrl+V), podpisywanie (tytuł do 16 znaków,
+  autor = nick), czytanie, NBT pages/title/author/generation/resolved, kopiowanie w craftingu (RecipeBookCloning: oryginał
+  zostaje, generacja 0 -> 1 -> 2, kopii kopii nie da się kopiować; hak KeepSlotHook łączony z hakiem sztandarów). Sieć:
+  C2S.EditBook jak MC|BEdit/MC|BSign, host sprawdza książkę w ręce i limity.
+- Bariera (220): niewidzialna, hardness -1, odporność 3600000, nic nie wypada, tylko /give; w kreatywnym z barierą w ręce
+  cząsteczka BARRIER (doVoidFogParticles: 1000 losowych bloków w promieniu 16 co tick, ikona przez 80 ticków).
+- Statystyki 1.8: 48 ogólnych w kolejności StatList (odległości wg addMovementStat/addMountedMovementStat, upadki od 2 bloków,
+  skoki, wyrzucone (Q), zadane/otrzymane obrażenia x10, śmierci, zabite moby/gracze, czas gry i od śmierci, interakcje z
+  blokami przez Player.OpenBlockGui, skrzynie Endu, doniczki, wyjścia z gry), bloki (stat.mineBlock tylko przy udanym
+  zbiorze), przedmioty (craftItem także z pieca, useItem, breakItem), moby z jajkiem spawnu (killEntity, entityKilledBy).
+  Zapis w PlayerData.Statistics. Ekran z menu pauzy (przycisk "Statystyki" obok "Osiągnięcia"): zakładki Ogólne / Bloki /
+  Przedmioty / Moby, sortowanie kolumn kliknięciem, przewijanie. W sieci liczy tylko host, klient prosi o kopię przy otwarciu.
+- Haki w plikach wspólnych (jedna linia każdy): Player (tick, ruch, skok, upadek, zniszczenie narzędzia, obrażenia, atak,
+  OpenBlockGui, FinishUsing), LivingEntity.OnDeath, PlayerController (kopanie, użycie, wybór bloku doniczki), Game (Q, tick
+  klienta, wyjście), Inventory (wyjście pieca), NetServer/NetClient/RemoteClient (pakiety, rozłączenie), Screens (menu pauzy).
+
+Testy: `dotnet build -c Release` 0 błędów (4 wcześniejsze ostrzeżenia); `--selftest` 1000 OK / 0 FAIL (74 nowe testy BL2,
+w tym host + gość w pamięci: skrzynia Endu gościa, wieko u klienta, doniczka, edycja i podpis książki, odrzucenie pakietu bez
+książki, statystyki u klienta, wyjście z gry); `--missing` bez EnderChest/FlowerPot/Barrier/WritableBook/WrittenBook/
+FlowerPotItem (zostaje tylko CommandBlock innego pionka); `--autotest --bl2`: BL2-TEST KONIEC: OK, 16 zrzutów bl2_*.png
+obejrzanych (skrzynie zamknięta/otwarta/obrócona, 8 doniczek, GUI skrzyni, cząsteczki bariery, edycja/podpis/czytanie
+książki, ikony, menu pauzy, 4 zakładki statystyk).
+
+Ograniczenia względem 1:1: tekstury skrzyni Endu, doniczki, ikon książek i bariery z client.jar 1.8, gdy jest w cache
+(inaczej proceduralne); skrzynia renderowana kaflami terenu ułożonymi z entity/chest/ender.png, nie modelem 64x64.
+GUI książki i statystyk rysowane prostokątami i tekstem (bez gui/book.png i ikon stats_icons.png). Strony książki trzymane
+jako zwykły tekst (1.8 zapisuje podpisane strony jako JSON), maks. stos napisanej książki 1 jak ItemEditableBook 1.8.
+Statystyki bez osiągnięcia "onARail" z odległości wagonikiem i bez części liczników należących do innych modułów
+(rozmnażanie, osadnicy, ciasto, kocioł, bloki nutowe, płyty, sztandary w kotle) - klucze i nazwy są, moduły mogą wołać
+`Bl2Stats.Add(gracz, "stat.cakeSlicesEaten")` itd. Użycie przedmiotów liczone w PlayerController/FinishUsing, nie w każdej
+klasie przedmiotu jak w 1.8 (łuk bez osobnego licznika przy strzale). Brak testu przez publiczny relay.
