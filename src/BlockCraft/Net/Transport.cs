@@ -81,6 +81,7 @@ public sealed class LoopbackConnection : QueuedConnection
 {
     private LoopbackConnection _other;
     private readonly CancellationTokenSource _cts = new();
+    private Task _sendTask = Task.CompletedTask;
 
     public static (LoopbackConnection a, LoopbackConnection b) Pair(string nameA, string nameB)
     {
@@ -93,7 +94,7 @@ public sealed class LoopbackConnection : QueuedConnection
 
     private void Start()
     {
-        _ = Task.Run(() => SendLoop(_ => Task.FromResult<Func<byte[], CancellationToken, ValueTask>>((f, c) =>
+        _sendTask = Task.Run(() => SendLoop(_ => Task.FromResult<Func<byte[], CancellationToken, ValueTask>>((f, c) =>
         {
             if (!_other.IsClosed) _other.Received(f);
             return ValueTask.CompletedTask;
@@ -103,8 +104,14 @@ public sealed class LoopbackConnection : QueuedConnection
     public override void Close(string reason)
     {
         MarkClosed(reason);
-        _other.MarkClosed("Druga strona zamknęła połączenie");
-        _cts.CancelAfter(200);
+        // najpierw dopycha ostatnie ramki (np. powód kicka), dopiero potem zamyka drugą stronę
+        var other = _other;
+        _ = Task.Run(async () =>
+        {
+            await Task.WhenAny(_sendTask, Task.Delay(200));
+            other.MarkClosed("Druga strona zamknęła połączenie");
+            _cts.Cancel();
+        });
     }
 }
 
