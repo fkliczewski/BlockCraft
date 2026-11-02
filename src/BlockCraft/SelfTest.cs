@@ -74,6 +74,7 @@ public static partial class SelfTest
         try { TestSkulls(); } catch (Exception e) { Check(false, "Czaszki", e.ToString()); }
         try { TestBoat(); } catch (Exception e) { Check(false, "Łódka", e.ToString()); }
         try { TestSigns(); } catch (Exception e) { Check(false, "Tabliczki", e.ToString()); }
+        try { TestBl2(); } catch (Exception e) { Check(false, "BL2", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }

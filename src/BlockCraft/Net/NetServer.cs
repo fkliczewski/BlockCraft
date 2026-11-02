@@ -113,6 +113,7 @@ public sealed partial class NetServer
     {
         Log.Info("Sieć: " + c.Name + " rozłączony: " + reason);
         Clients.Remove(c);
+        if (c.P != null) Entities.Bl2Stats.Add(c.P, "stat.leaveGame");
         SavePlayer(c);
         RemovePuppet(c);
         Main.BroadcastMessage("§e" + c.Name + " opuścił grę");
@@ -166,6 +167,8 @@ public sealed partial class NetServer
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;
             case C2S.Respawn: c.Respawn(); break;
             case C2S.OpenInventory: c.P.AwardAchievement("openInventory"); break;
+            case C2S.EditBook: c.EditBook(r); break;
+            case C2S.RequestStats: c.SendStatistics(); break;
             case C2S.KeepAlive: c.P.Ping = (int)Math.Clamp(Environment.TickCount64 - r.ReadInt64(), 0, 99999); break;
         }
     }

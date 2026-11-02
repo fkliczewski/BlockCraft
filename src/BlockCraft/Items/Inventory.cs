@@ -166,6 +166,7 @@ public sealed class FurnaceOutputSlot : Slot
             f.StoredXp = 0;
             if (xp > 0) p.AddXp(xp);
         }
+        Entities.Bl2Stats.Crafted(p, taken);
         if (taken?.Id == I.IronIngot) p?.AwardAchievement("acquireIron");
         if (taken?.Id == I.CookedFish) p?.AwardAchievement("cookFish");
     }

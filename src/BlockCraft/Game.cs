@@ -297,6 +297,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     public void QuitToTitle()
     {
+        if (Player != null) Bl2Stats.Add(Player, "stat.leaveGame");
         NetShutdown();
         SaveWorld();
         Dimensions?.Dispose(); Dimensions = null;
@@ -430,6 +431,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                     if (s != null && !p.Spectator)
                     {
                         Client?.SendDrop(ctrl);
+                        Bl2Stats.Add(p, "stat.drop");
                         var drop = ctrl ? s.Copy() : s.CopyWith(1);
                         s.Count -= drop.Count; if (s.Count <= 0) p.Inventory.Selected = null;
                         p.DropStack(drop, false); p.SwingArm();
@@ -542,6 +544,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         UpdateDimensionChunks();
         Renderer.TickAnimations();
         Items.ItemAnimations.Tick(World, Player);
+        Bl2ClientTick();
         Renderer.TickParticles();
         // ekwipowanie
         _prevEquip = _equip;

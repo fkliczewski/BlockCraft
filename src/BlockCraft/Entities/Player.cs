@@ -84,6 +84,7 @@ public partial class Player : LivingEntity
         }
         else if (SleepTimer > 0) { SleepTimer++; if (SleepTimer >= 110) SleepTimer = 0; }
         base.Tick();
+        Bl2Stats.TickPlayer(this);
         if (Dead) return;
         if (!World.IsRemote) { FoodTick(); MapLogic.TickPlayer(this); TickAchievements(); }
         UseItemTick();
@@ -97,6 +98,7 @@ public partial class Player : LivingEntity
         double horiz = Math.Sqrt(dx * dx + dz * dz);
         if (horiz < 5)
         {
+            Bl2Stats.Moved(this, dx, dy, dz);
             if (InWater) AddExhaustion(0.015f * (float)Math.Sqrt(dx * dx + dy * dy + dz * dz));
             else if (OnGround) AddExhaustion((Sprinting ? 0.1f : 0.01f) * (float)horiz);
         }
@@ -139,6 +141,7 @@ public partial class Player : LivingEntity
     public override void Jump()
     {
         base.Jump();
+        Bl2Stats.Add(this, "stat.jump");
         AddExhaustion(Sprinting ? 0.8f : 0.2f);
     }
 
@@ -165,6 +168,7 @@ public partial class Player : LivingEntity
     protected override void OnFall(float distance)
     {
         if (AllowFlying || Flying) return;
+        Bl2Stats.Fell(this, distance);
         if (distance > 3)
         {
             int dmg = (int)Math.Ceiling(distance - 3 - (EffectLevel(Effect.JumpBoost) + 1));
@@ -258,6 +262,7 @@ public partial class Player : LivingEntity
         var s = ItemInUse; ItemInUse = null; ItemInUseCount = 0;
         if (s == null) return;
         var it = s.Item;
+        Bl2Stats.Used(this, s.Id);
         if (it.IsFood)
         {
             Eat(s);
@@ -314,6 +319,7 @@ public partial class Player : LivingEntity
         if (s == null) return;
         if (s.DamageItem(amount) || s.Count <= 0)
         {
+            Bl2Stats.Add(this, Bl2Stats.Break + s.Id);
             Inventory.Selected = null;
             World.PlaySound("break", X, Y, Z, 0.8f, 0.8f + World.Rand.NextFloat() * 0.4f);
         }
@@ -340,7 +346,7 @@ public partial class Player : LivingEntity
     // ---------- interakcje ----------
     public void SendMessage(string msg) => Handler?.OnMessage(msg);
 
-    public void OpenBlockGui(GuiKind kind, int x, int y, int z) => Handler?.OpenBlockGui(kind, x, y, z);
+    public void OpenBlockGui(GuiKind kind, int x, int y, int z) { Handler?.OpenBlockGui(kind, x, y, z); Bl2Stats.OpenedGui(this, kind, x, y, z); }
 
     public void CloseContainer()
     {
@@ -447,7 +453,9 @@ public partial class Player : LivingEntity
     {
         if (Sleeping) WakeUp();
         AddExhaustion(0.3f);
+        float before = Health;
         base.DamageEntity(src, amount);
+        Bl2Stats.Damaged(this, before - Health);
     }
 
     /// <summary>Atak wręcz na encję.</summary>
@@ -470,6 +478,7 @@ public partial class Player : LivingEntity
         bool tempFire = false;
         if (fireAspect > 0 && le.FireTicks <= 0) { tempFire = true; le.SetFire(1); }
         bool hit = le.Attack(DamageSource.PlayerAttack(this), dmg);
+        if (hit) Bl2Stats.DealtDamage(this, dmg);
         if (!hit && tempFire) le.FireTicks = 0;
         if (hit)
         {
