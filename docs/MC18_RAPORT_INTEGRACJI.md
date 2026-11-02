@@ -750,3 +750,31 @@ Statystyki bez osiągnięcia "onARail" z odległości wagonikiem i bez części 
 (rozmnażanie, osadnicy, ciasto, kocioł, bloki nutowe, płyty, sztandary w kotle) - klucze i nazwy są, moduły mogą wołać
 `Bl2Stats.Add(gracz, "stat.cakeSlicesEaten")` itd. Użycie przedmiotów liczone w PlayerController/FinishUsing, nie w każdej
 klasie przedmiotu jak w 1.8 (łuk bez osobnego licznika przy strzale). Brak testu przez publiczny relay.
+
+### 2026-11-02 — integracja BL2 po przekazaniu sesji
+
+Scalono mc18/blocks2 (888cf16) do feature/mc18, commit scalenia 79cdd9e.
+Skrzynia Endu, doniczki, bariera, książki i statystyki przeszły Release
+(0 błędów, 4 dotychczasowe ostrzeżenia), selftest 1000/0 i autotest BL2.
+Obejrzano zrzuty skrzyń/doniczek, edycji książki i statystyk mobów.
+Dowody lokalne: .modus/integration-bl2-evidence.
+
+89d8d10 dodaje brakujące wyzwalacze stat.cakeSlicesEaten i stat.recordPlayed.
+Pięć nowych testów sprawdza rzeczywiste zjedzenie całego ciasta, odrzucenie
+kęsa u sytego gracza, włożenie płyty, zajętą szafę i brak naliczania u klienta.
+Zaklinanie miało już wyzwalacz stat.itemEnchanted. Selftest: 1005 OK / 0 FAIL,
+log .modus/integration-stats-selftest.txt. Pozostałe braki liczników z raportu
+BL2 nie są tym samym zamknięte.
+
+Pełny autotest ujawnił fałszywe oczekiwanie przy stawianiu: po wykopaniu liścia
+celownik trafiał dalej, a test sprawdzał nadal pierwsze wykopane pole.
+a51a72e sprawdza aktualny cel kontrolera oraz zużycie dokładnie jednej deski.
+Powtórzony --autotest --fps 60: kopanie/stawianie i wszystkie scenariusze RS OK,
+AUTOTEST DONE, brak FAIL/ERROR w logu tego przebiegu (19:35:19–19:35:48).
+Zrzut 06c_after_place obejrzany; dowody .modus/integration-full-retry-evidence.
+
+README i początek CHECKLISTA opisują obecny stan (548ba00).
+CMD i NET2 nadal pracują w osobnych worktree; nie zostały scalone w tej sesji.
+Przy scalaniu trzeba uzgodnić wersję i numery pakietów: BL2 używa protokołu9,
+C2S.EditBook40/RequestStats41 oraz S2C.Statistics40.
+Nie wydano jeszcze Alfa1.4 ani nie scalono do main. Alfa1.0 pozostaje bez zmian.
