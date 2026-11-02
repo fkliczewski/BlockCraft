@@ -126,6 +126,8 @@ public sealed partial class World : IBlockAccess
     public readonly Dictionary<int, Entity> EntityById = new();
     /// <summary>Siatka przestrzenna encji z World.Entities (zapytania GetEntitiesInBox).</summary>
     public readonly EntityGrid Grid = new();
+    /// <summary>Licznik zmian bloków (SetBlock/SetBlockRemote): unieważnia podręczne dane eksplozji.</summary>
+    public long BlockVersion;
     public readonly List<Player> Players = new();
     private readonly List<Entity> _toAdd = new();
     private int _nextEntityId = 1;
@@ -205,7 +207,7 @@ public sealed partial class World : IBlockAccess
         byte old = c.Blocks[i]; int oldMeta = c.Meta[i];
         if (old == id && oldMeta == meta) return false;
         var ob = Block.ById[old]; var nb = Block.ById[id];
-        c.SetBlockRaw(lx, y, lz, id, meta);
+        c.SetBlockRaw(lx, y, lz, id, meta); BlockVersion++;
         c.Modified = true;
         if (ob.LightOpacity != nb.LightOpacity)
         {
@@ -252,7 +254,7 @@ public sealed partial class World : IBlockAccess
         byte old = c.Blocks[i];
         if (old == id && c.Meta[i] == meta) return;
         var ob = Block.ById[old]; var nb = Block.ById[id];
-        c.SetBlockRaw(lx, y, lz, id, meta);
+        c.SetBlockRaw(lx, y, lz, id, meta); BlockVersion++;
         if (ob.LightOpacity != nb.LightOpacity) c.RecalcHeight(lx, lz);
         Light.OnBlockChanged(x, y, z, ob, nb);
         if (old != id && ob.HasTileEntity && !nb.HasTileEntity) RemoveTileEntity(x, y, z);
@@ -679,6 +681,7 @@ public sealed partial class World : IBlockAccess
         public bool Hit; public int X, Y, Z, Face; public double HitX, HitY, HitZ, Distance;
     }
 
+    [ThreadStatic] private static List<AABB> _rayBoxes;
     public HitResult RayCast(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist, bool hitLiquids = false)
     {
         var res = new HitResult();
@@ -688,7 +691,7 @@ public sealed partial class World : IBlockAccess
         double tMaxY = dy != 0 ? ((stepY > 0 ? y + 1 - oy : oy - y) / Math.Abs(dy)) : double.MaxValue;
         double tMaxZ = dz != 0 ? ((stepZ > 0 ? z + 1 - oz : oz - z) / Math.Abs(dz)) : double.MaxValue;
         double tdX = dx != 0 ? 1 / Math.Abs(dx) : double.MaxValue, tdY = dy != 0 ? 1 / Math.Abs(dy) : double.MaxValue, tdZ = dz != 0 ? 1 / Math.Abs(dz) : double.MaxValue;
-        var boxes = new List<AABB>();
+        var boxes = _rayBoxes ??= new List<AABB>();
         for (int i = 0; i < 200; i++)
         {
             if (y >= 0 && y < Chunk.Height)

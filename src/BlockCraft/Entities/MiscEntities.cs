@@ -391,9 +391,9 @@ public sealed class ThrownEntity : Entity
     public override void SetNetData(int d) => Kind = d;
 }
 
-public static class Explosion
+public static partial class Explosion
 {
-    public static void Explode(World.World w, Entity source, double x, double y, double z, float power, bool breakBlocks)
+    public static void ExplodeReference(World.World w, Entity source, double x, double y, double z, float power, bool breakBlocks)
     {
         w.PlaySound("explode", x, y, z, 4f, (1f + (w.Rand.NextFloat() - w.Rand.NextFloat()) * 0.2f) * 0.7f);
         w.SpawnParticles(power >= 2 ? ParticleKind.Explosion : ParticleKind.LargeSmoke, x, y, z, 1, (int)(power * 10));
@@ -436,7 +436,7 @@ public static class Explosion
             double d = Math.Sqrt(ex * ex + ey * ey + ez * ez);
             if (d == 0) continue;
             ex /= d; ey /= d; ez /= d;
-            double exposure = Exposure(w, x, y, z, e.BoundingBox);
+            double exposure = ExposureReference(w, x, y, z, e.BoundingBox);
             double impact = (1 - dist) * exposure;
             float dmg = (float)((impact * impact + impact) / 2 * 8 * r2 + 1);
             if (e.CanBeAttacked) e.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
@@ -464,7 +464,7 @@ public static class Explosion
         }
     }
 
-    private static double Exposure(World.World w, double x, double y, double z, AABB bb)
+    internal static double ExposureReference(World.World w, double x, double y, double z, AABB bb)
     {
         int hit = 0, total = 0;
         for (double fx = 0; fx <= 1; fx += 0.5)

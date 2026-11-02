@@ -197,6 +197,7 @@ public sealed class OwGenRegion : IGenAccess
     {
         long key = MathUtil.ChunkKey(c.Cx, c.Cz);
         if (_writes.TryGetValue(key, out var edits)) foreach (var (index, state) in edits) { c.Blocks[index] = state.id; c.Meta[index] = state.meta; c.TileEntities.Remove(index); }
+        if (edits != null) c.InvalidateColumns();
         if (_tiles.TryGetValue(key, out var tiles)) foreach (var (index, plan) in tiles) plan.Apply(c, index);
         foreach (var e in Entities)
             if (((int)Math.Floor(e.X) >> 4) == c.Cx && ((int)Math.Floor(e.Z) >> 4) == c.Cz)
