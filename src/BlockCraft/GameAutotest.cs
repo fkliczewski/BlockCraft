@@ -73,6 +73,7 @@ public sealed partial class Game
         Step(10, () => Shot("09_inventory"));
         // kopanie i stawianie przez kontroler (jak myszką)
         int mx = 0, my = 0, mz = 0; byte before = 0;
+        int px = 0, py = 0, pz = 0, planksBefore = 0; bool placeHit = false;
         Step(5, () =>
         {
             SetScreen(null);
@@ -88,12 +89,22 @@ public sealed partial class Game
             byte now = World.GetBlock(mx, my, mz);
             Log.Info($"AUTOTEST mine: {(now != before ? "OK" : "FAIL")} ({Block.Get(before).Key} -> {Block.Get(now).Key}), inv dirt={Player.Inventory.CountOf(B.Dirt)}");
             Player.Inventory.SelectedSlot = 1;
-            _rightPressed = true;
+            // Po wykopaniu liścia promień trafia dalej. Sprawdzamy pole kliknięcia,
+            // nie zakładamy, że nowa deska zastąpi pierwszy wykopany blok.
+            Ctrl.UpdateTarget(1f);
+            var hit = Ctrl.Hit;
+            placeHit = hit.Hit;
+            px = hit.X; py = hit.Y; pz = hit.Z;
+            if (placeHit && !Block.Get(World.GetBlock(px, py, pz)).Replaceable)
+            { px += Dir.X[hit.Face]; py += Dir.Y[hit.Face]; pz += Dir.Z[hit.Face]; }
+            planksBefore = Player.Inventory.CountOf(B.OakPlanks);
+            Ctrl.TickRight(true);
         });
         Step(10, () =>
         {
-            byte now = World.GetBlock(mx, my, mz);
-            Log.Info($"AUTOTEST place: {(now == B.OakPlanks ? "OK" : "FAIL")} ({Block.Get(now).Key}), planks left={Player.Inventory.CountOf(B.OakPlanks)}");
+            byte now = World.GetBlock(px, py, pz);
+            int left = Player.Inventory.CountOf(B.OakPlanks);
+            Log.Info($"AUTOTEST place: {(placeHit && now == B.OakPlanks && left == planksBefore - 1 ? "OK" : "FAIL")} ({Block.Get(now).Key} at {px} {py} {pz}), planks left={left}");
             Shot("06c_after_place");
         });
         Step(5, () =>
