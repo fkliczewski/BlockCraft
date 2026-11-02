@@ -34,7 +34,41 @@ public static partial class SelfTest
         TestBl2FlowerPot();
         TestBl2Books();
         TestBl2Stats();
+        TestBl2InteractionStats();
         TestBl2Net();
+    }
+
+    private static void TestBl2InteractionStats()
+    {
+        var w = MakeWorld(225, WorldType.Superflat, 1);
+        var p = new Player(w);
+        w.SetBlock(8, 4, 8, B.Cake);
+        p.FoodLevel = 20;
+        Block.Get(B.Cake).OnActivated(w, 8, 4, 8, p);
+        Check(Bl2Stats.Get(p, "stat.cakeSlicesEaten") == 0, "Statystyki: syty gracz nie zalicza kęsa");
+        p.FoodLevel = 0;
+        for (int i = 0; i < 7; i++) Block.Get(B.Cake).OnActivated(w, 8, 4, 8, p);
+        Check(Bl2Stats.Get(p, "stat.cakeSlicesEaten") == 7 && w.GetBlock(8, 4, 8) == B.Air,
+            "Statystyki: siedem rzeczywistych kęsów ciasta");
+        w.SetBlock(10, 4, 8, B.Jukebox);
+        p.Inventory.Selected = new ItemStack(I.RecordCat);
+        var record = p.Inventory.Selected;
+        bool inserted = Item.ById[record.Id].UseOnBlock(p, record, 10, 4, 8, Dir.Up, .5, 1, .5);
+        Check(inserted && Bl2Stats.Get(p, "stat.recordPlayed") == 1, "Statystyki: włożenie płyty zalicza odtworzenie");
+        record = new ItemStack(I.RecordCat);
+        bool rejected = !Item.ById[record.Id].UseOnBlock(p, record, 10, 4, 8, Dir.Up, .5, 1, .5);
+        Check(rejected && Bl2Stats.Get(p, "stat.recordPlayed") == 1, "Statystyki: zajęta szafa nie zalicza drugiej płyty");
+        var hostWorld = w;
+        w = new World.World(225, WorldType.Superflat, true);
+        foreach (var entry in hostWorld.Chunks) w.Chunks[entry.Key] = entry.Value;
+        p = new Player(w);
+        w.SetBlock(12, 4, 8, B.Cake);
+        p.FoodLevel = 0;
+        Block.Get(B.Cake).OnActivated(w, 12, 4, 8, p);
+        w.SetBlock(14, 4, 8, B.Jukebox);
+        Item.ById[record.Id].UseOnBlock(p, record, 14, 4, 8, Dir.Up, .5, 1, .5);
+        Check(Bl2Stats.Get(p, "stat.cakeSlicesEaten") == 0 && Bl2Stats.Get(p, "stat.recordPlayed") == 0,
+            "Statystyki: klient nie dolicza lokalnie ciasta ani płyt");
     }
 
     private static void TestBl2Barrier()

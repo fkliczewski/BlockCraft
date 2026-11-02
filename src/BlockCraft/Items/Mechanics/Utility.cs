@@ -85,6 +85,7 @@ namespace BlockCraft.Items
                     if (w.GetBlock(x, y, z) != B.Jukebox || w.GetMeta(x, y, z) != 0) return false;
                     if (w.IsRemote) return true;
                     JukeboxBlock.Insert(w, x, y, z, s.CopyWith(1));
+                    Bl2Stats.Add(p, "stat.recordPlayed");
                     if (!p.Creative) { s.Count--; if (s.Count <= 0) p.Inventory.Selected = null; }
                     return true;
                 };

@@ -31,6 +31,7 @@ public sealed class CakeBlock : Block, IComparatorSource
     private void Eat(World w,int x,int y,int z,Player p)
     {
         if(w.IsRemote||!p.CanEat(false))return;
+        Bl2Stats.Add(p,"stat.cakeSlicesEaten");
         p.FoodLevel=Math.Min(20,p.FoodLevel+2);p.Saturation=Math.Min(p.FoodLevel,p.Saturation+.4f);
         p.Inventory.Dirty=true;
         int bites=w.GetMeta(x,y,z);
