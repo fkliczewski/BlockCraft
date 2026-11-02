@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 9;
+    public const int Version = 10;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -75,6 +75,8 @@ public enum S2C : byte
     MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
     OpenSignEditor = 32,// int x,y,z
     MapData = 33,       // patrz MapSync: int id, skala, wymiar, środek, wersja, rodzaj, prostokąt pikseli, znaczniki
+    BlockBreakAnim = 34,// int id kopiącego, int x,y,z, sbyte etap pęknięcia 0-9 (-1 koniec); świat odbiorcy (S25PacketBlockBreakAnim)
+    EntityLinks = 35,   // int id, int pojazd (RidingEntity), int wierzchowiec (Player.RidingMob / Mob.Vehicle), int trzymający smycz; -1 brak (S1BPacketEntityAttach)
     Statistics = 40,    // BL2: int len, bajty (int n, n x (string klucz, int wartość)) - S37PacketStatistics
 }
 

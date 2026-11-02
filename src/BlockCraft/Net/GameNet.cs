@@ -57,6 +57,7 @@ public sealed partial class Game : INetClientHost
         Server = new NetServer(Dimensions?.Get(DimensionId.Overworld) ?? World)
         {
             HostPlayer = () => Player,
+            HostCtrl = () => Ctrl,
             ViewDistance = Math.Max(4, Settings.RenderDistance),
             DefaultGameMode = _level?.GameMode ?? 0,
         };
@@ -211,6 +212,7 @@ public sealed partial class Game : INetClientHost
             i.HitFx = (float)(h.HitX - h.X); i.HitFy = (float)(h.HitY - h.Y); i.HitFz = (float)(h.HitZ - h.Z);
         }
         _netLeftPressed = _netRightPressed = _netMiddle = false;
+        if (ArgsNetAutotest && _net2TestInput != null) i = _net2TestInput(i);
         return i;
     }
 

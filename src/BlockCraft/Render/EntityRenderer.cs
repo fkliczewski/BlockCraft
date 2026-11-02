@@ -414,7 +414,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         la.RX = MathF.Cos(limb * 0.6662f) * 2f * amt * 0.5f;
         rl.RX = MathF.Cos(limb * 0.6662f) * 1.4f * amt;
         ll.RX = MathF.Cos(limb * 0.6662f + MathF.PI) * 1.4f * amt;
-        if (e is Player { RidingMob: not null } || e is Mob { Vehicle: not null }) // ModelBiped.isRiding
+        if (e is Player { RidingMob: not null } || e is Mob { Vehicle: not null } || e.RidingEntity != null) // ModelBiped.isRiding (także łódka i wagonik)
         { ra.RX -= MathF.PI / 5f; la.RX -= MathF.PI / 5f; rl.RX = ll.RX = -MathF.PI * 2f / 5f; rl.RY = MathF.PI / 10f; ll.RY = -MathF.PI / 10f; }
         if (e.HeldItem != null || e is Player p && p.Inventory.Selected != null) ra.RX = ra.RX * 0.5f - MathF.PI / 10f;
         float swing = e.PrevSwingProgress + (e.SwingProgress - e.PrevSwingProgress) * pt;
@@ -505,11 +505,13 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
                     else root = Matrix4.CreateScale(0.9375f) * root;
                     Skin.Layer = SkinGen.Get("steve");
                     Biped(e, pt, limb, amt, age, headYaw, pitch, _head, _body, _rArm, _lArm, _rLeg, _lLeg, false, 4);
+                    // ModelBiped.heldItemRight = 3: blokowanie mieczem
+                    if (pl.ItemInUse != null && pl.ItemInUse.Item?.Action == UseAction.Block) _rArm.RX -= MathF.PI / 5f;
                     if (pl.ItemInUse?.Id == I.Bow) { _rArm.RY = -0.1f + _head.RY; _lArm.RY = 0.1f + _head.RY + 0.4f; _rArm.RX = -MathF.PI / 2f + _head.RX; _lArm.RX = -MathF.PI / 2f + _head.RX; }
                     foreach (var part in new[] { _head, _body, _rArm, _lArm, _rLeg, _lLeg }) RenderPart(Skin, part, root);
                     RenderArmorLayers(pl.Inventory.Armor, _head, _body, _rArm, _lArm, _rLeg, _lLeg, root);
                     var held = pl.Inventory.Selected;
-                    if (held != null) RenderHeld(held, _rArm, root);
+                    if (held != null) RenderHeld(held, _rArm, root, held.Id == I.FishingRod && pl.FishHook is { Removed: false } && TextureGen.Has("item_fishing_rod_cast") ? TextureGen.Layer("item_fishing_rod_cast") : -1);
                     break;
                 }
             case Zombie:
@@ -630,7 +632,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         Skin.Overlay = Vector4.Zero;
     }
 
-    private void RenderHeld(ItemStack s, ModelPart arm, Matrix4 root)
+    private void RenderHeld(ItemStack s, ModelPart arm, Matrix4 root, int sprite = -1)
     {
         // pozycja dłoni: koniec ramienia
         var m = Matrix4.Identity;
@@ -647,7 +649,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
             im = Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(180)) * Matrix4.CreateRotationY(MathHelper.DegreesToRadians(-90)) * Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-60))
                  * Matrix4.CreateScale(0.7f) * Matrix4.CreateTranslation(0, 0.25f, -0.15f) * handM;
         var c = Terrain.Sky; Terrain.Sky = Skin.Sky; Terrain.Blk = Skin.Blk;
-        RenderItem(s, im);
+        if (sprite >= 0) RenderSpriteExtruded(sprite, im); // np. zarzucona wędka (RenderPlayer: fishing_rod_cast)
+        else RenderItem(s, im);
     }
 
     // ================= ręka w pierwszej osobie =================

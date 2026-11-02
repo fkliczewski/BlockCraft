@@ -32,6 +32,12 @@ try {
         Write-Output ($netRole + ': ' + $netResult)
         if (-not $netResult.StartsWith('OK ')) { throw ('Test ' + $netRole + ' nie powiódł się.') }
     }
+    foreach ($netSignal in @('net2-break-host-seen', 'net2-break-guest-seen', 'net2-crafted', 'net2-boat-riding', 'net2-boat-host-seen', 'net2-boat-done')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $netOutput $netSignal))) {
+            throw ('Brak potwierdzenia scenariusza NET2: ' + $netSignal)
+        }
+    }
+    Write-Output 'NET2: pęknięcia, wyposażenie, wytwarzanie, sterowanie łódką bez teleportów i wysiadanie OK.'
     Write-Output ('Logi i zrzuty: ' + $netOutput)
 }
 finally {

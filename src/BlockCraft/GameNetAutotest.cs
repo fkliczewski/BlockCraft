@@ -92,6 +92,7 @@ public sealed partial class Game
         Step(20, () => Shot("08_remote_player"));
         SetupNetWeatherHostTest();
         SetupNetEntityHostTest();
+        SetupNet2HostTest();
         Step(1, () => Server.Kick(Server.Clients.Single(c => c.P != null), "Test wyrzucania przez hosta"));
         WaitUntil(() => File.Exists(NetTestFile("disconnected")));
         WaitUntil(() => File.Exists(NetTestFile("rejoined")) && Server.Clients.Any(c => c.P != null));
@@ -117,6 +118,7 @@ public sealed partial class Game
         Step(20, () => { Shot("04_synced"); SendChat("NET-CLIENT-ACK"); NetTestSignal("verified"); });
         SetupNetWeatherJoinTest();
         SetupNetEntityJoinTest();
+        SetupNet2JoinTest();
         WaitUntil(() => Client == null && _screen is DisconnectedScreen);
         Step(15, () => { Shot("05_kicked"); NetTestSignal("disconnected"); });
         Step(10, () => SetScreen(new ConnectingScreen(new MultiplayerScreen(new TitleScreen()), null, "TestGuest")));
