@@ -495,7 +495,11 @@ public sealed partial class NetClient
         if (!W.Chunks.TryRemove(key, out var c)) return;
         c.Unloaded = true;
         foreach (var e in W.Entities.ToArray())
-            if (e != P && e is not DragonPart && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz) W.RemoveEntity(e);
+            if (e != P && e is not DragonPart && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz)
+            {
+                OnRemoved(e.Id);
+                W.RemoveEntity(e);
+            }
     }
 
     private void ApplyTile(int x, int y, int z, int type, byte[] data)
@@ -515,7 +519,7 @@ public sealed partial class NetClient
     {
         var w = W;
         if (id == P.Id) return;
-        if (w.EntityById.TryGetValue(id, out var old)) w.RemoveEntity(old);
+        if (w.EntityById.TryGetValue(id, out var old)) { OnRemoved(id); w.RemoveEntity(old); }
         Entity e = key == "player" ? new Player(w) { Name = string.IsNullOrEmpty(name) ? "?" : name } : EntitySerializer.Create(key, w);
         if (e == null) { Log.Error("Sieć: nieznany typ encji '" + key + "' (brak rejestracji w Registries?)"); return; }
         e.Id = id;

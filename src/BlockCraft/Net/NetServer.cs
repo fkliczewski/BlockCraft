@@ -90,8 +90,8 @@ public sealed partial class NetServer
 
     public void Shutdown(string reason)
     {
-        SavePlayers();
         foreach (var c in Clients.ToArray()) { c.Kick(reason); RemovePuppet(c); }
+        SaveNames();
         foreach (var c in _pending) c.Kick(reason);
         Clients.Clear(); _pending.Clear();
         foreach (var (w, t) in _taps) w.Listeners.Remove(t);
@@ -114,7 +114,6 @@ public sealed partial class NetServer
     {
         Log.Info("Sieć: " + c.Name + " rozłączony: " + reason);
         Clients.Remove(c);
-        SavePlayer(c);
         RemovePuppet(c);
         Main.BroadcastMessage("§e" + c.Name + " opuścił grę");
     }
@@ -123,6 +122,8 @@ public sealed partial class NetServer
     {
         if (c.P == null) return;
         try { c.P.CloseContainer(); c.P.InventoryContainer.OnClose(c.P); } catch { }
+        // Kursor i siatka wracają do ekwipunku przed zapisem, inaczej przepadają po powrocie gracza.
+        SavePlayer(c);
         c.P.World.RemoveEntity(c.P);
     }
 

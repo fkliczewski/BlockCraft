@@ -5,6 +5,8 @@ using BlockCraft.Gui;
 using BlockCraft.Items;
 using BlockCraft.Net;
 using BlockCraft.World;
+using Tailcat.TestSupport;
+using Tailcat.Link.Storage;
 
 namespace BlockCraft;
 
@@ -12,6 +14,47 @@ namespace BlockCraft;
 /// wygląd innych graczy, GUI, kontakt z blokami, odporność i podróże portalami. Host i dwóch gości w pamięci.</summary>
 public static partial class SelfTest
 {
+    /// <summary>Utrata datagramów pod uporządkowanym kanałem: przekaźnik połyka ruch, potem odnawia połączenie DERP.
+    /// Kanał ma dostarczyć pełne ramki w kolejności albo jawnie zakończyć sesję. Nie jest trwały między sesjami.</summary>
+    private static async Task TestNet2PacketLoss()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var ct = cts.Token;
+        await using var relay = new FakeDerpRelay();
+        var gw = new FakeRelayGatewayFactory(relay, null) { DirectPaths = false };
+        await using var host = await LinkHostService.StartAsync(LinkSetup.Options("host", gw, new InMemoryLinkStore()), ct);
+        await using var join = await LinkClientService.JoinAsync(await host.InviteAsync(ct), "Utrata", LinkSetup.Options("client", gw, new InMemoryLinkStore()), ct);
+        var receiver = join.Connection;
+        receiver.Send(new byte[] { 1 });
+        LinkConnection sender = null;
+        while (!host.NewConnections.TryDequeue(out sender)) await Task.Delay(10, ct);
+        while (!sender.TryReceive(out _)) await Task.Delay(10, ct);
+        // Czekamy także na kanał zwrotny, zanim przerwiemy trasę.
+        sender.Send(new byte[] { 2 });
+        while (!receiver.TryReceive(out _)) await Task.Delay(10, ct);
+        var key = host.Peers.Single().Key;
+        relay.Freeze(key);
+        var first = new byte[200_000]; new Random(91).NextBytes(first);
+        var second = new byte[] { 9, 8, 7, 6 };
+        sender.Send(first); sender.Send(second);
+        await Task.Delay(250, ct);
+        bool blocked = !receiver.TryReceive(out _);
+        Check(blocked, "Sieć2: zerwana trasa DERP rzeczywiście blokuje ramki (bez ścieżki bezpośredniej)");
+        relay.DisconnectClient(key);
+        var frames = new List<byte[]>();
+        var timer = Stopwatch.StartNew();
+        while (frames.Count < 2 && timer.ElapsedMilliseconds < 25000 && !receiver.IsClosed)
+        {
+            while (receiver.TryReceive(out var frame)) frames.Add(frame);
+            await Task.Delay(10, ct);
+        }
+        bool complete = frames.Count == 2 && frames[0].AsSpan().SequenceEqual(first) && frames[1].AsSpan().SequenceEqual(second);
+        bool ended = frames.Count == 0 && receiver.IsClosed;
+        Check(complete || ended, "Sieć2: utrata trasy DERP daje pełne ramki albo jawne rozłączenie",
+            $"ramki {frames.Count}, czas {timer.ElapsedMilliseconds} ms, {receiver.CloseReason}");
+        Console.WriteLine($"    Utrata DERP: {(ended ? "sesja zakończona, wymagany powrót gracza" : "pełne ramki po odnowieniu trasy")}, {timer.ElapsedMilliseconds} ms");
+    }
+
     /// <summary>Gość podłączony pętlą w pamięci: świat zdalny, gracz i wejście wysyłane co tick jak w Game.BuildInput.</summary>
     private sealed class NetGuest
     {
@@ -343,6 +386,13 @@ public static partial class SelfTest
         Check(dragon.Health < hp0, "Sieć2: gość trafia smoka w część ciała", $"{hp0} -> {dragon.Health}");
         BossStatus.BossName = null; A.Client.Tick();
         Check(BossStatus.BossName == dragon.DisplayName, "Sieć2: pasek zdrowia smoka u gościa");
+        // Oddalenie wysyła UnloadChunk przed RemoveEntities. Części muszą zniknąć także tą ścieżką.
+        rig.Move(A, 88.5, gy + 1, 5.5); rig.Step(6);
+        Check(!A.W.Entities.OfType<DragonPart>().Any() && A.Find<EnderDragon>(dragon.Id) == null,
+            "Sieć2: wyładowanie chunka smoka usuwa jego części");
+        rig.Move(A, 8.5, gy + 1, 5.5); rig.Step(12);
+        Check(A.Find<EnderDragon>(dragon.Id)?.Parts?.Length == 7 && A.W.Entities.OfType<DragonPart>().Count() == 7,
+            "Sieć2: powrót w zasięg tworzy dokładnie siedem części smoka");
         rig.Hw.RemoveEntity(dragon);
         rig.Step(4);
         Check(!A.W.Entities.OfType<DragonPart>().Any() && !A.W.Entities.OfType<EnderDragon>().Any(), "Sieć2: usunięcie smoka usuwa jego części u gościa");
@@ -552,6 +602,10 @@ public static partial class SelfTest
         A.Once = i => Click(i, boat);
         rig.Step(4);
         Check(pa.RidingEntity == boat, "Sieć2: gość w łódce przed rozłączeniem");
+        pa.OpenBlockGui(GuiKind.Crafting, 8, gy + 1, 19);
+        pa.OpenContainer.CraftGrid.Set(0, new ItemStack(B.OakLog, 2));
+        pa.Cursor = new ItemStack(I.Emerald, 3);
+        rig.Step(4);
         A.Client.Disconnect("test");
         rig.Step(4);
         Check(rig.Server.Clients.Count == 1 && boat.Passenger == null, "Sieć2: rozłączenie zwalnia łódkę");
@@ -563,6 +617,9 @@ public static partial class SelfTest
             "Sieć2: powrót gościa z tym samym kluczem przywraca ekwipunek");
         Check(pa2?.RidingEntity == boat && A2.P.RidingEntity?.Id == boat.Id, "Sieć2: po powrocie gość siedzi w tej samej łódce",
             $"host {pa2?.RidingEntity?.Id} gość {A2.P.RidingEntity?.Id} łódka {boat.Id}");
+        Check(A2.P.Inventory.CountOf(I.Emerald) == 3 && A2.P.Inventory.CountOf(B.OakLog) == 2
+            && pa2.Inventory.CountOf(I.Emerald) == 3 && pa2.Inventory.CountOf(B.OakLog) == 2,
+            "Sieć2: rozłączenie zachowuje kursor i siatkę wytwarzania dokładnie raz");
         A2.P.Sneaking = true; rig.Step(3); A2.P.Sneaking = false; rig.Step(4);
         boat.Kill();
         rig.Step(2);

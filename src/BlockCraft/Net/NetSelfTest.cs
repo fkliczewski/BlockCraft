@@ -466,7 +466,7 @@ public static partial class SelfTest
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await using var relay = new FakeDerpRelay();
-        var gw = new FakeRelayGatewayFactory(relay, null);
+        var gw = new FakeRelayGatewayFactory(relay, null) { DirectPaths = false };
         await using var host = await LinkHostService.StartAsync(LinkSetup.Options("host", gw, new InMemoryLinkStore()), cts.Token);
         string code = await host.InviteAsync(cts.Token);
         Check(!string.IsNullOrEmpty(code), "Tailcat: kod zaproszenia", code);
@@ -499,5 +499,6 @@ public static partial class SelfTest
         }
         Check(client.Login != null && server.Clients.Count == 1, "Tailcat: logowanie do gry", client.Error ?? "");
         server.Shutdown("koniec testu");
+        await TestNet2PacketLoss();
     }
 }
