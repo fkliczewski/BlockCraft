@@ -20,7 +20,7 @@ public static partial class SelfTest
             && gen.StructureMonsterAt(box.X0 - 1, 50, z) == null && gen.StructureMonsterAt(box.X1 + 1, 50, z) == null,
             "Guardian nie ma specjalnego spawnu pod, nad i obok monumentu");
         var entries = w.Spawner.EntriesAt(SpawnKind.Monster, x, 50, z);
-        Check(entries.Length == 1 && entries[0] is { Key: "guardian", Weight: 1, Min: 2, Max: 4 }, "Monument zastępuje listę potworów strażnikami 1/2–4");
+        Check(entries.Length == 1 && entries[0] is { Key: "guardian", Weight: 1, Min: 2, Max: 4 }, "Monument zastępuje listę potworów strażnikami 1/2-4");
         Check(!w.Spawner.EntriesAt(SpawnKind.Water, x, 50, z).Any(e => e.Key == "guardian")
             && BiomeSpawns.CountsAs(new Guardian(w), SpawnKind.Monster) && !BiomeSpawns.CountsAs(new Guardian(w), SpawnKind.Water),
             "Strażnik korzysta z limitu potworów i nie zastępuje wodnej listy kałamarnic");
@@ -29,7 +29,7 @@ public static partial class SelfTest
         Check(gen.StructureMonsterAt(788, 66, -285) == "witch" && gen.StructureMonsterAt(788, 63, -285) == null
             && gen.StructureMonsterAt(793, 66, -285) == null, "Specjalna lista wiedźm ograniczona do obszaru chatki");
         Check(w.Spawner.EntriesAt(SpawnKind.Monster, 788, 66, -285).Single() is { Key: "witch", Weight: 1, Min: 1, Max: 1 },
-            "Chatka zastępuje zwykłe potwory listą wiedźm 1/1–1");
+            "Chatka zastępuje zwykłe potwory listą wiedźm 1/1-1");
         var flat = new World.World(12345, WorldType.Superflat, false);
         var nether = new World.World(12345, WorldType.Default, false, DimensionId.Nether);
         Check(!flat.Spawner.EntriesAt(SpawnKind.Monster, x, 50, z).Any(e => e.Key == "guardian")

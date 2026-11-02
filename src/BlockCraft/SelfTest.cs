@@ -303,7 +303,7 @@ public static partial class SelfTest
         p.X = 0.5; p.MoveForward = 1; Ticks(w, 40); p.MoveForward = 0;
         Check(p.Z <= MathUtil.FloorToInt(p.Z) + 1 && p.CollidedH | true, "Kolizja ze ścianą", p.Z.ToString("F3"));
         Check(Math.Abs(p.Z + 0.3 - Math.Round(p.Z + 0.3)) < 0.01, "Stoi przy ścianie", p.Z.ToString("F3"));
-        // stopień 1 bloku – wejście skokiem
+        // stopień 1 bloku - wejście skokiem
         // upadek
         var p2 = SpawnPlayer(w, 10.5, 19, 10.5);
         Ticks(w, 80);

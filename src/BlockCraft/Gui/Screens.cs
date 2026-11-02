@@ -60,12 +60,12 @@ public sealed class HelpScreen : Screen
     {
         DrawDirtBackground();
         var sb = G.Sb;
-        sb.TextCentered("BlockCraft – sterowanie", W / 2f, 15, 0xFFFFFFFF);
+        sb.TextCentered("BlockCraft - sterowanie", W / 2f, 15, 0xFFFFFFFF);
         string[] lines =
         {
-            "WASD – ruch, Spacja – skok (2x w kreatywnym: latanie)", "Shift – kucanie (trzymanie krawędzi), Ctrl lub 2x W – sprint",
-            "LPM – kopanie / atak, PPM – stawianie / używanie, ŚPM – wybierz blok", "1-9 / kółko – pasek szybkiego wyboru, Q – wyrzuć przedmiot",
-            "E – ekwipunek, T – czat, / – komenda, Esc – pauza", "F1 – ukryj HUD, F2 – zrzut ekranu, F3 – debug, F5 – kamera, F11 – pełny ekran",
+            "WASD - ruch, Spacja - skok (2x w kreatywnym: latanie)", "Shift - kucanie (trzymanie krawędzi), Ctrl lub 2x W - sprint",
+            "LPM - kopanie / atak, PPM - stawianie / używanie, ŚPM - wybierz blok", "1-9 / kółko - pasek szybkiego wyboru, Q - wyrzuć przedmiot",
+            "E - ekwipunek, T - czat, / - komenda, Esc - pauza", "F1 - ukryj HUD, F2 - zrzut ekranu, F3 - debug, F5 - kamera, F11 - pełny ekran",
             "", "Komendy: /help, /time set day, /gamemode creative, /give @p diamond 64,", "/tp x y z, /summon zombie, /kill, /gamerule keepInventory true",
         };
         for (int i = 0; i < lines.Length; i++) sb.TextCentered(lines[i], W / 2f, 40 + i * 12, 0xFFE0E0E0);
@@ -104,7 +104,7 @@ public sealed class WorldSelectScreen : Screen
         sb.Fill(0, ListTop, W, ListBottom - ListTop, 0xC0000000);
         sb.TextCentered("Wybierz świat", W / 2f, 12, 0xFFFFFFFF);
         _play.Enabled = _sel >= 0; _del.Enabled = _sel >= 0;
-        if (_worlds.Count == 0) sb.TextCentered("Brak światów – stwórz nowy!", W / 2f, ListTop + 20, 0xFFA0A0A0);
+        if (_worlds.Count == 0) sb.TextCentered("Brak światów - stwórz nowy!", W / 2f, ListTop + 20, 0xFFA0A0A0);
         for (int i = 0; i < _worlds.Count; i++)
         {
             int y = ListTop + 4 + i * 36 - (int)_scroll;

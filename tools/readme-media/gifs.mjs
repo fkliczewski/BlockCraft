@@ -1,4 +1,4 @@
-// node gifs.mjs <folderShowcase> <folderWyjściowy> [szerokość] [scena1,scena2,...] – składa klatki z --showcase w GIF-y
+// node gifs.mjs <folderShowcase> <folderWyjściowy> [szerokość] [scena1,scena2,...] - składa klatki z --showcase w GIF-y
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';

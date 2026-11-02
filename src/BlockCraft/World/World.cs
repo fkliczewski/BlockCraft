@@ -240,7 +240,7 @@ public sealed partial class World : IBlockAccess
         if (notify && !IsRemote) NotifyNeighbors(x, y, z, c.Blocks[i]);
     }
 
-    /// <summary>Ustawienie bez logiki (sieć – klient).</summary>
+    /// <summary>Ustawienie bez logiki (sieć - klient).</summary>
     public void SetBlockRemote(int x, int y, int z, byte id, int meta)
     {
         if ((uint)y >= Chunk.Height) return;

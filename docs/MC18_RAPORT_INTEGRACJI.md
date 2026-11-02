@@ -287,7 +287,7 @@ deszcz gasi płonące encje i uwzględnia dach, biom oraz temperaturę.
 
 Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest: **516 OK, 0 FAIL**,
 w tym 15 nowych testów podstawy pogody i 2 testy komend pogody przez transport
-host–klient (`.modus/ow-weather-selftest.log`). Nie wykonano jeszcze testu
+host-klient (`.modus/ow-weather-selftest.log`). Nie wykonano jeszcze testu
 pogody w dwóch graficznych oknach przez relay.
 
 To nie jest ukończenie OW: pozostały grafika i dźwięk opadów, pioruny,
@@ -372,13 +372,13 @@ oknach przez relay. Wydanie BlockCraft_Gra nie jest jeszcze odświeżone.
 
 Podłączono `ChunkProviderGenerate.getPossibleCreatures` do naturalnego spawnera:
 wewnątrz monumentu lista potworów zawiera zwykłego guardiana (waga 1, grupa
-2–4), a w chatce wyłącznie wiedźmę (waga 1, grupa 1–1). Kategorie zwierząt,
+2-4), a w chatce wyłącznie wiedźmę (waga 1, grupa 1-1). Kategorie zwierząt,
 wodnych i nietoperzy zachowują listy biomów. Guardian należy do limitu
 potworów, mimo że jego umieszczenie wymaga wody, a nie podłoża lądowego.
 Istniejące zasady światła, kolizji, odległości od graczy i limitów pozostają.
 
 Do planów dodano odrębne obszary spawnu. Monument używa oryginalnego pudła
-58×23×58 (Y 39–61); rozszerzony obszar fundamentów i karczowania nie zwiększa
+58×23×58 (Y 39-61); rozszerzony obszar fundamentów i karczowania nie zwiększa
 zasięgu spawnu. Chatka pomija podpory poniżej bazowego Y. Lista jest ponownie
 sprawdzana przy każdym przesunięciu grupy, z tożsamością SpawnListEntry
 (wiedźma ze struktury nie przenosi wagi 1 do zwykłej listy biomu). Superflat
@@ -421,7 +421,7 @@ Release: 0 błędów, 4 istniejące ostrzeżenia. Selftest **569 OK, 0 FAIL**:
 przy dokładnie 70 potworach i po przekroczeniu limitu. Nadal przechodzą testy
 rzeczywistego naturalnego spawnu guardianów i wiedźm. Pełny `--autotest`
 zakończony `AUTOTEST DONE`; obejrzano ekran debug (54 FPS, 131 encji,
-97 wczytanych chunków w pojedynczym ujęciu — to nie jest benchmark wydajności).
+97 wczytanych chunków w pojedynczym ujęciu - to nie jest benchmark wydajności).
 Log uruchomienia nadal zawiera 4 wcześniejsze braki tekstur przedmiotów:
 baked_potato, poisonous_potato, pumpkin_seeds i melon_seeds. Nie wynikają
 ze zmiany spawnera; pozostają do integracji itemów/ME.
@@ -475,7 +475,7 @@ tekstury oraz opisane odstępstwo audio grzmotu. BlockCraft_Gra nadal wymaga
 odświeżenia przy końcowej integracji. Następny etap: ME, potem finalne testy
 i raport wraz z problemami orkiestracji.
 
-### 2026-11-01 — ME-h 39c, sztandary
+### 2026-11-01 - ME-h 39c, sztandary
 
 Dokończono WIP poprzedniej sesji: 16 kolorów, stojące sztandary (16 obrotów),
 ścienne (4 kierunki), 38 wzorów plus baza. Crafting dodaje do 6 warstw;
@@ -505,7 +505,7 @@ warstw w podpowiedzi przedmiotu. Nie deklaruję pełnej zgodności grafiki 1:1.
 Nowego przebiegu dwóch okien przez publiczny relay dla samych sztandarów nie
 wykonano. Alfa 1.0 w BlockCraft_Gra i komputer brata pozostały nietknięte.
 
-### 2026-11-01 — ME-h 39d, system osiągnięć
+### 2026-11-01 - ME-h 39d, system osiągnięć
 
 Dodano drzewo 34 osiągnięć z zależnościami i współrzędnymi AchievementList
 klienta 1.8 (javap tl). Reguła przyznawania wymaga odblokowanego rodzica;
@@ -543,7 +543,7 @@ diamentu jest obecnie śledzony w pamięci; nie utrzymuje się w upuszczonej enc
 po zapisie i ponownym wczytaniu świata. Te ograniczenia wykluczają deklarację
 pełnej zgodności osiągnięć 1:1. Wersji zainstalowanej u graczy nie podmieniano.
 
-### 2026-11-01 — ME-53a, ciasto i ryby
+### 2026-11-01 - ME-53a, ciasto i ryby
 
 Zarejestrowano I.CakeItem i B.Cake: receptura mleko/cukier/jajko/pszenica,
 stos 1, zwrot trzech wiader przy odbiorze, stawianie na litym podłożu,
@@ -571,7 +571,7 @@ Krok 53 podzielony na 54 (ten podetap), 55 wędkowanie, 56 czaszki i 57 latarnia
 Krok zbiorczy pozostaje otwarty. Wędkowanie nadal nie jest podłączone do wędki;
 czaszek i latarni nie rejestrowano w ramach tego podetapu. Alfa 1.0 nietknięta.
 
-### 2026-11-01 — ME-53b, wędkowanie
+### 2026-11-01 - ME-53b, wędkowanie
 
 Wędka tworzy jedną encję fishing_hook przypisaną do gracza. Spławik jest
 autorytatywny na hoście: rzut z rozrzutem, kolizja z blokiem lub encją, wypór
@@ -607,7 +607,7 @@ graczy. Generator losowy świata pozostaje BlockCraft.Rng; nie potwierdzono
 identycznej sekwencji RNG Minecrafta ani kompletnego porównania trajektorii.
 Spławik nie jest utrwalany w zapisie świata. Czaszki i latarnia: nadal kroki56/57.
 
-### 2026-11-01 — ME-53c, czaszki
+### 2026-11-01 - ME-53c, czaszki
 
 Zarejestrowano B.Skull, I.SkullItem (5 wariantów) i TE64 SkullTile.
 Stawianie na podłodze (16 obrotów, yaw bez przesunięcia o 180 stopni), czterech
@@ -659,11 +659,11 @@ z portalami, okiem Endu, smokiem, przywołaniem i walką z Witherem. Obejrzano
 ne_18_wither_spawn, dowody w .modus/skulls-ne60-evidence. Potwierdza to
 zależność testowych limitów od FPS; krok58 pozostaje do usunięcia tej zależności.
 
-### 2026-11-01 — ME-53d: latarnia (pauza na prośbę użytkownika)
+### 2026-11-01 - ME-53d: latarnia (pauza na prośbę użytkownika)
 
 Zarejestrowano blok B.Beacon i TE65 BeaconTile, przedmiot blokowy oraz recepturę
 5 szkła + gwiazda Netheru + 3 obsydianu. Piramidy z mieszanych bloków żelaza,
-złota, diamentów i szmaragdów, poziomy 1–4, kontrola przesłonięcia kolumny.
+złota, diamentów i szmaragdów, poziomy 1-4, kontrola przesłonięcia kolumny.
 Reguły sprawdzone przez javap oryginalnego client.jar 1.8 (bck i acl;
 bytecode w .modus/beacon-18-bytecode.txt i beacon-dyes-18-bytecode.txt).
 Efekty Speed/Haste, Resistance/JumpBoost, Strength i dodatkowa Regeneration
@@ -751,7 +751,7 @@ Statystyki bez osiągnięcia "onARail" z odległości wagonikiem i bez części 
 `Bl2Stats.Add(gracz, "stat.cakeSlicesEaten")` itd. Użycie przedmiotów liczone w PlayerController/FinishUsing, nie w każdej
 klasie przedmiotu jak w 1.8 (łuk bez osobnego licznika przy strzale). Brak testu przez publiczny relay.
 
-### 2026-11-02 — integracja BL2 po przekazaniu sesji
+### 2026-11-02 - integracja BL2 po przekazaniu sesji
 
 Scalono mc18/blocks2 (888cf16) do feature/mc18, commit scalenia 79cdd9e.
 Skrzynia Endu, doniczki, bariera, książki i statystyki przeszły Release
@@ -770,7 +770,7 @@ Pełny autotest ujawnił fałszywe oczekiwanie przy stawianiu: po wykopaniu liś
 celownik trafiał dalej, a test sprawdzał nadal pierwsze wykopane pole.
 a51a72e sprawdza aktualny cel kontrolera oraz zużycie dokładnie jednej deski.
 Powtórzony --autotest --fps 60: kopanie/stawianie i wszystkie scenariusze RS OK,
-AUTOTEST DONE, brak FAIL/ERROR w logu tego przebiegu (19:35:19–19:35:48).
+AUTOTEST DONE, brak FAIL/ERROR w logu tego przebiegu (19:35:19-19:35:48).
 Zrzut 06c_after_place obejrzany; dowody .modus/integration-full-retry-evidence.
 
 README i początek CHECKLISTA opisują obecny stan (548ba00).
@@ -778,3 +778,69 @@ CMD i NET2 nadal pracują w osobnych worktree; nie zostały scalone w tej sesji.
 Przy scalaniu trzeba uzgodnić wersję i numery pakietów: BL2 używa protokołu9,
 C2S.EditBook40/RequestStats41 oraz S2C.Statistics40.
 Nie wydano jeszcze Alfa1.4 ani nie scalono do main. Alfa1.0 pozostaje bez zmian.
+
+### 2026-11-02 - CMD: komendy Minecraft 1.8
+
+Gałąź `mc18/commands` otrzymała nowy rdzeń komend, selektory `@p/@a/@r/@e`,
+parser Mojangson i JSON, komendy bloków/encji/świata oraz model scoreboardu
+i granicy świata. Dodano `/scoreboard`, `/stats`, `/trigger`, `/worldborder`,
+blok poleceń z TE89 i wagonik z blokiem poleceń. Blok reaguje na zbocze
+narastające redstone, udostępnia wynik komparatorowi oraz zapisuje `SuccessCount`,
+`LastOutput`, `trackOutput` i ustawienia statystyk. Edycja zdalna działa przez
+hosta po protokole 9 (C2S.CommandBlock 18, S2C.CommandUi 34).
+
+Scoreboard zapisuje cele, wyniki, drużyny, sloty wyświetlania i wiązania `/stats`
+w `data/scoreboard.dat`; wyświetla sidebar, listę Tab i wynik pod nazwą gracza.
+Granica świata obsługuje zmianę średnicy w czasie, obrażenia, kolizję, blokadę
+stawiania, render ściany i ostrzegawczą winietę, a stan zapisuje w
+`data/worldborder.dat`. Tryb przygody respektuje `CanDestroy` i `CanPlaceOn`
+w NBT przedmiotu i pokazuje te tagi w podpowiedzi.
+
+Weryfikacja: `dotnet build -c Release` zakończony zerem błędów i czterema
+wcześniejszymi ostrzeżeniami kompilatora. Pełny `--selftest`: 1108 OK, 0 FAIL;
+CMD-only: 182 OK, 0 FAIL. `--missing` nie zgłasza CommandBlock. `--autotest --cmd`
+zakończył się komunikatem `AUTOTEST DONE`; wykonano i obejrzano pięć zrzutów
+sidebaru, title, ściany granicy, edytora i impulsu redstone. Test pętli host-gość
+sprawdza uprawnienia i zasięg edycji, synchronizację scoreboardu/granicy/title,
+GUI oraz wyrzucenie gracza.
+
+Pozostałe różnice wobec klienta 1.8: tekst JSON parsuje `clickEvent`, `hoverEvent`
+i `insertion`, ale czat nie obsługuje interakcji. Kody fontu `k-o` są ignorowane.
+Cząstki używają najbliższego dostępnego rodzaju, a parametry prędkości i trybu
+nie odwzorowują wszystkich zachowań vanilla. `/entitydata` zapisuje tylko pola
+obsługiwane przez modele encji BlockCraft. Kryteria `stat.*` aktualizują się
+z dostępnych statystyk gracza. Część nazw slotów `/replaceitem` (enderchest,
+koń) nie ma jeszcze magazynu w tej implementacji. Wynik serca w HUD Tab i
+proceduralny render granicy są uproszczone. Test sieci używa pętli lokalnej,
+nie publicznego przekaźnika.
+
+Commity `b3407e9`, `5bb5dc7` i `c96deef` wypchnięto na `mc18/commands`.
+Gałąź nie została scalona z `feature/mc18`; integrację wykonuje master.
+Logi testów i obejrzane PNG pozostawiono w `.modus/cmd-evidence`.
+
+### 2026-11-02 - integracja fali 2: NET2 i CMD
+
+Scalono `mc18/net2` (5be1cf9) jako 0ceded8 oraz `mc18/commands` (c96deef, b7f3201)
+jako 32f07aa i commit raportu. Konflikty dotyczyły tylko numerów pakietów,
+haków modułów i zapisu gracza przy rozłączeniu:
+
+- wspólny `Protocol.Version = 10` (BL2, NET2 i CMD miały osobno 9);
+- S2C: 34 BlockBreakAnim i 35 EntityLinks (NET2), 36 CommandUi (CMD, przeniesione z 34),
+  40 Statistics (BL2); C2S: 18 CommandBlock, 40 EditBook, 41 RequestStats;
+- `RemovePuppet` zamyka okna i dopiero wtedy zapisuje gracza (NET2), licznik
+  `stat.leaveGame` z BL2 zostaje w `Disconnected`, `Shutdown` bez wcześniejszego `SavePlayers`;
+- `Modules.cs`: haki `*Bl2` i `*Commands` wołane po kolei, `LivingEntity.OnDeath` woła
+  `Bl2Stats.Killed` i `DeathHook` (scoreboard).
+
+Test `CMD sieć powód kick` w pełnym selfteście raz nie zdążył w 2 tickach (osobno
+przechodził 3/3); teraz czeka na rozłączenie do 50 ticków.
+
+Weryfikacja po scaleniu: Release 0 błędów (4 stare ostrzeżenia), `--selftest`
+1262 OK / 0 FAIL; `--autotest --fps 60` AUTOTEST DONE bez FAIL/ERROR; moduły
+`--cmd --bl2 --ne --me --mo --ow` z `--fps 60` 0 FAIL; `tools/dev/Test-Net.ps1`
+(dwa procesy przez gry.fimson.pl) host i gość OK z wszystkimi sygnałami NET2
+(pęknięcia, wytwarzanie, łódka). Obejrzane zrzuty: sidebar i edytor bloku poleceń,
+gracz zdalny u hosta. Dowody: `.modus/net-e2e-integracja-fala2`.
+
+`/replaceitem` dla slotów enderchest można teraz podpiąć do `Player.EnderInventory`
+z BL2 (niezrobione). Merge do `main` czeka na akceptację Filipa.
