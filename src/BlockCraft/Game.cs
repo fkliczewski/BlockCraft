@@ -219,7 +219,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         var w = new World.World(level.Seed, (WorldType)level.Type, false)
         {
             Name = level.Name, AllowCheats = level.AllowCheats, Hardcore = level.Hardcore, DayTime = level.DayTime, TotalTime = level.Time,
-            Difficulty = (Difficulty)level.Difficulty, Storage = storage
+            Difficulty = (Difficulty)level.Difficulty, Storage = storage, DefaultGameMode = level.GameMode
         };
         foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString().ToLowerInvariant(), out _);
         if (level.RuleValues != null) foreach (var kv in level.RuleValues) w.Rules.Set(kv.Key, kv.Value, out _, true);
@@ -283,7 +283,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             _level.Weather = home.Weather;
             _level.SpawnX = home.SpawnX; _level.SpawnY = home.SpawnY; _level.SpawnZ = home.SpawnZ;
             _level.Difficulty = (int)World.Difficulty;
-            _level.GameMode = Player.GameMode;
+            _level.GameMode = home.DefaultGameMode;
             _level.Player = Player.ToData();
             _level.Rules = new Dictionary<string, bool>
             {

@@ -15,6 +15,15 @@ public static class Mojangson
     public static Nbt Parse(string s)
     {
         s = s.Trim();
+        int nesting = 0; bool quoted = false, escaped = false;
+        foreach (char ch in s)
+        {
+            if (escaped) { escaped = false; continue; }
+            if (quoted && ch == '\\') { escaped = true; continue; }
+            if (ch == '"') { quoted = !quoted; continue; }
+            if (!quoted && ch is '{' or '[' && ++nesting > 256) throw new CommandException("Tag danych jest zbyt głęboko zagnieżdżony");
+            if (!quoted && ch is '}' or ']') nesting--;
+        }
         if (!s.StartsWith('{')) throw new CommandException("Nieprawidłowy tag danych: musi zaczynać się od '{'");
         int i = 0;
         var v = Value(s, ref i);

@@ -200,7 +200,6 @@ public sealed partial class NetServer
         Log.Info($"Sieć: zalogowano {name} ({c.Conn.PeerKey})");
     }
 
-    private static readonly HashSet<string> FreeCommands = new() { "help", "me", "say", "list", "seed", "tell", "msg" };
 
     private void Chat(RemoteClient c, string s)
     {
@@ -209,7 +208,6 @@ public sealed partial class NetServer
         if (s.Length > 256) s = s[..256];
         if (s.StartsWith("/"))
         {
-            string cmd = s[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant() ?? "";
             c.P.IsLocalOp = Ops.Contains(c.Conn.PeerKey);
             Log.Info($"[CHAT] {c.Name}: {s}");
             _actor = null;

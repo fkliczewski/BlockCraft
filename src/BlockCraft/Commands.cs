@@ -19,6 +19,7 @@ public sealed partial class Commands
     private static readonly Dictionary<string, CommandDef> Map = new(StringComparer.OrdinalIgnoreCase);
     private static readonly List<CommandDef> Defs = new();
     [ThreadStatic] private static Dictionary<string, Entity> _resolved;
+    [ThreadStatic] private static int _commandDepth;
 
     public static string[] Names => Defs.SelectMany(d => d.Aliases.Prepend(d.Name)).ToArray();
 
@@ -43,6 +44,15 @@ public sealed partial class Commands
     /// <summary>CommandHandler.executeCommand: zwraca liczbę udanych wykonań.</summary>
     public static int Run(CommandSender s, string line)
     {
+        if (_commandDepth >= 64) { s.Message("§cPrzekroczono limit zagnieżdżenia komend"); s.SetStat(StatType.SuccessCount, 0); return 0; }
+        _commandDepth++;
+        try { return RunInner(s, line); }
+        catch (CommandException e) { s.Message("§c" + e.Message); s.SetStat(StatType.SuccessCount, 0); return 0; }
+        finally { _commandDepth--; }
+    }
+
+    private static int RunInner(CommandSender s, string line)
+    {
         line = (line ?? "").Trim();
         if (line.StartsWith('/')) line = line[1..];
         var parts = SplitJava(line);
@@ -52,7 +62,7 @@ public sealed partial class Commands
         if (!Map.TryGetValue(parts[0], out var def))
             s.Message("§cNieznana komenda. Wpisz \"/help\", aby wyświetlić listę komend.");
         else if (s.PermissionLevel < def.Level)
-            s.Message("§cNie masz uprawnień do użycia tej komendy");
+            s.Message(s.Entity is Player { Handler: Net.RemoteClient } ? "§cTylko host i operatorzy mogą używać tej komendy." : "§cNie masz uprawnień do użycia tej komendy");
         else
         {
             int ui = UsernameIndex(def, args);

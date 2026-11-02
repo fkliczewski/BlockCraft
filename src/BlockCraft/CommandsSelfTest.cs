@@ -29,6 +29,7 @@ public static partial class SelfTest
         var nbt = Mojangson.Parse("{Name:\"A B\",Health:10f,Long:5L,CanDestroy:[minecraft:stone],Nested:{ok:1b}}");
         Check(nbt.GetString("Name") == "A B" && nbt["Health"] is float && nbt["Long"] is long && nbt.GetList("CanDestroy").Count == 1, "CMD Mojangson typy i listy");
         Check(Fails(() => Mojangson.Parse("{a:[1,2}")) && Fails(() => Mojangson.Parse("{}x")), "CMD błędny Mojangson");
+        Check(Fails(() => Mojangson.Parse(string.Concat(Enumerable.Repeat("{a:", 300)) + "0" + new string('}', 300))), "CMD limit głębokości NBT");
         Check(Mojangson.Matches(Mojangson.Parse("{Nested:{ok:1b}}"), nbt) && !Mojangson.Matches(Mojangson.Parse("{Nested:{ok:2b}}"), nbt), "CMD częściowe porównanie NBT");
         Check(TextComponent.Render("{\"text\":\"Witaj \",\"extra\":[{\"selector\":\"@a\"}]}", s, p).Contains("Ala") && TextComponent.Render("{\"score\":{\"name\":\"Ala\",\"objective\":\"brak\"}}", s, p) == "", "CMD JSON tekst i selektor");
         var pig = new Pig(w); pig.SetPositionAndPrev(3.5, 4, 3.5); w.AddEntityNow(pig);
@@ -91,6 +92,8 @@ public static partial class SelfTest
         Check(Selector.Match(ps, "@a[score_punkty_min=10]").Single() == p, "CMD selektor scoreboard");
         Run("scoreboard teams add red"); Run("scoreboard teams option red color red"); Run("scoreboard teams join red Ala");
         Check(sb.TeamOf("Ala")?.Color == 'c' && Selector.Match(ps, "@a[team=red]").Single() == p && sb.FormatName("Ala").StartsWith("§c"), "CMD drużyna selektor i kolor");
+        Run("scoreboard teams join red Bob"); Run("scoreboard teams option red friendlyfire false");
+        Check(!q.Attack(DamageSource.PlayerAttack(p), 3), "CMD drużyna wyłącza friendly fire");
         Run("scoreboard objectives add przycisk trigger"); Run("trigger przycisk set 8", ps, 0);
         Run("scoreboard players enable Ala przycisk"); Run("trigger przycisk add 8", ps); Run("trigger przycisk add 1", ps, 0);
         Check(sb.GetScore("Ala", sb.GetObjective("przycisk")).Points == 8, "CMD trigger jednokrotny");
@@ -125,6 +128,8 @@ public static partial class SelfTest
         Run("kill @e[name=Prosiak]"); Check(w.Entities.OfType<Pig>().Any(e => e.CustomName == "Prosiak" && e.Dead), "CMD kill encji");
         Run("scoreboard teams leave Ala"); Run("scoreboard objectives remove przycisk");
         Check(sb.TeamOf("Ala") == null && sb.GetObjective("przycisk") == null, "CMD usuwanie drużyny i celu");
+        TestCommandSave(w, sb);
+        TestCommandNetwork();
     }
 
     private static void TestCommandBlock(World.World w, Player p, ConsoleSender s, Scoreboard sb)
@@ -145,5 +150,72 @@ public static partial class SelfTest
         w.SetBlock(0, 3, 5, B.Stone); w.SetBlock(0, 4, 5, B.ActivatorRail); w.SetBlock(1, 4, 5, B.RedstoneBlock); cart.Tick();
         Check(cart.Logic.SuccessCount == 1 && w.DayTime == 13000, "CMD wagonik tory aktywacyjne");
         Check(Commands.Run(s, "summon MinecartCommandBlock 2 4 5 {Command:\"time set day\"}") == 1, "CMD summon wagonika z komendą");
+    }
+
+    private static void TestCommandNetwork()
+    {
+        var w = MakeWorld(183, WorldType.Superflat, 1); w.Rules.DoMobSpawning = false;
+        w.SpawnX = 0; w.SpawnY = 4; w.SpawnZ = 0; w.AllowCheats = true;
+        var server = new NetServer(w); var (a, b) = LoopbackConnection.Pair("HostCMD", "GoscCMD"); server.Accept(a);
+        var client = NetClient.Start(b, "GoscCMD", 2); var host = new TestClientHost(); bool attached = false;
+        void Step(int n)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                client.Flush(); server.Tick(); w.Tick(); server.AfterTick(); Thread.Sleep(3);
+                if (!attached && client.PollLogin())
+                {
+                    host.World = new World.World(0, WorldType.Superflat, true);
+                    host.Player = new Player(host.World) { Name = client.Login.Name, Id = client.Login.EntityId };
+                    host.Player.SetPositionAndPrev(client.Login.X, client.Login.Y, client.Login.Z); client.Attach(host); attached = true;
+                }
+                if (attached) client.Tick();
+            }
+        }
+        try
+        {
+            for (int i = 0; i < 200 && !attached; i++) Step(1);
+            Check(attached, "CMD sieć logowanie"); if (!attached) return;
+            var remote = server.Clients.Single(); var s = new ConsoleSender(w);
+            w.SetBlock(3, 4, 0, B.CommandBlock); var tile = (CommandBlockTile)w.GetTileEntity(3, 4, 0);
+            Step(20);
+            client.UpdateCommands(3, 4, 0, -1, "kill @a", true); Step(3);
+            Check(tile.Logic.Command == "", "CMD sieć odrzuca edycję nieoperatora mimo allowCheats");
+            remote.P.IsLocalOp = true; remote.P.SetGameMode(1); remote.P.SetPositionAndPrev(.5, 4, .5);
+            client.UpdateCommands(3, 4, 0, -1, "time set night", false); Step(3);
+            Check(tile.Logic.Command == "time set night" && !tile.Logic.TrackOutput, "CMD sieć edycja operatora wykonywana na hoście");
+            Commands.Run(s, "scoreboard objectives add net dummy"); Commands.Run(s, "scoreboard players set GoscCMD net 23"); Commands.Run(s, "scoreboard objectives setdisplay sidebar net");
+            Commands.Run(s, "worldborder center 0 0"); Commands.Run(s, "worldborder set 80"); Step(22);
+            Check(Scoreboard.Client.Display[1]?.Name == "net" && Scoreboard.Client.GetScore("GoscCMD", Scoreboard.Client.GetObjective("net"))?.Points == 23, "CMD sieć scoreboard host-gość");
+            Check(WorldBorder.Client.EndDiameter == 80 && WorldBorder.Client.CenterX == .5, "CMD sieć granica host-gość");
+            Commands.Run(s, "title GoscCMD times 0 50 0"); Commands.Run(s, "title GoscCMD title {\"text\":\"Sieć\"}"); Step(2);
+            Check(host.Player.Title.Title == "Sieć" && host.Player.Title.Ticks == 50, "CMD sieć title");
+            CommandBlocks.Open(remote.P, 3, 4, 0); Step(2); Check(host.CurrentScreen is CommandBlockScreen, "CMD sieć otwarcie edytora");
+            remote.P.SetPositionAndPrev(20, 4, 0); client.UpdateCommands(3, 4, 0, -1, "kill @a", true); Step(2);
+            Check(tile.Logic.Command == "time set night", "CMD sieć odrzuca edycję poza zasięgiem");
+            Check(Commands.Run(s, "kick GoscCMD Koniec testu") == 1, "CMD kick"); Step(2);
+            Check(host.Disconnected?.Contains("Koniec testu") == true, "CMD sieć powód kick");
+        }
+        finally { server.Shutdown("koniec CMD"); b.Close("koniec CMD"); Scoreboard.Client = new(); WorldBorder.Client = new(); }
+    }
+
+    private static void TestCommandSave(World.World w, Scoreboard sb)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "BlockCraft-CMD-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            w.Storage = new WorldStorage(dir);
+            // Nowy model zna ścieżkę zapisu od chwili utworzenia w świecie z magazynem.
+            byte[] scores = sb.ToBytes(true); w.ScoreboardField = null;
+            using (var r = new BinaryReader(new MemoryStream(scores))) Scoreboard.Of(w).Read(r, true);
+            w.BorderField = null; WorldBorder.Of(w).SetTransition(80, 40, 200, w.TotalTime);
+            Commands.SaveState(w);
+            w.ScoreboardField = null; w.BorderField = null;
+            var restored = Scoreboard.Of(w);
+            Check(restored.Display[1]?.Name == "punkty" && restored.GetScore("Ala", restored.GetObjective("punkty")).Points == 19 && restored.EntityStats.ContainsKey("Ala"), "CMD zapis świata scoreboard i stats");
+            Check(WorldBorder.Of(w).EndDiameter == 40 && WorldBorder.Of(w).EndTick == w.TotalTime + 200, "CMD zapis świata granica i czas zmiany");
+            Check(File.Exists(Path.Combine(dir, "data", "scoreboard.dat")) && File.Exists(Path.Combine(dir, "data", "worldborder.dat")), "CMD pliki stanu świata");
+        }
+        finally { w.Storage = null; if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
 }

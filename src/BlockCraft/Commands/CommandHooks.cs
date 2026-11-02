@@ -91,6 +91,15 @@ namespace BlockCraft.Entities
     {
         /// <summary>Stan tytułu (/title) wyświetlany na HUD tego gracza.</summary>
         public readonly TitleState Title = new();
+        public override bool Attack(DamageSource source, float amount)
+        {
+            if (source.Attacker is Player attacker && attacker != this)
+            {
+                var board = Scoreboard.Of(World); var team = board.TeamOf(Name);
+                if (team != null && !team.FriendlyFire && team == board.TeamOf(attacker.Name)) return false;
+            }
+            return base.Attack(source, amount);
+        }
     }
 }
 

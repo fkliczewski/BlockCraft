@@ -159,7 +159,7 @@ public static class Arg
         if (k == "air") return 0;
         var it = Items.Item.Get(k);
         if (it != null && it.IsBlock && World.Block.ById[it.BlockId] != null) return it.BlockId;
-        if (int.TryParse(k, out int id) && id is > 0 and < 256 && World.Block.ById[id] != null) return id;
+        if (int.TryParse(k, out int id) && id is > 0 and < 256 && World.Block.ById[id]?.Id == id) return id;
         foreach (var b in World.Block.ById) if (b != null && b.Key == k) return b.Id;
         throw new CommandException($"Nie ma bloku o nazwie {s}");
     }
