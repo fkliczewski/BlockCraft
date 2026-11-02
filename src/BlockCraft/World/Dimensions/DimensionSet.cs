@@ -82,6 +82,7 @@ public sealed class DimensionSet : IDisposable
     private void CopyRules(World w)
     {
         // Nether i End mają własny spawner (DimensionSpawner), więc ogólny MobSpawner świata jest w nich wyłączony
+        if (w != _overworld) w.Rules.CopyFrom(_overworld.Rules);
         w.Rules.DoDaylightCycle = _overworld.Rules.DoDaylightCycle; w.Rules.DoMobSpawning = w == _overworld && _overworld.Rules.DoMobSpawning;
         w.Rules.KeepInventory = _overworld.Rules.KeepInventory; w.Rules.DoFireTick = _overworld.Rules.DoFireTick;
         w.Rules.MobGriefing = _overworld.Rules.MobGriefing; w.Rules.NaturalRegeneration = _overworld.Rules.NaturalRegeneration;

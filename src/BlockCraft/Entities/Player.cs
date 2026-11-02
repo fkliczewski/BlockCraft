@@ -419,7 +419,7 @@ public partial class Player : LivingEntity
                 if (xp > 0) World.SpawnXp(X, Y + 0.5, Z, xp);
                 XpLevel = 0; XpProgress = 0; XpTotal = 0;
             }
-            World.BroadcastMessage(DeathMessage);
+            if (World.Rules.ShowDeathMessages) World.BroadcastMessage(DeathMessage);
         }
         Handler?.OnDeath(DeathMessage);
     }

@@ -221,7 +221,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             Name = level.Name, AllowCheats = level.AllowCheats, Hardcore = level.Hardcore, DayTime = level.DayTime, TotalTime = level.Time,
             Difficulty = (Difficulty)level.Difficulty, Storage = storage
         };
-        foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString(), out _);
+        foreach (var kv in level.Rules) w.Rules.Set(kv.Key, kv.Value.ToString().ToLowerInvariant(), out _);
+        if (level.RuleValues != null) foreach (var kv in level.RuleValues) w.Rules.Set(kv.Key, kv.Value, out _, true);
         w.RestoreWeather(level.Weather);
         if (isNew || (level.SpawnX == 0 && level.SpawnY == 0 && level.SpawnZ == 0))
         {
@@ -289,6 +290,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 ["doDaylightCycle"] = World.Rules.DoDaylightCycle, ["keepInventory"] = World.Rules.KeepInventory, ["doMobSpawning"] = World.Rules.DoMobSpawning,
                 ["mobGriefing"] = World.Rules.MobGriefing, ["doFireTick"] = World.Rules.DoFireTick, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
             };
+            _level.RuleValues = home.Rules.ToStrings();
+            Cmd.Commands.SaveState(home);
             _storage.SaveLevel(_level);
             Dimensions.SaveAll();
         }
