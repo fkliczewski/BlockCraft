@@ -26,5 +26,8 @@ public static partial class SelfTest
         Check(cow is > 0.075 and < 0.1, "Moby: krowa chodzi ok. 1,75 bloku/s jak w MC 1.8 (nie 8)", $"{cow * 20:F2} b/s");
         double zombie = WalkSpeedPerTick(w, new Zombie(w), 0.23f);
         Check(zombie is > 0.1 and < 0.13, "Moby: zombie ok. 2,3 bloku/s, wolniej niż chodzący gracz (4,3)", $"{zombie * 20:F2} b/s");
+        var vil = new Villager(w, 0);
+        double villager = WalkSpeedPerTick(w, vil, (float)(vil.MoveSpeed * .6));
+        Check(Math.Abs(vil.MoveSpeed - .5) < 1e-9 && villager is > 0.17 and < 0.21, "Moby: wieśniak wędruje z prędkością 0,5 x 0,6 jak EntityAIWander w 1.8", $"{villager * 20:F2} b/s");
     }
 }

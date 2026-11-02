@@ -233,7 +233,7 @@ namespace BlockCraft.Render
             foreach (var l in _sqLegs) l.RX = t;
             float pitch = MathHelper.Lerp(s.PrevBodyPitch, s.BodyPitch, p.Pt), roll = MathHelper.Lerp(s.PrevBodyRoll, s.BodyRoll, p.Pt);
             var m = Matrix4.CreateTranslation(0, -1.5078125f, 0) * Matrix4.CreateScale(-1, -1, 1) * Matrix4.CreateTranslation(0, -1.2f, 0)
-                    * Matrix4.CreateRotationY(roll) * Matrix4.CreateRotationX(Rad(pitch)) * Matrix4.CreateTranslation(0, .5f, 0);
+                    * Matrix4.CreateRotationY(Rad(roll)) * Matrix4.CreateRotationX(Rad(pitch)) * Matrix4.CreateTranslation(0, .5f, 0);
             if (s.DeathTime > 0) m *= Matrix4.CreateRotationZ(Rad(Math.Min(1, MathF.Sqrt(Math.Max(0, (s.DeathTime + p.Pt - 1) / 20f * 1.6f))) * 90));
             m *= Matrix4.CreateRotationY(Rad(180 - p.BodyYaw)) * Matrix4.CreateTranslation(p.Pos);
             RenderPart(Skin, _sqBody, m); foreach (var l in _sqLegs) RenderPart(Skin, l, m);

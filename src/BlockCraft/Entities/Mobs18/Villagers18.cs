@@ -174,7 +174,7 @@ public sealed class Villager : Animal
     private static readonly Dictionary<long, (int tick, int doors)> DoorCache = new();
 
     public Villager(World.World w) : this(w, w.Rand.Next(5)) { }
-    public Villager(World.World w, int profession) : base(w) { Width = .6f; Height = 1.8f; MaxHealth = Health = 20; MoveSpeed = .3; Profession = Math.Clamp(profession, 0, 4); }
+    public Villager(World.World w, int profession) : base(w) { Width = .6f; Height = 1.8f; MaxHealth = Health = 20; MoveSpeed = .5; /* atrybut movementSpeed 1.8, zadania AI mnożą go jak w EntityVillager */ Profession = Math.Clamp(profession, 0, 4); }
     public override string TypeKey => "villager";
     public override string DisplayName => Career > 0 ? VillagerTrades.Professions[Profession][Career - 1].Name : VillagerTrades.ProfessionNames[Profession];
     public override bool Persistent => true;
@@ -250,15 +250,15 @@ public sealed class Villager : Animal
         }
         // EntityAIAvoidEntity(zombie, 8, 0.6, 0.6)
         var zombie = World.GetEntitiesInBox(BoundingBox.Grow(8, 3, 8), this).OfType<Zombie>().FirstOrDefault(z => !z.Dead);
-        if (zombie != null) { if (Age % 10 == 0 || !Nav.HasPath) Nav.MoveTo(X + (X - zombie.X) * 2, Y, Z + (Z - zombie.Z) * 2, MoveSpeed * 2); return; }
+        if (zombie != null) { if (Age % 10 == 0 || !Nav.HasPath) Nav.MoveTo(X + (X - zombie.X) * 2, Y, Z + (Z - zombie.Z) * 2, MoveSpeed * .6); return; }
         PickupFood();
         if (!IsBaby && Profession == 0 && Career == 1 && HarvestFarmland()) return;
         if (!IsBaby && WillingToMate && TryMate()) return;
-        if (IsBaby && World.Rand.Next(200) == 0) { var other = World.GetEntitiesInBox(BoundingBox.Grow(6, 3, 6), this).OfType<Villager>().FirstOrDefault(v => v.IsBaby); if (other != null) Nav.MoveTo(other.X, other.Y, other.Z, MoveSpeed * 1.5); }
+        if (IsBaby && World.Rand.Next(200) == 0) { var other = World.GetEntitiesInBox(BoundingBox.Grow(6, 3, 6), this).OfType<Villager>().FirstOrDefault(v => v.IsBaby); if (other != null) Nav.MoveTo(other.X, other.Y, other.Z, MoveSpeed * .32); } // EntityAIPlay(0.32)
         TrySpawnGolem();
         if (World.Rand.Next(1000) == 0 && GoIndoors()) return;
         LookAtPlayersRandomly();
-        Wander(MoveSpeed * .6 / .5, 120);
+        Wander(MoveSpeed * .6, 120); // EntityAIWander(0.6)
     }
 
     private void PickupFood()
@@ -316,7 +316,7 @@ public sealed class Villager : Animal
         var m = (Villager)Mate;
         if (m.Dead || --MateTicks <= 0) { Mate = null; return false; }
         LookTarget = m; LookTime = 10;
-        if (DistanceSq(m) > 2.25) { if (Age % 10 == 0) Nav.MoveTo(m.X, m.Y, m.Z, MoveSpeed * .5 / .5); return true; }
+        if (DistanceSq(m) > 2.25) { if (Age % 10 == 0) Nav.MoveTo(m.X, m.Y, m.Z, MoveSpeed * .25); /* EntityAIVillagerMate(0.25) */ return true; }
         Nav.Stop();
         if (World.Rand.Next(35) == 0) World.SpawnParticles(ParticleKind.Heart, X, Y + Height + .5, Z, 1);
         if (MateTicks % 50 == 0 && HasFoodToBreed && m.HasFoodToBreed)
@@ -350,7 +350,7 @@ public sealed class Villager : Animal
             int x = x0 + World.Rand.Next(17) - 8, z = z0 + World.Rand.Next(17) - 8, y = y0 + World.Rand.Next(3) - 1, id = World.GetBlock(x, y, z);
             bool ripe = (id == B.Wheat || id == B.Carrots || id == B.Potatoes) && World.GetMeta(x, y, z) >= 7;
             bool empty = id == B.Air && World.GetBlock(x, y - 1, z) == B.Farmland && (Count(I.Seeds) + Count(I.Carrot) + Count(I.Potato)) > 0;
-            if ((ripe || empty) && Nav.MoveTo(x, y, z, MoveSpeed * .6 / .5)) return true;
+            if ((ripe || empty) && Nav.MoveTo(x, y, z, MoveSpeed * .6)) return true;
         }
         return false;
     }
@@ -362,7 +362,7 @@ public sealed class Villager : Animal
         if (t is < 13000 or > 23000) return false;
         int x0 = MathUtil.FloorToInt(X), y0 = MathUtil.FloorToInt(Y), z0 = MathUtil.FloorToInt(Z);
         for (int r = 2; r <= 16; r += 2) for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++)
-            if (PathFinder.IsWoodDoor(World.GetBlock(x0 + dx, y0, z0 + dz)) && Nav.MoveTo(x0 + dx, y0, z0 + dz, MoveSpeed * .6 / .5)) return true;
+            if (PathFinder.IsWoodDoor(World.GetBlock(x0 + dx, y0, z0 + dz)) && Nav.MoveTo(x0 + dx, y0, z0 + dz, MoveSpeed)) return true; // EntityAIMoveIndoors(1.0)
         return false;
     }
 
