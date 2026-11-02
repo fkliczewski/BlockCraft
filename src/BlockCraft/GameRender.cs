@@ -40,7 +40,7 @@ public sealed partial class Game
     private void RenderMenuWorld(float pt, int fw, int fh)
     {
         var w = _menuWorld;
-        _menuYaw += 0.03f;
+        _menuYaw = (_tickCount + pt) * 0.1f; // 1.8 GuiMainMenu: 0,1 stopnia na tick, niezależnie od liczby klatek
         int top = 0;
         for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) top = Math.Max(top, w.GetHeight(w.SpawnX + dx, w.SpawnZ + dz));
         var cam = new Vector3d(w.SpawnX + 0.5, Math.Max(w.SpawnY + 4, top + 2.5), w.SpawnZ + 0.5);
