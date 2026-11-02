@@ -42,6 +42,11 @@ public static partial class SelfTest
         try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
         var sw = Stopwatch.StartNew();
         Console.WriteLine("=== BlockCraft self-test ===");
+        if (args.Contains("--cmd-only"))
+        {
+            try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
+            Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); return _fail == 0 ? 0 : 2;
+        }
         try { TestRegistry(); } catch (Exception e) { Check(false, "Registry", e.ToString()); }
         try { TestAudioMix(); } catch (Exception e) { Check(false, "Audio", e.ToString()); }
         try { TestWorldGen(); } catch (Exception e) { Check(false, "WorldGen", e.ToString()); }
@@ -75,6 +80,7 @@ public static partial class SelfTest
         try { TestBoat(); } catch (Exception e) { Check(false, "Łódka", e.ToString()); }
         try { TestSigns(); } catch (Exception e) { Check(false, "Tabliczki", e.ToString()); }
         try { TestCommands(); } catch (Exception e) { Check(false, "Commands", e.ToString()); }
+        try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
         try { TestNetherEnd(); } catch (Exception e) { Check(false, "NetherEnd", e.ToString()); }
         try { TestOverworld(); } catch (Exception e) { Check(false, "Overworld", e.ToString()); }
         try { TestNet(); } catch (Exception e) { Check(false, "Net", e.ToString()); }

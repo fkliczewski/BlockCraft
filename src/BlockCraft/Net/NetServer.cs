@@ -210,7 +210,6 @@ public sealed partial class NetServer
         if (s.StartsWith("/"))
         {
             string cmd = s[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant() ?? "";
-            if (!FreeCommands.Contains(cmd) && !Ops.Contains(c.Conn.PeerKey)) { c.OnMessage("§cTylko host i operatorzy mogą używać tej komendy."); return; }
             c.P.IsLocalOp = Ops.Contains(c.Conn.PeerKey);
             Log.Info($"[CHAT] {c.Name}: {s}");
             _actor = null;

@@ -84,6 +84,7 @@ public static class EntityNbt
         }
         switch (e)
         {
+            case CommandMinecart cart: cart.Logic.WriteNbt(n); break;
             case ItemEntity ie:
                 n["Age"] = ie.Age; n["PickupDelay"] = ie.PickupDelay; if (ie.Stack != null) n["Item"] = ItemToNbt(ie.Stack); break;
             case XpOrbEntity xo: n["Value"] = xo.Value; n["Age"] = xo.Age; break;
@@ -139,6 +140,7 @@ public static class EntityNbt
         }
         switch (e)
         {
+            case CommandMinecart cart: cart.Logic.ReadNbt(n); break;
             case ItemEntity ie:
                 if (n.ContainsKey("PickupDelay")) ie.PickupDelay = n.GetInt("PickupDelay");
                 if (n.ContainsKey("Age")) ie.Age = n.GetInt("Age");

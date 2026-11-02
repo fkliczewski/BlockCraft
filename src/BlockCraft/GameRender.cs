@@ -111,6 +111,7 @@ public sealed partial class Game
         Renderer.Render(cam, view, _proj, pt, p, third, sel, Ctrl.BreakStage);
         NetCaptureCamera(cam, view);
         DrawSignTexts(cam, view * _proj);
+        DrawWorldBorder(cam, view * _proj);
 
         // ręka
         if (!third && !p.Spectator && !p.Sleeping && !HideGui)
@@ -277,6 +278,7 @@ public sealed partial class Game
             if (p.IsInsideOpaqueBlock() && !p.Spectator) sb.Fill(0, 0, W, H, 0xC0101010);
         }
         NetDrawNameTags(pt);
+        DrawCommandHud(pt);
         // winieta
         sb.Gradient(0, 0, W, H / 6f, 0x30000000, 0x00000000);
         sb.Gradient(0, H - H / 6f, W, H / 6f, 0x00000000, 0x30000000);

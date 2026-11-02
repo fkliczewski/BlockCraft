@@ -74,6 +74,7 @@ public sealed partial class PlayerController
         var b = Block.Get(W.GetBlock(x, y, z));
         if (b.Id == 0) return;
         var tool = p.Inventory.Selected;
+        if (!Cmd.WorldBorder.Of(W).Contains(W, x, z) || p.GameMode == 2 && !Cmd.Adventure.Allows(tool, "CanDestroy", b.Id)) { ResetBreak(); return; }
         if (p.Creative)
         {
             if (tool?.Item?.Tool == ToolType.Sword) return;
@@ -107,6 +108,7 @@ public sealed partial class PlayerController
         var b = Block.Get(W.GetBlock(x, y, z));
         int meta = W.GetMeta(x, y, z);
         var tool = P.Inventory.Selected;
+        if (!P.Creative && b.Hardness < 0 || !Cmd.WorldBorder.Of(W).Contains(W, x, z) || P.GameMode == 2 && !Cmd.Adventure.Allows(tool, "CanDestroy", b.Id)) return;
         if (!P.Creative) b.OnDestroyedByPlayer(W, x, y, z, meta, P);
         // liście: ścinanie sąsiadów przyspiesza zanik
         if (b is LogBlock)
@@ -188,6 +190,7 @@ public sealed partial class PlayerController
         var h = W.RayCast(ex, ey, ez, lx, ly, lz, 5, true);
         if (!h.Hit) return false;
         int id = W.GetBlock(h.X, h.Y, h.Z);
+        if (!Cmd.WorldBorder.Of(W).Contains(W, h.X, h.Z) || p.GameMode == 2 && !Cmd.Adventure.Allows(held, "CanPlaceOn", id)) return false;
         if (held.Id == I.Bucket)
         {
             if ((id == B.Water || id == B.Lava) && W.GetMeta(h.X, h.Y, h.Z) == 0)
@@ -206,6 +209,7 @@ public sealed partial class PlayerController
         var tb = Block.Get(id);
         if (!tb.Replaceable || tb.IsLiquid && W.GetMeta(tx, ty, tz) == 0) { tx += Dir.X[h.Face]; ty += Dir.Y[h.Face]; tz += Dir.Z[h.Face]; }
         var at = Block.Get(W.GetBlock(tx, ty, tz));
+        if (!Cmd.WorldBorder.Of(W).Contains(W, tx, tz)) return false;
         if (!at.Replaceable && at.Id != 0) return false;
         if (at.Id != 0 && !at.IsLiquid) W.BreakBlock(tx, ty, tz, true);
         W.SetBlock(tx, ty, tz, held.Id == I.WaterBucket ? B.Water : B.Lava, 0);
@@ -218,6 +222,9 @@ public sealed partial class PlayerController
     {
         var p = P; var it = held.Item;
         int id = W.GetBlock(x, y, z);
+        if (!Cmd.WorldBorder.Of(W).Contains(W, x, z) || !Cmd.WorldBorder.Of(W).Contains(W, x + Dir.X[face], z + Dir.Z[face])) return false;
+        if (p.GameMode == 2 && !Cmd.Adventure.Allows(held, "CanPlaceOn", id)) return false;
+        if (held.Id == B.CommandBlock && !p.Creative) return false;
         if (it.UseOnBlock != null && it.UseOnBlock(p, held, x, y, z, face, hx, hy, hz)) return true;
         if (held.Id == I.SpawnEgg)
         {
@@ -283,6 +290,7 @@ public sealed partial class PlayerController
         var p = P; var it = held.Item;
         byte bid = (byte)it.BlockId;
         var nb = Block.Get(bid);
+        if (bid == B.CommandBlock && !p.Creative) return false;
         // płyty łączą się
         if (nb is SlabBlock slab && W.GetBlock(x, y, z) == bid)
         {

@@ -245,7 +245,7 @@ public static class Selector
         if (c != 0)
         {
             if (c < 0) res.Reverse();
-            res = res.Take(Math.Abs(c)).ToList();
+            res = res.Take((int)Math.Min(Math.Abs((long)c), res.Count)).ToList();
         }
         return res;
     }

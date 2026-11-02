@@ -83,7 +83,7 @@ namespace BlockCraft.Cmd
             if (command == null || command.Length > 32767) return false;
             var logic = Resolve(p, x, y, z, entityId); if (logic == null) return false;
             logic.Command = command; logic.TrackOutput = track; if (!track) logic.LastOutput = "";
-            if (entityId < 0) p.World.MarkDirty(x, y, z);
+            if (entityId < 0) { p.World.MarkDirty(x, y, z); p.World.SetTileEntity(x, y, z, p.World.GetTileEntity(x, y, z)); }
             return true;
         }
     }
@@ -120,7 +120,7 @@ namespace BlockCraft.World
         public override void OnScheduledTick(World w, int x, int y, int z, Rng r)
         {
             if (w.IsRemote || w.GetTileEntity(x, y, z) is not CommandBlockTile tile) return;
-            tile.Bind(w); tile.Logic.Trigger(); w.MarkDirty(x, y, z); Redstone.NotifyNeighbors(w, x, y, z, Id);
+            tile.Bind(w); tile.Logic.Trigger(); w.SetTileEntity(x, y, z, tile); w.MarkDirty(x, y, z); Redstone.NotifyNeighbors(w, x, y, z, Id);
         }
         public int GetComparatorOutput(World w, int x, int y, int z) => w.GetTileEntity(x, y, z) is CommandBlockTile tile ? tile.Logic.SuccessCount : 0;
     }
@@ -168,6 +168,9 @@ namespace BlockCraft.Render
                 px[y * 16 + x] = rim ? Rgba(107, 74, 48) : dot ? Rgba(165, 116, 87) : Rgba(211 + (x + y) % 7, 167, 119);
             }
             Add("command_block", px);
+            var wall = new uint[256];
+            for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) wall[y * 16 + x] = Rgba(255, 255, 255, (x + y) % 8 < 2 || (x - y + 16) % 8 < 2 ? 230 : 30);
+            Add("world_border", wall);
         }
     }
 }

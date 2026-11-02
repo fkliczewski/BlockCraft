@@ -22,7 +22,7 @@ public partial class Player : LivingEntity
     public Container OpenContainer;
     public ItemStack Cursor;
     public IPlayerHandler Handler;
-    public int GameMode; // 0 przetrwanie, 1 kreatywny, 3 obserwator
+    public int GameMode; // 0 przetrwanie, 1 kreatywny, 2 przygoda, 3 obserwator
     public bool Flying, AllowFlying, Invulnerable;
     public float FlySpeed = 0.05f;
     public int FoodLevel = 20; public float Saturation = 5f, Exhaustion; public int FoodTimer; public int PrevFoodLevel = 20;
@@ -75,6 +75,7 @@ public partial class Player : LivingEntity
 
     public override void Tick()
     {
+        Title.Tick();
         if (IsRemoteControlled) { base.Tick(); return; }
         if (NetPuppet) NetPuppetMove?.Invoke();
         if (Sleeping)

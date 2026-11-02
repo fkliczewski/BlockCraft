@@ -8,7 +8,8 @@ public sealed partial class Commands
 {
     private static void RegisterScoreboard()
     {
-        Reg("scoreboard", 2, "/scoreboard <objectives|players|teams> ...", ScoreboardCommand);
+        Reg("scoreboard", 2, "/scoreboard <objectives|players|teams> ...", ScoreboardCommand,
+            user: (a, i) => a.Length > 1 && (a[0] == "players" && (i == 2 || a[1] == "operation" && i == 5) || a[0] == "teams" && (a[1] == "join" && i >= 3 || a[1] == "leave" && i >= 2)));
         Reg("trigger", 0, "/trigger <cel> <add|set> <wartość>", (s, a) =>
         {
             if (a.Length != 3) throw new UsageException("/trigger <cel> <add|set> <wartość>");
@@ -23,7 +24,7 @@ public sealed partial class Commands
             score.Locked = true; sb.Dirty = true;
             Notify(s, $"Zmieniono wyzwalacz {o.Name} na {score.Points}");
         });
-        Reg("stats", 2, "/stats <entity|block> ...", StatsCommand);
+        Reg("stats", 2, "/stats <entity|block> ...", StatsCommand, user: (a, i) => a.Length > 0 && a[0] == "entity" && i == 1);
     }
 
     private static ScoreObjective Objective(Scoreboard sb, string name, bool write = false)
@@ -45,10 +46,11 @@ public sealed partial class Commands
         if (a.Length < 2) throw new UsageException("/scoreboard <objectives|players|teams> ...");
         var sb = Scoreboard.Of(s.World);
         // Znak * rozwija istniejących posiadaczy wyników, również w drugim argumencie operacji.
-        int wildcard = Array.IndexOf(a, "*");
+        int[] holders = a[0] == "players" ? a[1] == "operation" ? new[] { 2, 5 } : new[] { 2 } : Array.Empty<int>();
+        int wildcard = holders.FirstOrDefault(i => i < a.Length && a[i] == "*", -1);
         if (wildcard >= 0)
         {
-            if (a.Count(x => x == "*") > 1) throw new CommandException("W komendzie można użyć tylko jednego '*'");
+            if (holders.Count(i => i < a.Length && a[i] == "*") > 1) throw new CommandException("W komendzie można użyć tylko jednego '*'");
             int success = 0;
             foreach (string n in sb.Scores.Keys.ToArray())
             {
@@ -218,7 +220,8 @@ public sealed partial class Commands
         if (a[0] == "entity")
         {
             var e = GetEntity(s, a[1]); var sb = Scoreboard.Of(s.World); string name = ScoreName(e);
-            if (!sb.EntityStats.TryGetValue(name, out stats)) sb.EntityStats[name] = stats = new CommandStats();
+            if (e is CommandMinecart minecart) stats = minecart.Logic.Stats;
+            else if (!sb.EntityStats.TryGetValue(name, out stats)) sb.EntityStats[name] = stats = new CommandStats();
             i = 2;
         }
         else if (a[0] == "block" && a.Length >= 6)
@@ -226,6 +229,7 @@ public sealed partial class Commands
             var pos = Arg.BlockPos(s, a, 1);
             if (s.World.GetTileEntity(pos.X, pos.Y, pos.Z) is not CommandBlockTile cb) throw new CommandException("Ten blok nie przechowuje wyników komend");
             stats = cb.Logic.Stats; i = 4;
+            cb.Bind(s.World); s.World.SetTileEntity(pos.X, pos.Y, pos.Z, cb);
         }
         else throw new UsageException("/stats <entity|block> ...");
         int type = Array.IndexOf(CommandStats.TypeNames, a[i + 1]);

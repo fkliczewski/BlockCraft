@@ -44,7 +44,7 @@ public sealed class PlayerSender : CommandSender
     public override (int X, int Y, int Z) BlockPos => Floor(P.X, P.Y + 0.5, P.Z);
     public override Entity Entity => P;
     public override void Message(string msg) => P.SendMessage(msg);
-    public override int PermissionLevel => P.IsLocalOp || P.World.AllowCheats ? 4 : 0;
+    public override int PermissionLevel => P.IsLocalOp || P.Handler is not Net.RemoteClient && P.World.AllowCheats ? 4 : 0;
 }
 
 /// <summary>Nadawca z /execute: pozycja i encja podmienione, uprawnienia i komunikaty od pierwotnego nadawcy.</summary>
