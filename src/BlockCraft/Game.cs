@@ -291,7 +291,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 ["mobGriefing"] = World.Rules.MobGriefing, ["doFireTick"] = World.Rules.DoFireTick, ["naturalRegeneration"] = World.Rules.NaturalRegeneration, ["doEntityDrops"] = World.Rules.DoEntityDrops
             };
             _level.RuleValues = home.Rules.ToStrings();
-            Cmd.Commands.SaveState(home);
+            Commands.SaveState(home);
             _storage.SaveLevel(_level);
             Dimensions.SaveAll();
         }

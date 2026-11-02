@@ -203,6 +203,11 @@ public sealed class NetClient
         if (_window is not EnchantingContainer) return;
         var writer = Out.Begin(C2S.EnchantItem); writer.Write(_windowId); writer.Write((byte)button); Out.End();
     }
+    public void UpdateCommands(int x, int y, int z, int entityId, string command, bool track)
+    {
+        var writer = Out.Begin(C2S.CommandBlock); writer.Write(x); writer.Write(y); writer.Write(z); writer.Write(entityId); writer.Write(command); writer.Write(track); Out.End();
+    }
+
     public void UpdateSign(int x, int y, int z, string[] lines)
     {
         var writer = Out.Begin(C2S.UpdateSign); writer.Write(x); writer.Write(y); writer.Write(z);
@@ -415,6 +420,13 @@ public sealed class NetClient
             case S2C.Cursor: { var s = r.ReadStack(); if (G.CurrentScreen is not CreativeScreen) p.Cursor = s; break; }
             case S2C.OpenWindow: OpenWindow(r); break;
             case S2C.MapData: MapSync.Read(r); break;
+            case S2C.CommandUi:
+                {
+                    int kind = r.ReadByte();
+                    if (kind == 0) p.Title.Show(r.ReadInt32(), r.ReadString(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32());
+                    else if (kind == 1) G.SetScreen(new CommandBlockScreen(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadString(), r.ReadBoolean(), r.ReadString()));
+                    break;
+                }
             case S2C.OpenSignEditor:
                 {
                     int sx = r.ReadInt32(), sy = r.ReadInt32(), sz = r.ReadInt32();

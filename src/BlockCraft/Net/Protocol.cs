@@ -12,7 +12,7 @@ namespace BlockCraft.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 8;
+    public const int Version = 9;
 }
 
 /// <summary>Pakiety klient -> host.</summary>
@@ -35,6 +35,7 @@ public enum C2S : byte
     UpdateSign = 15,    // int x,y,z, 4 x string
     Beacon = 17, // byte okno, int primary, int secondary; rozlicza host
     OpenInventory = 16, // otwarcie lokalnego ekwipunku; wyłącznie wyzwalacz openInventory
+    CommandBlock = 18,  // int x,y,z,entityId (-1 blok), string komenda, bool trackOutput
 }
 
 /// <summary>Pakiety host -> klient.</summary>
@@ -73,6 +74,7 @@ public enum S2C : byte
     MerchantOffers = 31,// byte okno, int indeks, int liczba, MerchantRecipe[]
     OpenSignEditor = 32,// int x,y,z
     MapData = 33,       // patrz MapSync: int id, skala, wymiar, środek, wersja, rodzaj, prostokąt pikseli, znaczniki
+    CommandUi = 34,     // byte rodzaj: 0 tytul, 1 edytor bloku polecen
 }
 
 /// <summary>Zdarzenia encji (EntityEvent).</summary>

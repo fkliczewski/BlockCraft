@@ -16,7 +16,8 @@ namespace BlockCraft.Render
         static partial void TexNetherEnd();
         static partial void TexMobs();
         static partial void TexMechanics();
-        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); }
+        static partial void TexCommands();
+        private static void ModuleTextures() { TexOverworld(); TexRedstone(); TexNetherEnd(); TexMobs(); TexMechanics(); TexCommands(); }
     }
 }
 
@@ -29,7 +30,8 @@ namespace BlockCraft.World
         static partial void BlocksNetherEnd();
         static partial void BlocksMobs();
         static partial void BlocksMechanics();
-        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); }
+        static partial void BlocksCommands();
+        private static void ModuleBlocks() { BlocksOverworld(); BlocksRedstone(); BlocksNetherEnd(); BlocksMobs(); BlocksMechanics(); BlocksCommands(); }
     }
 }
 
@@ -68,11 +70,12 @@ namespace BlockCraft.Entities
         static partial void EntitiesNetherEnd();
         static partial void EntitiesMobs();
         static partial void EntitiesMechanics();
+        static partial void EntitiesCommands();
 
         public static void Init()
         {
             if (_init) return; _init = true;
-            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics();
+            EntitiesOverworld(); EntitiesRedstone(); EntitiesNetherEnd(); EntitiesMobs(); EntitiesMechanics(); EntitiesCommands();
         }
 
         /// <summary>Klucze encji, które są mobami (do /summon, jajek spawnu i spawnera).</summary>

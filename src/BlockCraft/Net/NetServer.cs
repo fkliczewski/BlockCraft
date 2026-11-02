@@ -161,6 +161,7 @@ public sealed partial class NetServer
             case C2S.EnchantItem: c.EnchantItem(r.ReadByte(), r.ReadByte()); break;
             case C2S.AnvilName: c.AnvilName(r.ReadByte(), r.ReadString()); break;
             case C2S.UpdateSign: c.UpdateSign(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), new[] { r.ReadString(), r.ReadString(), r.ReadString(), r.ReadString() }); break;
+            case C2S.CommandBlock: Cmd.CommandBlocks.Update(c.P, r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadString(), r.ReadBoolean()); break;
             case C2S.CreativeSlot: c.CreativeSlot(r.ReadInt16(), r.ReadStack()); break;
             case C2S.CreativeDrop: { var s = r.ReadStack(); if (c.P.Creative && s != null) c.P.DropStack(s, false); break; }
             case C2S.DropSelected: c.DropSelected(r.ReadBoolean()); break;

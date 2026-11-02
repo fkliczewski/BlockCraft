@@ -9,6 +9,7 @@ namespace BlockCraft.World
     {
         public Scoreboard ScoreboardField;
         public WorldBorder BorderField;
+        public int DefaultGameMode;
 
         /// <summary>Wołane z World.Tick na hoście.</summary>
         private void TickCommands()
@@ -45,8 +46,7 @@ namespace BlockCraft.World
             {
                 if (!o.Criteria.StartsWith("stat.")) continue;
                 int now = p.Statistics.GetValueOrDefault(o.Criteria);
-                string key = p.Name + "
-" + o.Criteria;
+                string key = p.Name + "\n" + o.Criteria;
                 if (!sb.StatSeen.TryGetValue(key, out int seen)) { sb.StatSeen[key] = now; continue; }
                 if (now > seen) sb.GetScore(p.Name, o).Points += now - seen;
                 if (now != seen) { sb.StatSeen[key] = now; sb.Dirty = true; }
