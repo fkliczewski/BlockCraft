@@ -6,14 +6,13 @@
 
 Stan rozbudowy MC 1.8: [raport integracji, wyniki testów i pozostałe braki](docs/MC18_RAPORT_INTEGRACJI.md).
 
-Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI są generowane proceduralnie w kodzie.
+Tekstury zastępcze, modele mobów, font i GUI powstają w kodzie. Wybrane tekstury oraz dźwięki i muzyka 1.8 korzystają z pobieranego lokalnie cache assetów Mojang; pliki te nie są dołączane do repozytorium.
 
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-latest-239120?logo=csharp&logoColor=white)
 ![OpenGL](https://img.shields.io/badge/OpenGL-3.3_core-5586A4?logo=opengl&logoColor=white)
 ![OpenTK](https://img.shields.io/badge/OpenTK-4.8-0B3D91)
 ![Platforma](https://img.shields.io/badge/platforma-Windows-0078D6?logo=windows&logoColor=white)
-![Linie kodu](https://img.shields.io/badge/kod-~17_tys._linii-orange)
 ![Status](https://img.shields.io/badge/status-w_rozwoju-yellow)
 
 <img src="docs/media/gif/flyover.gif" alt="Przelot nad proceduralnie wygenerowanym światem" width="640">
@@ -30,12 +29,13 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 
 | | |
 |---|---|
-| 🌍 **Nieskończony świat** | Szum Perlina, biomy las i pustynia, jaskinie, rudy, drzewa, woda na poziomie morza |
+| 🌍 **Świat i wymiary** | Biomy 1.8, struktury, pogoda, Nether i End z portalami |
 | ☀️ **Oświetlenie jak w MC** | Sky light + block light (BFS), smooth lighting, ambient occlusion, cykl dnia i nocy |
 | 🧱 **Pełny survival** | Kopanie wg twardości/narzędzia, crafting 2×2 i 3×3, piec, skrzynie, głód, obrażenia, śmierć |
-| 🐄 **Moby z AI** | 9 mobów, pathfinding A*, spawnowanie w ciemności, rozmnażanie, płonięcie w słońcu |
-| 🔴 **Redstone** | Pył, pochodnie, dźwignie, przyciski, repeatery, lampy, tłoki (też lepkie), TNT, drzwi |
-| 🎨 **Zero assetów** | Pixel-artowe tekstury 16×16, skiny mobów i font z polskimi znakami generowane w kodzie |
+| 🐄 **Moby z AI** | Moby 1.8, konie, oswajanie, rozmnażanie, handel, smok i Wither; ograniczenia zgodności opisuje raport |
+| 🔴 **Redstone** | Komparatory, leje, dozowniki, tłoki, quasi-connectivity, tory i wagoniki; testy reguł 1.8 |
+| 📚 **Przedmioty i mechaniki** | Zaklinanie, kowadło, mikstury, mapy, sztandary, fajerwerki, latarnie, książki, skrzynie Endu i statystyki |
+| 🎵 **Audio i multiplayer** | Mikser 3D, muzyka, host w grze i dołączanie kodem przez przekaźnik |
 
 ---
 
@@ -154,7 +154,7 @@ Bez jednego pliku z grafiką – wszystkie tekstury, modele mobów, font i GUI s
 <summary><b>🌍 Świat</b></summary>
 
 - Rejestr bloków (id + metadata), chunki 16×128×16 dzielone na sekcje 16³
-- Generator terenu: szum Perlina (oktawy), biomy **las** i **pustynia**, plaże, woda na poziomie 63, jaskinie, bedrock
+- Generator terenu: biomy 1.8, plaże, woda na poziomie 63, jaskinie, bedrock, struktury i dekoracje; wysokość świata 256
 - Rudy: węgiel, żelazo, złoto, redstone, lapis, diament
 - Drzewa (dąb, brzoza) jak w MC, kwiaty, trawa, kaktusy, martwe krzaki, trzcina
 - Świat superpłaski

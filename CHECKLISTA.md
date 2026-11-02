@@ -1,4 +1,15 @@
-Stan integracji MC 1.8 z 2026-10-30: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
+Stan integracji MC 1.8 z 2026-11-02: [raport i lista braków](docs/MC18_RAPORT_INTEGRACJI.md). Starsze punkty poniżej są historyczne.
+
+## Aktualizacja 2026-11-02 — fala 2
+
+- [x] .NET 10, świat o wysokości 256, biomy i moby 1.8, portale Netheru/Endu, pogoda i struktury.
+- [x] Zaklinanie, kowadło, mikstury, mapy, fajerwerki, sztandary, osiągnięcia, wędkowanie, czaszki i latarnia.
+- [x] BL2 scalone: skrzynie Endu (osobny ekwipunek gracza), doniczki, bariera, edycja/podpis/kopiowanie książek, ekran statystyk.
+- [x] Po scaleniu BL2: Release bez błędów, selftest 1000 OK / 0 FAIL, `--autotest --bl2 --fps 60` zakończony OK.
+- [ ] Integracja komend i dalszych poprawek multiplayera z osobnych gałęzi CMD/NET2.
+- [ ] Końcowe testy po scaleniu całej fali 2 i przygotowanie Alfa 1.4.
+
+Rejestracja wszystkich mobów i biomów nie oznacza pełnej zgodności każdej mechaniki, grafiki ani generacji z oryginałem. Raport opisuje ograniczenia; część liczników statystyk nadal nie ma wyzwalaczy.
 
 # BlockCraft – checklista implementacji (klon Minecrafta 1.8 w .NET)
 
