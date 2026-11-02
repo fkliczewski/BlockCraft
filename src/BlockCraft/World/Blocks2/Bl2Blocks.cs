@@ -62,6 +62,13 @@ namespace BlockCraft.World
             }
         }
 
+        /// <summary>Świat klienta nie tickuje TE (World.Tick), więc animację wieka u klienta sieciowego napędza ten tick.</summary>
+        public static void TickRemote(World w)
+        {
+            if (w == null || !w.IsRemote) return;
+            foreach (var c in w.Chunks.Values) foreach (var te in c.TileEntities.Values) if (te is EnderChestTile t) t.Tick(w);
+        }
+
         /// <summary>Zamyka GUI wszystkim patrzącym (usunięcie bloku).</summary>
         public void CloseAll() { foreach (var u in _users.ToArray()) if (u.p.OpenContainer == u.c) u.p.CloseContainer(); _users.Clear(); Viewers = 0; }
 

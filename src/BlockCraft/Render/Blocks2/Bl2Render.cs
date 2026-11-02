@@ -200,6 +200,7 @@ namespace BlockCraft
         {
             var w = World; var p = Player;
             if (w == null || p == null) return;
+            EnderChestTile.TickRemote(w);
             bool barrier = p.GameMode == 1 && p.Inventory.Selected?.Id == B.Barrier;
             int px = MathUtil.FloorToInt(p.X), py = MathUtil.FloorToInt(p.Y), pz = MathUtil.FloorToInt(p.Z);
             var r = _bl2Rand;
