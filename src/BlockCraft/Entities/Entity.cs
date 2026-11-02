@@ -56,7 +56,17 @@ public abstract class Entity
 {
     public int Id;
     public World.World World;
-    public double X, Y, Z, PrevX, PrevY, PrevZ, MotionX, MotionY, MotionZ;
+    private double _x, _y, _z;
+    /// <summary>Pozycja; zmiana aktualizuje siatkę przestrzenną świata (World.Grid).</summary>
+    public double X { get => _x; set { _x = value; GridOwner?.Moved(this); } }
+    public double Y { get => _y; set { _y = value; GridOwner?.Moved(this); } }
+    public double Z { get => _z; set { _z = value; GridOwner?.Moved(this); } }
+    public double PrevX, PrevY, PrevZ, MotionX, MotionY, MotionZ;
+    // siatka przestrzenna (World/EntityGrid.cs)
+    internal BlockCraft.World.EntityGrid GridOwner;
+    internal long GridKey, GridSeq;
+    internal int GridIndex;
+    internal bool GridBig;
     public float Yaw, Pitch, PrevYaw, PrevPitch;
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
@@ -118,8 +128,8 @@ public abstract class Entity
 
     public virtual AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
 
-    public void SetPosition(double x, double y, double z) { X = x; Y = y; Z = z; }
-    public void SetPositionAndPrev(double x, double y, double z) { X = PrevX = x; Y = PrevY = y; Z = PrevZ = z; }
+    public void SetPosition(double x, double y, double z) { _x = x; _y = y; _z = z; GridOwner?.Moved(this); }
+    public void SetPositionAndPrev(double x, double y, double z) { _x = PrevX = x; _y = PrevY = y; _z = PrevZ = z; GridOwner?.Moved(this); }
 
     public virtual void PrevTick()
     {

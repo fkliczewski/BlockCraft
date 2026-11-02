@@ -124,6 +124,8 @@ public sealed partial class World : IBlockAccess
 
     public readonly List<Entity> Entities = new();
     public readonly Dictionary<int, Entity> EntityById = new();
+    /// <summary>Siatka przestrzenna encji z World.Entities (zapytania GetEntitiesInBox).</summary>
+    public readonly EntityGrid Grid = new();
     public readonly List<Player> Players = new();
     private readonly List<Entity> _toAdd = new();
     private int _nextEntityId = 1;
@@ -453,7 +455,7 @@ public sealed partial class World : IBlockAccess
         foreach (var e in list)
         {
             if (EntityById.ContainsKey(e.Id)) continue;
-            Entities.Add(e); EntityById[e.Id] = e;
+            Entities.Add(e); EntityById[e.Id] = e; Grid.Add(e);
             if (e is Player p && !Players.Contains(p)) Players.Add(p);
             foreach (var l in Listeners) l.OnEntityAdded(e);
         }
@@ -467,7 +469,7 @@ public sealed partial class World : IBlockAccess
         e.Removed = true;
         if (Entities.Remove(e))
         {
-            EntityById.Remove(e.Id);
+            EntityById.Remove(e.Id); Grid.Remove(e);
             if (e is Player p) Players.Remove(p);
             foreach (var l in Listeners) l.OnEntityRemoved(e);
         }
@@ -476,10 +478,11 @@ public sealed partial class World : IBlockAccess
     public List<Entity> GetEntitiesInBox(AABB box, Entity except = null)
     {
         var res = new List<Entity>();
-        foreach (var e in Entities)
-            if (e != except && !e.Removed && e.BoundingBox.Intersects(box)) res.Add(e);
+        Grid.Query(box, except, res);
         return res;
     }
+    /// <summary>Jak wyżej, ale dopisuje do podanej listy (bez alokacji).</summary>
+    public void GetEntitiesInBox(AABB box, Entity except, List<Entity> into) => Grid.Query(box, except, into);
 
     public void DropItem(double x, double y, double z, ItemStack s, bool scatter = true)
     {
@@ -554,13 +557,14 @@ public sealed partial class World : IBlockAccess
             if (!IsLoadedAt(MathUtil.FloorToInt(e.X), MathUtil.FloorToInt(e.Z)) && e is not Player) continue;
             e.PrevTick();
             e.Tick();
+            Grid.Revalidate(e);
         }
         for (int i = Entities.Count - 1; i >= 0; i--)
         {
             var e = Entities[i];
             if (e.Removed || (e.Dead && e is not Player))
             {
-                Entities.RemoveAt(i); EntityById.Remove(e.Id);
+                Entities.RemoveAt(i); EntityById.Remove(e.Id); Grid.Remove(e);
                 if (e is Player p) Players.Remove(p);
                 e.Removed = true;
                 foreach (var l in Listeners) l.OnEntityRemoved(e);
