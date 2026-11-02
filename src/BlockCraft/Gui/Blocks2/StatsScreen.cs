@@ -21,6 +21,7 @@ public sealed class StatsScreen : Screen
     private int _receivedAtOpen;
 
     public StatsScreen(Screen parent) { _parent = parent; }
+    private const int ColX = 140, ColW = 70;
 
     protected override void Init()
     {
@@ -67,11 +68,11 @@ public sealed class StatsScreen : Screen
     {
         if ((Current is Tab.Blocks or Tab.Items) && my >= 32 && my < 50)
         {
-            int left = W / 2 - 110;
+            int left = W / 2 - 140;
             for (int c = 0; c < 3; c++)
             {
-                int cx = left + 115 + c * 50;
-                if (mx >= cx - 45 && mx < cx + 2)
+                int cx = left + ColX + c * ColW;
+                if (mx >= cx - ColW + 4 && mx < cx + 2)
                 {
                     if (_sortColumn == c) { if (_sortDir == 1) _sortDir = -1; else _sortColumn = -1; }
                     else { _sortColumn = c; _sortDir = 1; }
@@ -90,7 +91,7 @@ public sealed class StatsScreen : Screen
         sb.TextCentered("Statystyki", W / 2f, 20, 0xFFFFFFFF);
         _blocks.Enabled = Rows(stats, true).Count > 0; _items.Enabled = Rows(stats, false).Count > 0; _mobs.Enabled = MobRows(stats).Count > 0;
         if (Loading) { sb.TextCentered("Pobieranie statystyk...", W / 2f, H / 2f, 0xFFFFFFFF); base.Render(mx, my, pt); return; }
-        int top = 32, bottom = H - 64, left = W / 2 - 110;
+        int top = 32, bottom = H - 64, left = W / 2 - 140;
         sb.Fill(0, top, W, bottom - top, 0x60000000);
         switch (Current)
         {
@@ -105,7 +106,7 @@ public sealed class StatsScreen : Screen
                             uint col = i % 2 == 0 ? 0xFFFFFFFF : 0xFF909090;
                             sb.Text(d.Name, left + 2, y + 1, col);
                             string v = Bl2Stats.Format(d.Format, stats.GetValueOrDefault(d.Key));
-                            sb.Text(v, left + 215 - sb.Measure(v), y + 1, col);
+                            sb.Text(v, left + 280 - sb.Measure(v), y + 1, col);
                         }
                         y += 10; i++;
                     }
@@ -119,7 +120,7 @@ public sealed class StatsScreen : Screen
                     for (int c = 0; c < 3; c++)
                     {
                         string h = heads[c] + (_sortColumn == c ? (_sortDir == 1 ? " v" : " ^") : "");
-                        sb.Text(h, left + 115 + c * 50 - sb.Measure(h), top + 5, _sortColumn == c ? 0xFFFFFF80 : 0xFFFFFFFF);
+                        sb.Text(h, left + ColX + c * ColW - sb.Measure(h), top + 5, _sortColumn == c ? 0xFFFFFF80 : 0xFFFFFFFF);
                     }
                     var rows = Rows(stats, blocks, _sortColumn, _sortDir);
                     _scroll = Math.Min(_scroll, Math.Max(0, rows.Count * 20 - (bottom - top - 20) + 4));
@@ -134,7 +135,7 @@ public sealed class StatsScreen : Screen
                             for (int c = 0; c < 3; c++)
                             {
                                 string v = Bl2Stats.Format(StatFormat.Simple, stats.GetValueOrDefault(cols[c] + id));
-                                sb.Text(v, left + 115 + c * 50 - sb.Measure(v), y + 5, odd ? 0xFF909090 : 0xFFFFFFFF);
+                                sb.Text(v, left + ColX + c * ColW - sb.Measure(v), y + 5, odd ? 0xFF909090 : 0xFFFFFFFF);
                             }
                             if (mx >= left && mx < left + 18 && my >= y && my < y + 18) sb.Text(new ItemStack(id).Name, mx + 12, my - 12, 0xFFFFFFFF);
                         }
