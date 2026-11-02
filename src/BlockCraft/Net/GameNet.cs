@@ -57,6 +57,7 @@ public sealed partial class Game : INetClientHost
         Server = new NetServer(Dimensions?.Get(DimensionId.Overworld) ?? World)
         {
             HostPlayer = () => Player,
+            HostCtrl = () => Ctrl,
             ViewDistance = Math.Max(4, Settings.RenderDistance),
             DefaultGameMode = _level?.GameMode ?? 0,
         };

@@ -33,6 +33,8 @@ public static partial class SelfTest
         TestNetLoopback();
         Console.WriteLine("-- Sieć: Tailcat.Link przez przekaźnik w pamięci");
         TestNetTailcat().GetAwaiter().GetResult();
+        Console.WriteLine("-- Sieć: NET2 (gość jak gracz jednoosobowy)");
+        TestNet2();
     }
 
     private static void TestNetProtocol()

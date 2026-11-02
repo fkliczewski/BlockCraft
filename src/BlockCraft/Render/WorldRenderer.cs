@@ -565,20 +565,33 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         er.Flush(er.Terrain, Terrain);
 
         // --- pęknięcia ---
-        if (sel.HasValue && breakStage >= 0)
+        // własne kopanie i kopanie innych graczy (sieć: World.DestroyProgress)
+        var cracks = new List<(int x, int y, int z, int stage)>();
+        if (sel.HasValue && breakStage >= 0) cracks.Add((sel.Value.X, sel.Value.Y, sel.Value.Z, breakStage));
+        foreach (var (id, a) in w.DestroyProgress)
         {
-            var h = sel.Value;
+            if (viewer != null && id == viewer.Id) continue;
+            double cdx = a.X + .5 - cam.X, cdy = a.Y + .5 - cam.Y, cdz = a.Z + .5 - cam.Z;
+            if (cdx * cdx + cdy * cdy + cdz * cdz > 1024 || w.GetBlock(a.X, a.Y, a.Z) == 0) continue;
+            cracks.Add((a.X, a.Y, a.Z, a.Stage));
+        }
+        if (cracks.Count > 0)
+        {
             var boxes = new List<AABB>();
-            Block.Get(w.GetBlock(h.X, h.Y, h.Z)).GetSelectionBoxes(w, h.X, h.Y, h.Z, w.GetMeta(h.X, h.Y, h.Z), boxes);
             GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.DstColor, BlendingFactor.SrcColor);
             GL.Enable(EnableCap.PolygonOffsetFill); GL.PolygonOffset(-3f, -3f); GL.DepthMask(false);
             er.Terrain.Sky = 15; er.Terrain.Blk = 15; er.Terrain.Color = Vector4.One; er.Terrain.Overlay = Vector4.Zero;
             er.Terrain.FlatShade = true;
-            int layer = TextureGen.Layer("destroy_" + Math.Clamp(breakStage, 0, 9));
-            foreach (var b in boxes)
+            foreach (var h in cracks)
             {
-                var bb = b.Offset(h.X - cam.X, h.Y - cam.Y, h.Z - cam.Z).Grow(0.002);
-                CrackBox(er.Terrain, bb, layer);
+                boxes.Clear();
+                Block.Get(w.GetBlock(h.x, h.y, h.z)).GetSelectionBoxes(w, h.x, h.y, h.z, w.GetMeta(h.x, h.y, h.z), boxes);
+                int layer = TextureGen.Layer("destroy_" + Math.Clamp(h.stage, 0, 9));
+                foreach (var b in boxes)
+                {
+                    var bb = b.Offset(h.x - cam.X, h.y - cam.Y, h.z - cam.Z).Grow(0.002);
+                    CrackBox(er.Terrain, bb, layer);
+                }
             }
             er.Shader.Set("uSun", 1f);
             er.Flush(er.Terrain, Terrain);

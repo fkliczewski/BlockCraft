@@ -73,6 +73,7 @@ public sealed partial class NetServer
     public void AfterTick()
     {
         UpdateEntityStates();
+        UpdateBreaks();
         bool teScan = _tick % 4 == 0;
         if (teScan) ScanTileEntities();
         foreach (var c in Clients.ToArray())
@@ -298,7 +299,8 @@ public sealed partial class NetServer
         public int Qx, Qy, Qz; public byte Yaw, Pitch, Flags;
         public long EquipHash = -1; public byte[] Data; public int NetData;
         public bool Dead; public int HurtTime;
-        public bool Moved, EquipChanged, DataChanged;
+        public bool Moved, EquipChanged, DataChanged, LinksChanged;
+        public EntityLinkIds Links = EntityLinkIds.None;
         public readonly List<(EntityEventKind kind, float arg)> Events = new();
     }
 
@@ -311,7 +313,8 @@ public sealed partial class NetServer
         foreach (var w in _taps.Keys)
             foreach (var e in w.Entities)
             {
-                if (e.Removed) continue;
+                // części smoka nie są wysyłane: klient tworzy własne z ID wyliczonym z ID smoka (NetLinks.DragonPartId)
+                if (e.Removed || e is DragonPart) continue;
                 alive.Add(e);
                 bool fresh = !_ents.TryGetValue(e, out var s);
                 if (fresh) _ents[e] = s = new EntState();
@@ -323,6 +326,8 @@ public sealed partial class NetServer
                 long eh = EquipHash(e);
                 s.EquipChanged = eh != s.EquipHash && !fresh; s.EquipHash = eh;
                 s.DataChanged = false;
+                var links = NetLinks.Of(e);
+                s.LinksChanged = links != s.Links; s.Links = links;
                 int nd = e.NetData;
                 if (fresh || dataTick || nd != s.NetData)
                 {
@@ -448,6 +453,8 @@ public sealed partial class NetServer
             foreach (var c in _s.Clients)
             {
                 if (c == _s._actor || c.P?.World != _w || c.P.DistanceSq(x, y, z) > 48 * 48) continue;
+                // okruchy jedzenia przy ustach gracza: jego klient wyświetlił je sam (Player.UseItemTick)
+                if (kind == ParticleKind.BlockBreak && data < 0 && c.P.DistanceSq(x, y - c.P.EyeHeight + 0.1, z) < 0.01) continue;
                 var bw = c.Out.Begin(S2C.Particles);
                 bw.Write((byte)kind); bw.Write(x); bw.Write(y); bw.Write(z); bw.Write(count); bw.Write(data);
                 c.Out.End();

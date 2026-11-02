@@ -90,7 +90,7 @@ public sealed partial class RemoteClient : IPlayerHandler
         if (i.TeleportAck > _ackTeleport) _ackTeleport = i.TeleportAck;
         // host przesunął gracza od ostatniego ruchu klienta (komenda, perła, łóżko) - ten ruch jest już nieaktualny
         double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
-        if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) SendTeleport();
+        if (!Riding && hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) SendTeleport();
         if (i.TeleportAck >= TeleportId && !p.Sleeping && !p.Dead) _inMoves.Enqueue(i);
         p.Sneaking = i.Sneaking; p.Sprinting = i.Sprinting; p.IsJumping = i.Jumping;
         p.Flying = i.Flying && p.AllowFlying;
@@ -107,7 +107,7 @@ public sealed partial class RemoteClient : IPlayerHandler
             if (dist <= Ctrl.Reach + 1.5 && i.HitFace is >= 0 and < 6)
                 Ctrl.Hit = new World.World.HitResult { Hit = true, X = i.HitX, Y = i.HitY, Z = i.HitZ, Face = i.HitFace, HitX = hx, HitY = hy, HitZ = hz, Distance = dist };
         }
-        else if (i.HitKind == 2 && W.EntityById.TryGetValue(i.HitEntity, out var e) && e != p && !e.Removed && e.DistanceSq(ex, ey, ez) < 8 * 8)
+        else if (i.HitKind == 2 && ResolveEntity(i.HitEntity) is { } e && e != p && !e.Removed && NetLinks.DistanceSqToBox(e, ex, ey, ez) < 6.5 * 6.5)
             Ctrl.HitEntity = e;
 
         Server.SetActor(this);
@@ -157,6 +157,8 @@ public sealed partial class RemoteClient : IPlayerHandler
             {
                 var i = _inMoves.Dequeue();
                 if (i.TeleportAck < TeleportId || p.Sleeping || p.Dead) continue;
+                // w pojeździe pozycję wyznacza pojazd hosta; klient podaje tylko kierunek patrzenia (C0CPacketInput + C05PacketPlayerLook)
+                if (Riding) { p.Yaw = i.Yaw; p.Pitch = i.Pitch; LastX = p.X; LastY = p.Y; LastZ = p.Z; continue; }
                 double hx0 = p.X - LastX, hy0 = p.Y - LastY, hz0 = p.Z - LastZ;
                 if (hx0 * hx0 + hy0 * hy0 + hz0 * hz0 > 1e-6) { SendTeleport(); return; }
                 double dx = i.X - p.X, dy = i.Y - p.Y, dz = i.Z - p.Z;
@@ -327,6 +329,8 @@ public sealed partial class RemoteClient : IPlayerHandler
     {
         _ticks++;
         if (W != _world) ChangeWorld();
+        SyncSelfLinks();
+        if (Riding) { LastX = P.X; LastY = P.Y; LastZ = P.Z; }
         // teleport (komenda, łóżko, odrodzenie, perła...) - pozycja zmieniona przez hosta
         double ddx = P.X - LastX, ddy = P.Y - LastY, ddz = P.Z - LastZ;
         if (ddx * ddx + ddy * ddy + ddz * ddz > 1e-6) SendTeleport();
@@ -341,6 +345,7 @@ public sealed partial class RemoteClient : IPlayerHandler
         FlushBlocks();
         if (teScan) SendTiles();
         TrackEntities();
+        SendSelfEvents();
         SendStats();
         if (_ticks % 100 == 0) ForceSync();
         SyncInventory();
@@ -455,7 +460,7 @@ public sealed partial class RemoteClient : IPlayerHandler
 
     private void TrackEntities()
     {
-        _seen.Clear(); _moves.Clear();
+        _seen.Clear(); _moves.Clear(); _links.Clear();
         double range = Math.Min(ViewDistance * 16, 96);
         foreach (var e in W.Entities)
         {
@@ -470,8 +475,10 @@ public sealed partial class RemoteClient : IPlayerHandler
                 _tracked[e.Id] = e;
                 Spawn(e, st);
                 _moves.Add((e, st));
+                if (!st.Links.IsNone) _links.Add((e.Id, st.Links));
                 continue;
             }
+            if (st.LinksChanged) _links.Add((e.Id, st.Links));
             if (st.Moved) _moves.Add((e, st));
             if (st.EquipChanged) Equip(e);
             if (st.DataChanged && st.Data != null)
@@ -487,6 +494,9 @@ public sealed partial class RemoteClient : IPlayerHandler
             foreach (var (e, s) in _moves) { w.Write(e.Id); w.Write(s.Qx); w.Write(s.Qy); w.Write(s.Qz); w.Write(s.Yaw); w.Write(s.Pitch); w.Write(s.Flags); }
             Out.End();
         }
+        // po spawnach i ruchach: pojazd i jeździec są już u klienta
+        foreach (var (id, l) in _links) NetServer.WriteLinks(Out, id, l);
+        _links.Clear();
         if (_tracked.Count > _seen.Count)
         {
             var gone = _tracked.Keys.Where(id => !_seen.Contains(id)).ToList();

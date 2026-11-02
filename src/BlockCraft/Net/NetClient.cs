@@ -34,7 +34,7 @@ public sealed class LoginInfo
 /// Lokalny gracz porusza się sam (jak w MC) i wysyła co tick ruch oraz akcje; kopanie, stawianie i kliknięcia w GUI
 /// są przewidywane lokalnie, a host i tak odsyła prawdziwy stan.
 /// </summary>
-public sealed class NetClient
+public sealed partial class NetClient
 {
     public readonly INetConnection Conn;
     private LinkClientService _link;
@@ -152,6 +152,7 @@ public sealed class NetClient
             if (G == null) return; // rozłączono w trakcie
         }
         if (P == null) return;
+        TickSync();
         // zamknięcie okna przez gracza -> host
         if (_window != null && P.OpenContainer != _window)
         {
@@ -375,7 +376,7 @@ public sealed class NetClient
             case S2C.RemoveEntities:
                 {
                     int n = r.ReadInt32();
-                    for (int i = 0; i < n; i++) { int id = r.ReadInt32(); if (id != p.Id && w.EntityById.TryGetValue(id, out var e)) w.RemoveEntity(e); }
+                    for (int i = 0; i < n; i++) { int id = r.ReadInt32(); OnRemoved(id); if (id != p.Id && w.EntityById.TryGetValue(id, out var e)) w.RemoveEntity(e); }
                     break;
                 }
             case S2C.Sound:
@@ -484,6 +485,8 @@ public sealed class NetClient
                     break;
                 }
             case S2C.ChangeDimension: ChangeDimension(r.ReadSByte(), r.ReadInt32()); break;
+            case S2C.BlockBreakAnim: BlockBreakAnim(r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadSByte()); break;
+            case S2C.EntityLinks: EntityLinks(r.ReadInt32(), new EntityLinkIds(r.ReadInt32(), r.ReadInt32(), r.ReadInt32())); break;
         }
     }
 
@@ -492,7 +495,7 @@ public sealed class NetClient
         if (!W.Chunks.TryRemove(key, out var c)) return;
         c.Unloaded = true;
         foreach (var e in W.Entities.ToArray())
-            if (e != P && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz) W.RemoveEntity(e);
+            if (e != P && e is not DragonPart && (MathUtil.FloorToInt(e.X) >> 4) == c.Cx && (MathUtil.FloorToInt(e.Z) >> 4) == c.Cz) W.RemoveEntity(e);
     }
 
     private void ApplyTile(int x, int y, int z, int type, byte[] data)
@@ -521,6 +524,7 @@ public sealed class NetClient
         e.IsRemoteControlled = true;
         e.NetX = e.X; e.NetY = e.Y; e.NetZ = e.Z; e.NetYaw = e.Yaw; e.NetPitch = e.Pitch;
         w.AddEntityNow(e);
+        OnSpawned(e);
     }
 
     private static void LoadKeepingPosition(Entity e, byte[] data, int netData)
@@ -614,6 +618,7 @@ public sealed class NetClient
     {
         _dim = dim; _gen++;
         _decoding.Clear(); _deferred.Clear();
+        ResetSync();
         W.RemoveEntity(P);
         P.Id = entityId;
         P.Removed = false;

@@ -40,7 +40,13 @@ public sealed class EnderDragon : Mob
         Tail1 = new(this, "tail", 4, 4); Tail2 = new(this, "tail", 4, 4); Tail3 = new(this, "tail", 4, 4);
         Wing1 = new(this, "wing", 4, 4); Wing2 = new(this, "wing", 4, 4);
         Parts = new[] { Head, Body, Tail1, Tail2, Tail3, Wing1, Wing2 };
-        foreach (var p in Parts) { p.SetPositionAndPrev(X, Y, Z); World.SpawnEntity(p); }
+        for (int i = 0; i < Parts.Length; i++)
+        {
+            var p = Parts[i];
+            // klient: części mają ID wyliczone z ID smoka u hosta, dzięki czemu gość może je trafić (sieć, NetLinks)
+            if (World.IsRemote) { p.IsRemoteControlled = true; p.Id = Net.NetLinks.DragonPartId(Id, i); }
+            p.SetPositionAndPrev(X, Y, Z); World.SpawnEntity(p);
+        }
     }
 
     /// <summary>getMovementOffsets: odczyt bufora ostatnich 64 pozycji (odchylenie, wysokość) z interpolacją.</summary>
