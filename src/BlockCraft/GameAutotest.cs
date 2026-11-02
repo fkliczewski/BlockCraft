@@ -14,6 +14,7 @@ public sealed partial class Game
     /// <summary>Krok czeka też na ticki gry (klatki/3, czyli tyle, ile przy 60 FPS): przy VSync 144 Hz albo bez limitu
     /// sama liczba klatek dawała za mało ticków i testy redstone/lejów padały losowo.</summary>
     private long _waitTick;
+    private long _evalTick = -1; private int _evalCount;
     private string _shotDir;
 
     private void Shot(string name) => TakeScreenshot(Path.Combine(_shotDir, name + ".png"));
@@ -212,6 +213,13 @@ public sealed partial class Game
             ok = true;
         }
         if (_steps.Count == 0) return;
-        if (ok) { _steps.Dequeue(); if (_steps.Count > 0) { _waitFrames = _steps.Peek().frames; _waitTick = _tickCount + (_waitFrames + 2) / 3; } }
+        if (!ok)
+        {
+            // Liczniki limitów w WaitUntil (++t > N) liczą wywołania. Najwyżej 3 sprawdzenia na tick gry, czyli tyle,
+            // ile przy 60 FPS: przy ~1500 FPS bez limitu oczekiwania kończyły się po ułamku zamierzonego czasu.
+            if (_tickCount != _evalTick) { _evalTick = _tickCount; _evalCount = 0; }
+            if (++_evalCount >= 3) _waitTick = _tickCount + 1;
+        }
+        if (ok) { _evalCount = 0; _steps.Dequeue(); if (_steps.Count > 0) { _waitFrames = _steps.Peek().frames; _waitTick = _tickCount + (_waitFrames + 2) / 3; } }
     }
 }
