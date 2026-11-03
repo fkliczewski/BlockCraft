@@ -30,6 +30,8 @@ public sealed class Horse : Animal
     private static double RandomJump(Rng r) => .4 + r.NextDouble() * .2 + r.NextDouble() * .2 + r.NextDouble() * .2;
 
     public override string TypeKey => HorseType switch { 1 => "donkey", 2 => "mule", 3 => "zombie_horse", 4 => "skeleton_horse", _ => "horse" };
+    protected override double PanicSpeed => 1.2; // EntityHorse: EntityAIPanic(1.2), EntityAIWander(0.7)
+    protected override double WanderSpeed => .7;
     public override string DisplayName => Names[Math.Clamp(HorseType, 0, 4)];
     public bool Undead => HorseType >= 3;
     public bool CanCarryChest => HorseType is 1 or 2;

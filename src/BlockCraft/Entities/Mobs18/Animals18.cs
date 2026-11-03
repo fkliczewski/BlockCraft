@@ -162,6 +162,8 @@ public sealed class Ocelot : Tameable
     public Ocelot(World.World w):base(w) { Width=.6f; Height=.7f; MaxHealth=Health=10; MoveSpeed=.3; }
     public override string TypeKey=>"ocelot";
     public override string DisplayName=>Tamed?"Kot":"Ocelot";
+    protected override double PanicSpeed=>1.33; // EntityOcelot: ucieczka 1.33, EntityAIWander(0.8)
+    protected override double WanderSpeed=>.8;
     public override string LivingSound=>!Tamed?null:InLove>0?"mob.cat.purreow":World.Rand.Next(4)==0?"mob.cat.purr":"mob.cat.meow";
     public override string HurtSound=>"mob.cat.hitt";
     public override string DeathSound=>"mob.cat.hitt";
@@ -221,7 +223,7 @@ public sealed class Ocelot : Tameable
 
 public sealed class Rabbit : Animal
 {
-    public int RabbitType; private int _hop,_raid,_attack,_carrotTicks;
+    public int RabbitType; private int _raid,_attack,_carrotTicks,_moveDur; private bool _wasOnGround=true; private float _hopSpeed,_hopUp=.2f;
     public float JumpAnim;
     public Rabbit(World.World w):base(w) { Width=.6f; Height=.7f; MaxHealth=Health=3; MoveSpeed=.3; RabbitType=-1; }
     public override string TypeKey=>RabbitType==99?"killer_bunny":"rabbit";
@@ -252,7 +254,35 @@ public sealed class Rabbit : Animal
         base.Tick();
         if(JumpAnim>0) JumpAnim=Math.Max(0,JumpAnim-.1f);
     }
-    public override void Jump() { MotionY=CollidedH?.5:.3; OnGround=false; JumpAnim=1; World.PlaySound("mob.rabbit.hop",X,Y,Z,.8f,((World.Rand.NextFloat()-World.Rand.NextFloat())*.2f+1f)*.8f); }
+    protected override double PanicSpeed=>2.2;
+    protected override double WanderSpeed=>.6; // EntityAIWander(0.6)
+    /// <summary>EntityRabbit 1.8: królik nie chodzi, tylko skacze. Na ziemi prędkość 0 (RabbitMoveHelper), skok co ok. 10 ticków
+    /// po wylądowaniu, w skoku 1.5 x prędkość typu ruchu (HOP 0.8, SPRINT 1.75 przy mnożniku AI powyżej 0.8).
+    /// Wcześniej szedł po ziemi jak krowa z prędkością 0.3 (3,9 b/s), a w panice 0.66 (kilkanaście b/s).</summary>
+    protected override void UpdateAI()
+    {
+        base.UpdateAI();
+        if(InWater||InLava) { _wasOnGround=OnGround; return; }
+        bool sprint=Nav.HasPath&&MoveSpeed>0&&Nav.Speed/MoveSpeed>.8;
+        if(_moveDur>0) _moveDur--;
+        if(OnGround) {
+            if(!_wasOnGround) _moveDur=RabbitType==99&&Target!=null?3:10;
+            if(Nav.HasPath&&_moveDur==0) {
+                _hopSpeed=(float)(MoveSpeed*1.5*(sprint?1.75:.8));
+                _hopUp=Nav.NextY>Y+.5||CollidedH?.5f:sprint?.4f:.2f;
+                SetMoveSpeed(_hopSpeed); IsJumping=true;
+            }
+            else { SetMoveSpeed(0); IsJumping=false; }
+        }
+        else SetMoveSpeed(Nav.HasPath?_hopSpeed:0);
+        _wasOnGround=OnGround;
+    }
+    public override void Jump()
+    {
+        MotionY=_hopUp;
+        if(_hopSpeed>0&&MotionX*MotionX+MotionZ*MotionZ<.01) MoveFlying(0,1,.1f); // EntityRabbit.jump: odbicie, gdy stoi
+        JumpAnim=1; World.PlaySound("mob.rabbit.hop",X,Y,Z,.8f,((World.Rand.NextFloat()-World.Rand.NextFloat())*.2f+1f)*.8f);
+    }
     protected override void Think()
     {
         if(_attack>0) _attack--;
@@ -265,10 +295,9 @@ public sealed class Rabbit : Animal
             else base.Think();
         } else {
             Entity danger=World.GetEntitiesInBox(BoundingBox.Grow(10,3,10),this).FirstOrDefault(e=>e is Wolf&&DistanceSq(e)<100||e is Monster&&DistanceSq(e)<16||e is Player p&&!p.Spectator&&!p.Creative&&DistanceSq(e)<64&&!IsBreedingItem(p.Inventory.Selected));
-            if(danger!=null&&PanicTicks==0) { if(Age%10==0||!Nav.HasPath) Nav.MoveTo(X+(X-danger.X)*2,Y,Z+(Z-danger.Z)*2,MoveSpeed*2.2); }
+            if(danger!=null&&PanicTicks==0) { if(Age%10==0||!Nav.HasPath) Nav.MoveTo(X+(X-danger.X)*2,Y,Z+(Z-danger.Z)*2,MoveSpeed*1.33); } // AIAvoidEntity(1.33)
             else if(!RaidFarm()) base.Think();
         }
-        if(OnGround&&Nav.HasPath&&--_hop<=0) { IsJumping=true; _hop=PanicTicks>0?2:10; }
     }
     /// <summary>EntityRabbit.AIRaidFarm: zjada dojrzałe marchewki (wiek - 1 albo zniszczenie).</summary>
     private bool RaidFarm()

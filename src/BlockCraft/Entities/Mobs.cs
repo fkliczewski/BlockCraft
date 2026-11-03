@@ -113,6 +113,11 @@ public abstract class Animal : Mob
 
     protected Animal(World.World w) : base(w) { }
 
+    /// <summary>Mnożnik EntityAIPanic z 1.8 (krowa 2.0, świnia i owca 1.25, kura 1.4, koń 1.2). Prędkość rośnie z kwadratem, więc liczy się dokładna wartość.</summary>
+    protected virtual double PanicSpeed => 1.25;
+    /// <summary>Mnożnik EntityAIWander z 1.8 (zwykle 1.0, ocelot 0.8, królik 0.6).</summary>
+    protected virtual double WanderSpeed => 1.0;
+
     public override void Tick()
     {
         base.Tick();
@@ -144,9 +149,9 @@ public abstract class Animal : Mob
                 for (int i = 0; i < 10; i++)
                 {
                     int tx = MathUtil.FloorToInt(X) + World.Rand.Next(11) - 5, tz = MathUtil.FloorToInt(Z) + World.Rand.Next(11) - 5;
-                    if (Nav.MoveTo(tx, Y, tz, baseSpeed * 1.25 * 1.25)) break;
+                    if (Nav.MoveTo(tx, Y, tz, baseSpeed * PanicSpeed)) break;
                 }
-            else Nav.SetSpeed(baseSpeed * 1.6);
+            else Nav.SetSpeed(baseSpeed * PanicSpeed);
             return;
         }
         // rozmnażanie
@@ -202,7 +207,7 @@ public abstract class Animal : Mob
                 }
         }
         LookAtPlayersRandomly();
-        Wander(baseSpeed);
+        Wander(baseSpeed * WanderSpeed);
     }
 
     public override bool Interact(Player p)
@@ -231,6 +236,7 @@ public class Cow : Animal
 {
     public Cow(World.World w) : base(w) { Width = 0.9f; Height = 1.4f; MaxHealth = 10; Health = 10; MoveSpeed = 0.2; }
     public override string TypeKey => "cow";
+    protected override double PanicSpeed => 2.0;
     public override string DisplayName => "Krowa";
     public override string LivingSound => "mob.cow.say";
     public override string StepSoundName => "mob.cow.step";
@@ -389,6 +395,7 @@ public sealed class Chicken : Animal
         Width = 0.4f; Height = 0.7f; MaxHealth = 4; Health = 4; MoveSpeed = 0.25; EggTimer = w.Rand.Next(6000) + 6000;
     }
     public override string TypeKey => "chicken";
+    protected override double PanicSpeed => 1.4;
     public override string DisplayName => "Kurczak";
     public override string LivingSound => "mob.chicken.say";
     public override string StepSoundName => "mob.chicken.step";

@@ -50,7 +50,17 @@ public sealed class Mixer : ISampleProvider
     public const int MaxVoices = 32;
     public const float OutputGain = 0.5f; // 6 dB zapasu przy sumowaniu wielu źródeł
     public const float PeakCeiling = 0.65f;
-    const int DuplicateFrames = 44100 / 30; // powtórne zgłoszenie w tej samej klatce audio
+    /// <summary>Promień (bloki), w którym zgłoszenia tego samego efektu w krótkim odstępie scalają się w jeden głos.</summary>
+    public const double MergeDistance = 6;
+    /// <summary>Ile kopii jednego efektu może brzmieć naraz (reszta: najstarsza wygasa).</summary>
+    public const int MaxSameEvent = 4;
+    /// <summary>Okno scalania: 25% długości próbki, 60-150 ms (uderzenia przy kopaniu co 200 ms zostają osobne).</summary>
+    static long MergeWindow(Voice v)
+    {
+        double frames = v.Frames > 0 && v.Reader == null ? v.Frames / Math.Max(.01, v.Step) : 44100;
+        return (long)Math.Clamp(frames * .25, 44100 * .06, 44100 * .15);
+    }
+    double DistSqToListener(Voice v) { double dx = v.X - LX, dy = v.Y - LY, dz = v.Z - LZ; return dx * dx + dy * dy + dz * dz; }
     static readonly float LimiterRelease = 1f - MathF.Exp(-1f / (44100f * .15f));
     public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
 
@@ -117,17 +127,28 @@ public sealed class Mixer : ISampleProvider
                 if (_voices[i].Done) { _voices[i].Dispose(); _voices.RemoveAt(i); }
             if (v.Positional && v.EventKey != null && !v.EventKey.StartsWith("note.") && v.Category != "record")
             {
-                int overlaps = 0;
+                // Ta sama próbka uruchomiona kilka razy z przesunięciem kilku-kilkudziesięciu ms brzmi jak echo
+                // (np. setki TNT obok siebie, seria ciosów, kilka mobów naraz). Takie zgłoszenia scalają się w jeden głos:
+                // bierze najwyższą głośność i bliższą pozycję. Okno zależy od długości próbki (wybuch 150 ms, krok ok. 125 ms).
+                long window = MergeWindow(v);
+                int overlaps = 0, same = 0; Voice oldest = null;
                 foreach (var other in _voices)
                 {
-                    if (other.EventKey != v.EventKey || !other.Positional) continue;
-                    double dx = other.X - v.X, dy = other.Y - v.Y, dz = other.Z - v.Z;
-                    if (dx * dx + dy * dy + dz * dz > .0625) continue;
-                    overlaps++;
-                    if (_mixedFrames - other.StartedAtFrame < DuplicateFrames && Math.Abs(other.EventPitch - v.EventPitch) < .01f)
-                    { SuppressedDuplicates++; v.Done = true; v.Dispose(); return; }
+                    if (other.Done || other.FadeSpeed < 0 || other.EventKey != v.EventKey || !other.Positional) continue;
+                    same++;
+                    if (oldest == null || other.StartedAtFrame < oldest.StartedAtFrame) oldest = other;
+                    double dx = other.X - v.X, dy = other.Y - v.Y, dz = other.Z - v.Z, d2 = dx * dx + dy * dy + dz * dz;
+                    if (d2 <= MergeDistance * MergeDistance && _mixedFrames - other.StartedAtFrame < window)
+                    {
+                        if (DistSqToListener(v) < DistSqToListener(other)) { other.X = v.X; other.Y = v.Y; other.Z = v.Z; }
+                        other.Volume = Math.Max(other.Volume, v.Volume); other.AttDist = Math.Max(other.AttDist, v.AttDist);
+                        SuppressedDuplicates++; v.Done = true; v.Dispose(); return;
+                    }
+                    if (d2 <= .0625) overlaps++;
                 }
                 if (overlaps >= 2) { SuppressedDuplicates++; v.Done = true; v.Dispose(); return; }
+                // najwyżej kilka kopii jednego efektu naraz: najstarsza szybko wygasa (bez trzasku)
+                if (same >= MaxSameEvent) oldest.FadeOut(.08f);
             }
             if (_voices.Count >= MaxVoices)
             {
