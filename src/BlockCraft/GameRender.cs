@@ -23,7 +23,27 @@ public sealed partial class Game
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         bool worldVisible = (_screen == null || _screen.ShowWorld) && Renderer.World != null;
-        if (worldVisible && World != null && Player != null && _sessionStarted) RenderGameWorld(pt, fw, fh);
+        if (worldVisible && World != null && Player != null && _sessionStarted)
+        {
+            // Skala renderu 3D (słabe GPU): świat w mniejszym buforze, rozciągnięty na ekran; HUD i GUI w pełnej rozdzielczości.
+            int sc = Math.Clamp(Settings.RenderScale, 25, 100);
+            if (sc < 100)
+            {
+                int sw = Math.Max(1, fw * sc / 100), sh = Math.Max(1, fh * sc / 100);
+                if (_scaleFb == null) _scaleFb = new Framebuffer(sw, sh);
+                else if (_scaleFb.Width != sw || _scaleFb.Height != sh) _scaleFb.Resize(sw, sh);
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, _scaleFb.Fbo);
+                GL.Viewport(0, 0, sw, sh);
+                GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                RenderGameWorld(pt, sw, sh);
+                GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _scaleFb.Fbo);
+                GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
+                GL.BlitFramebuffer(0, 0, sw, sh, 0, 0, fw, fh, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Linear);
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                GL.Viewport(0, 0, fw, fh);
+            }
+            else RenderGameWorld(pt, fw, fh);
+        }
         else if (_menuWorld != null && Renderer.World == _menuWorld) RenderMenuWorld(pt, fw, fh);
 
         // GUI
@@ -36,6 +56,8 @@ public sealed partial class Game
         DrawAchievementNotice();
         Sb.End();
     }
+
+    private Framebuffer _scaleFb;
 
     private void RenderMenuWorld(float pt, int fw, int fh)
     {

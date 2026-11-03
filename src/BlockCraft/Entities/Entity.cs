@@ -56,7 +56,18 @@ public abstract class Entity
 {
     public int Id;
     public World.World World;
-    public double X, Y, Z, PrevX, PrevY, PrevZ, MotionX, MotionY, MotionZ;
+    private double _x, _y, _z;
+    /// <summary>Pozycja; zmiana aktualizuje siatkę przestrzenną świata (World.Grid).</summary>
+    public double X { get => _x; set { _x = value; GridOwner?.Moved(this); } }
+    public double Y { get => _y; set { _y = value; GridOwner?.Moved(this); } }
+    public double Z { get => _z; set { _z = value; GridOwner?.Moved(this); } }
+    public double PrevX, PrevY, PrevZ, MotionX, MotionY, MotionZ;
+    // siatka przestrzenna (World/EntityGrid.cs)
+    internal BlockCraft.World.EntityGrid GridOwner;
+    internal long GridKey, GridSeq;
+    internal int GridIndex;
+    internal bool GridBig, GridCustomBox, GridPure;
+    internal BlockCraft.World.EntityGrid.Cell GridCell;
     public float Yaw, Pitch, PrevYaw, PrevPitch;
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
@@ -118,8 +129,8 @@ public abstract class Entity
 
     public virtual AABB BoundingBox => new(X - Width / 2, Y, Z - Width / 2, X + Width / 2, Y + Height, Z + Width / 2);
 
-    public void SetPosition(double x, double y, double z) { X = x; Y = y; Z = z; }
-    public void SetPositionAndPrev(double x, double y, double z) { X = PrevX = x; Y = PrevY = y; Z = PrevZ = z; }
+    public void SetPosition(double x, double y, double z) { _x = x; _y = y; _z = z; GridOwner?.Moved(this); }
+    public void SetPositionAndPrev(double x, double y, double z) { _x = PrevX = x; _y = PrevY = y; _z = PrevZ = z; GridOwner?.Moved(this); }
 
     public virtual void PrevTick()
     {
@@ -172,7 +183,11 @@ public abstract class Entity
 
     public void UpdateFluidState()
     {
-        var bb = BoundingBox.Grow(-0.001, -0.401, -0.001);
+        var full = BoundingBox;
+        if (World.IsAirBox(MathUtil.FloorToInt(full.MinX), MathUtil.FloorToInt(full.MinY), MathUtil.FloorToInt(full.MinZ),
+                MathUtil.FloorToInt(full.MaxX), MathUtil.FloorToInt(full.MaxY), MathUtil.FloorToInt(full.MaxZ)))
+        { InWater = false; InLava = false; return; } // brak płynów w zasięgu obu testów IsAnyLiquid
+        var bb = full.Grow(-0.001, -0.401, -0.001);
         bool wasIn = InWater;
         InWater = World.IsAnyLiquid(bb, false);
         InLava = World.IsAnyLiquid(BoundingBox.Grow(-0.1, -0.4, -0.1), true);
@@ -242,6 +257,24 @@ public abstract class Entity
         if (InWeb) { InWeb = false; dx *= 0.25; dy *= 0.05000000074505806; dz *= 0.25; MotionX = 0; MotionY = 0; MotionZ = 0; }
         double odx = dx, ody = dy, odz = dz;
         var box = BoundingBox;
+
+        // Szybka ścieżka: w obszarze ruchu (z zapasem na blok pod stopami i kolizje z blokami) samo powietrze,
+        // brak ścian granicy świata. Wtedy nic nie przycina ruchu i nie ma kolizji: wynik identyczny z pełną ścieżką.
+        if (!(OnGround && IsSneakingForEdge))
+        {
+            var ex = box.Expand(dx, dy, dz);
+            if (World.IsAirBox(MathUtil.FloorToInt(ex.MinX - 0.01), MathUtil.FloorToInt(ex.MinY) - 1, MathUtil.FloorToInt(ex.MinZ - 0.01),
+                    MathUtil.FloorToInt(ex.MaxX + 0.01), MathUtil.FloorToInt(ex.MaxY) + 1, MathUtil.FloorToInt(ex.MaxZ + 0.01))
+                && World.NoBorderBoxes(ex))
+            {
+                var fb = box.Offset(0, dy, 0); fb = fb.Offset(dx, 0, 0); fb = fb.Offset(0, 0, dz);
+                X = (fb.MinX + fb.MaxX) / 2; Y = fb.MinY; Z = (fb.MinZ + fb.MaxZ) / 2;
+                CollidedH = false; CollidedV = false; OnGround = false;
+                UpdateStepSound(dx, dz);
+                if (dy < 0) FallDistance -= (float)dy;
+                return;
+            }
+        }
 
         if (OnGround && IsSneakingForEdge)
         {

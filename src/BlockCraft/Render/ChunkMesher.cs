@@ -173,6 +173,7 @@ public sealed partial class ChunkMesher
                         case RenderType.Cactus: Cactus(b, x, y, z, meta); break;
                     }
                 }
+        ComputeVisibility();
     }
 
     // ---------------- sześciany ----------------

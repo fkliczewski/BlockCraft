@@ -43,6 +43,37 @@ public sealed class Chunk
         byte old = Blocks[i];
         if ((old != 0) != (id != 0)) SectionCounts[y >> 4] += id != 0 ? 1 : -1;
         Blocks[i] = id; Meta[i] = (byte)meta;
+        if (_colTop != null && (old != 0) != (id != 0))
+        {
+            int c = (z << 4) | x;
+            if (id != 0) { if (y + 1 > _colTop[c]) _colTop[c] = (short)(y + 1); if (y < _colBot[c]) _colBot[c] = (short)y; }
+            else if (y == _colTop[c] - 1 || y == _colBot[c]) RecalcColumn(c);
+        }
+    }
+
+    // Zakres niepustych bloków w kolumnach (szybkie testy "samo powietrze" w eksplozjach). Liczony leniwie.
+    private short[] _colTop, _colBot;
+    /// <summary>Najwyższy niepusty blok kolumny + 1 (0 = pusta kolumna).</summary>
+    public short[] ColTop { get { if (_colTop == null) BuildColumns(); return _colTop; } }
+    /// <summary>Najniższy niepusty blok kolumny (Height = pusta kolumna).</summary>
+    public short[] ColBot { get { if (_colTop == null) BuildColumns(); return _colBot; } }
+    /// <summary>Unieważnia zakresy kolumn po zapisie z pominięciem SetBlockRaw (generacja).</summary>
+    public void InvalidateColumns() { _colTop = null; _colBot = null; }
+    private void BuildColumns()
+    {
+        var top = new short[256]; var bot = new short[256];
+        _colBot = bot; _colTop = top;
+        for (int c = 0; c < 256; c++) RecalcColumn(c);
+    }
+    private void RecalcColumn(int c)
+    {
+        var b = Blocks;
+        int t = Height - 1;
+        while (t >= 0 && b[(t << 8) | c] == 0) t--;
+        _colTop[c] = (short)(t + 1);
+        int lo = 0;
+        while (lo <= t && b[(lo << 8) | c] == 0) lo++;
+        _colBot[c] = (short)(t < 0 ? Height : lo);
     }
 
     public void RecountSections()

@@ -237,7 +237,7 @@ public static class ChunkCodec
         var c = new Chunk(cx, cz) { Populated = true };
         using var br = new BinaryReader(new DeflateStream(new MemoryStream(data), CompressionMode.Decompress), Encoding.UTF8);
         int sections = br.ReadByte();
-        ReadFully(br, c.Blocks, sections * 4096);
+        ReadFully(br, c.Blocks, sections * 4096); c.InvalidateColumns();
         ReadFully(br, c.Meta, sections * 4096);
         ReadFully(br, c.Biomes, 256);
         int n = br.ReadInt32();

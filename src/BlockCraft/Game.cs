@@ -67,6 +67,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             Net.LinkSetup.Profile = name;
         }
         _showcase = args.Contains("--showcase");
+        _stress = !_autotest && !_showcase && args.Contains("--stress");
         Settings = Settings.Load();
         int fps = Array.IndexOf(args, "--fps");
         if (fps >= 0 && fps + 1 < args.Length && int.TryParse(args[fps + 1], out int f) && f > 0) _fpsOverride = f;
@@ -78,7 +79,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnLoad()
     {
         base.OnLoad();
-        Log.Info("Start BlockCraft, GL: " + GL.GetString(StringName.Renderer) + " / " + GL.GetString(StringName.Version));
+        string glRenderer = GL.GetString(StringName.Renderer);
+        Log.Info("Start BlockCraft, GL: " + glRenderer + " / " + GL.GetString(StringName.Version));
+        // Pierwsze uruchomienie na danej karcie: słaba grafika (zintegrowana, programowa) dostaje profil "laptop".
+        if (Settings.GpuProfileFor != glRenderer && !_autotest && !_showcase && !_stress)
+        {
+            var kind = GpuProfile.Detect(glRenderer);
+            if (kind != GpuProfile.Kind.Dedicated) { GpuProfile.ApplyLaptop(Settings, kind); Log.Info("Profil grafiki: " + kind + " (zasięg " + Settings.RenderDistance + ", skala " + Settings.RenderScale + "%)"); }
+            Settings.GpuProfileFor = glRenderer; Settings.Save();
+        }
         SharedQuadIndices.Init();
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
@@ -91,6 +100,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             if (World == null || !_sessionStarted) return;
             // szafa grająca: "record:cat" gra płytę w bloku x,y,z, "record:" ją zatrzymuje
             if (n.StartsWith("record:")) { if (n.Length > 7) Sound.PlayRecord(n[7..], x, y, z); else Sound.StopRecord(x, y, z); return; }
+            // Limit dźwięków na tick: przy masowych wybuchach mikser i tak gra najwyżej Mixer.MaxVoices głosów,
+            // a każde wywołanie kosztuje (dekodowanie, wyszukiwanie duplikatów). Mechanika gry bez zmian.
+            if (_soundTick != _tickCount) { _soundTick = _tickCount; _soundsThisTick = 0; }
+            if (++_soundsThisTick > 24) return;
             Sound.Play(n, x, y, z, v, p);
         };
         UpdateGuiScale();
@@ -101,6 +114,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
         else if (_showcase) SetupShowcase();
+        else if (_stress) SetupStress();
     }
 
     // ================= ustawienia / GUI =================
@@ -452,7 +466,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         if (_netTestOriginalSettings != null) Settings = _netTestOriginalSettings;
-        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); if (!_stress) Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
 
         base.OnClosing(e);
     }
@@ -461,7 +475,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnRenderFrame(FrameEventArgs args)
     {
         base.OnRenderFrame(args);
-        double now = _clock.Elapsed.TotalSeconds;
+        double now = _clock.Elapsed.TotalSeconds; _frameStart = now;
         double dt = Math.Min(0.25, now - _lastTime); _lastTime = now;
         _fpsTimer += dt; _fpsCount++;
         if (_fpsTimer >= 1)
@@ -471,28 +485,51 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             long day = World?.DayTime ?? 0; _dayRate = (int)(day - _tpsLastDay); _tpsLastDay = day;
         }
         _acc += dt;
+        // Budżet czasu ticków na klatkę: ciężki tick (np. tysiące wybuchów TNT) dzieli się na kawałki
+        // i klatka rysuje się między nimi, więc obraz i mysz nie stają. Wynik ticku jest ten sam.
+        // Autotest liczy na stary rytm (całe ticki), więc tam bez budżetu.
+        long deadline = _autotest || _noSlice ? long.MaxValue : Stopwatch.GetTimestamp() + (long)(TickBudgetSeconds * Stopwatch.Frequency);
         int n = 0;
-        while (_acc >= 0.05 && n < 10) { _acc -= 0.05; n++; try { Tick(); } catch (Exception ex) { Log.Error("Tick: " + ex); } }
-        if (n >= 10) _acc = 0;
-        float pt = (float)(_acc / 0.05);
+        if (_midTick) { n++; try { ContinueTick(deadline); } catch (Exception ex) { _midTick = false; Log.Error("Tick: " + ex); } }
+        while (!_midTick && _acc >= 0.05 && n < 10 && (n == 0 || Stopwatch.GetTimestamp() < deadline))
+        {
+            _acc -= 0.05; n++;
+            try { Tick(deadline); } catch (Exception ex) { _midTick = false; Log.Error("Tick: " + ex); }
+        }
+        if (n >= 10 || _acc > 0.5) _acc = 0;
+        // w połowie ticku: pt=0, czyli wszystko w pozycji z początku ticku (bez cofania po jego końcu)
+        float pt = _midTick ? 0f : (float)(_acc / 0.05);
         if (World != null && _screen != null && _screen.PausesGame && _sessionStarted) pt = 1f;
 
         MouseLook();
+        bool gpuQ = _stressMeasure;
+        if (gpuQ) StressGpuBegin();
         try { RenderFrame(pt); } catch (Exception ex) { Log.Error("Render: " + ex); }
+        if (gpuQ) StressGpuEnd();
         _frames++;
         if (_autotest) AutotestStep();
         else if (_showcase) ShowcaseFrame();
+        else if (_stress) StressFrame();
         if (_screenshotRequested) { _screenshotRequested = false; TakeScreenshot(null); }
         SwapBuffers();
         int maxFps = _fpsOverride > 0 ? _fpsOverride : Settings.MaxFps;
         if ((!Settings.VSync || _fpsOverride > 0) && maxFps < 1000)
         {
+            // Limiter z harmonogramem (bez dryfu): sen po 1 ms (timeBeginPeriod), końcówka dokręcana Yield,
+            // bo sam Thread.Sleep na Windows ma rozdzielczość do 15,6 ms (limit 120 dawał ~64 FPS).
             double target = 1.0 / maxFps;
-            double spent = _clock.Elapsed.TotalSeconds - now;
-            if (spent < target) Thread.Sleep((int)((target - spent) * 1000));
+            _nextFrame += target;
+            double t = _clock.Elapsed.TotalSeconds;
+            if (_nextFrame < t - target) _nextFrame = t; // duże opóźnienie: nie nadrabiamy klatek
+            while (_nextFrame - t > 0.0015) { Thread.Sleep(1); t = _clock.Elapsed.TotalSeconds; }
+            while (_clock.Elapsed.TotalSeconds < _nextFrame) Thread.Yield();
         }
+        else _nextFrame = _clock.Elapsed.TotalSeconds;
     }
+    private double _nextFrame;
     private bool _screenshotRequested;
+    private double _frameStart;
+    private long _soundTick; private int _soundsThisTick;
 
     private void MouseLook()
     {
@@ -508,7 +545,22 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     }
     private int _skipMouse = 2;
 
-    private void Tick()
+    /// <summary>Ile czasu na klatkę mogą zająć ticki, zanim klatka się narysuje (reszta ticku w następnej).</summary>
+    private const double TickBudgetSeconds = 0.020;
+    /// <summary>--no-slice: stary rytm (całe ticki w klatce), do porównań.</summary>
+    private readonly bool _noSlice = Environment.GetCommandLineArgs().Contains("--no-slice");
+    private bool _midTick; private DimensionSet _midDims; private World.World _midWorld; private Player _midPlayer;
+
+    /// <summary>Dokańcza przerwany tick świata; gdy świat się zmienił (wyjście do menu), porzuca go.</summary>
+    private void ContinueTick(long deadline)
+    {
+        if (World == null || Player != _midPlayer || Dimensions != _midDims || (_midDims == null && World != _midWorld)) { _midTick = false; return; }
+        if (!(_midDims != null ? _midDims.TickSlice(deadline) : _midWorld.TickSlice(deadline))) return;
+        _midTick = false;
+        TickAfterWorld(_midPlayer);
+    }
+
+    private void Tick(long deadline)
     {
         _tickCount++;
         try { AudioTick(); } catch (Exception ex) { Log.Error("Audio: " + ex.Message); }
@@ -545,9 +597,18 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (World == null) return;
         NetCaptureButtons();
         ControlTick();
-        if (Dimensions != null) Dimensions.Tick(); else w.Tick();
+        _midDims = Dimensions; _midWorld = w; _midPlayer = p;
+        bool done;
+        if (Dimensions != null) { Dimensions.TickBegin(); done = Dimensions.TickSlice(deadline); }
+        else { w.TickBegin(); done = w.TickSlice(deadline); }
+        if (!done) { _midTick = true; return; }
+        TickAfterWorld(p);
+    }
+
+    private void TickAfterWorld(Player p)
+    {
         DimensionMusicTick();
-        w = World;
+        var w = World;
         NetAfterTick();
 
         if (!p.Dead && p.Removed) { }

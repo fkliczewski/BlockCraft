@@ -124,6 +124,10 @@ public sealed partial class World : IBlockAccess
 
     public readonly List<Entity> Entities = new();
     public readonly Dictionary<int, Entity> EntityById = new();
+    /// <summary>Siatka przestrzenna encji z World.Entities (zapytania GetEntitiesInBox).</summary>
+    public readonly EntityGrid Grid = new();
+    /// <summary>Licznik zmian bloków (SetBlock/SetBlockRemote): unieważnia podręczne dane eksplozji.</summary>
+    public long BlockVersion;
     public readonly List<Player> Players = new();
     private readonly List<Entity> _toAdd = new();
     private int _nextEntityId = 1;
@@ -144,9 +148,24 @@ public sealed partial class World : IBlockAccess
     }
 
     // ---------- dostęp do chunków ----------
-    public Chunk GetChunk(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) ? c : null;
-    public Chunk GetChunkIfLit(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) && c.Lit ? c : null;
-    public bool IsChunkLoaded(int cx, int cz) => Chunks.ContainsKey(MathUtil.ChunkKey(cx, cz));
+    // Bezpośrednio mapowana pamięć podręczna chunków (64x64 sloty): GetBlock bez słownika współbieżnego.
+    // Wpis jest ważny, gdy chunk ma te same współrzędne i nie jest wyładowany (każde usunięcie z Chunks ustawia Unloaded).
+    private readonly Chunk[] _chunkCache = new Chunk[64 * 64];
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public Chunk GetChunk(int cx, int cz)
+    {
+        var c = _chunkCache[((cx & 63) << 6) | (cz & 63)];
+        if (c != null && c.Cx == cx && c.Cz == cz && !c.Unloaded) return c;
+        return GetChunkSlow(cx, cz);
+    }
+    private Chunk GetChunkSlow(int cx, int cz)
+    {
+        if (!Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c)) return null;
+        if (!c.Unloaded) _chunkCache[((cx & 63) << 6) | (cz & 63)] = c;
+        return c;
+    }
+    public Chunk GetChunkIfLit(int cx, int cz) { var c = GetChunk(cx, cz); return c != null && c.Lit ? c : null; }
+    public bool IsChunkLoaded(int cx, int cz) => GetChunk(cx, cz) != null;
     public bool IsLoadedAt(int x, int z) => IsChunkLoaded(x >> 4, z >> 4);
     public bool IsAreaLoaded(int x, int z, int r)
     {
@@ -159,13 +178,13 @@ public sealed partial class World : IBlockAccess
     public byte GetBlock(int x, int y, int z)
     {
         if ((uint)y >= Chunk.Height) return 0;
-        if (!Chunks.TryGetValue(MathUtil.ChunkKey(x >> 4, z >> 4), out var c)) return 0;
+        var c = GetChunk(x >> 4, z >> 4); if (c == null) return 0;
         return c.Blocks[(y << 8) | ((z & 15) << 4) | (x & 15)];
     }
     public int GetMeta(int x, int y, int z)
     {
         if ((uint)y >= Chunk.Height) return 0;
-        if (!Chunks.TryGetValue(MathUtil.ChunkKey(x >> 4, z >> 4), out var c)) return 0;
+        var c = GetChunk(x >> 4, z >> 4); if (c == null) return 0;
         return c.Meta[(y << 8) | ((z & 15) << 4) | (x & 15)];
     }
     public int GetSkyLight(int x, int y, int z)
@@ -203,7 +222,7 @@ public sealed partial class World : IBlockAccess
         byte old = c.Blocks[i]; int oldMeta = c.Meta[i];
         if (old == id && oldMeta == meta) return false;
         var ob = Block.ById[old]; var nb = Block.ById[id];
-        c.SetBlockRaw(lx, y, lz, id, meta);
+        c.SetBlockRaw(lx, y, lz, id, meta); BlockVersion++;
         c.Modified = true;
         if (ob.LightOpacity != nb.LightOpacity)
         {
@@ -211,7 +230,9 @@ public sealed partial class World : IBlockAccess
             if (nb.LightOpacity > 0 && y >= h) c.HeightMap[(lz << 4) | lx] = (short)(y + 1);
             else if (nb.LightOpacity == 0 && y == h - 1) c.RecalcHeight(lx, lz);
         }
+        long pt = Prof.Begin();
         Light.OnBlockChanged(x, y, z, ob, nb);
+        Prof.End(Prof.Light, pt);
         MarkDirty(x, y, z);
         foreach (var l in Listeners) l.OnBlockChanged(x, y, z, id, meta);
         if (!IsRemote)
@@ -221,7 +242,9 @@ public sealed partial class World : IBlockAccess
                 ob.OnRemoved(this, x, y, z, oldMeta);
                 if (GetBlock(x, y, z) == id) nb.OnAdded(this, x, y, z);
             }
+            pt = Prof.Begin();
             if (notify) NotifyNeighbors(x, y, z, id);
+            Prof.End(Prof.Notify, pt);
         }
         return true;
     }
@@ -250,7 +273,7 @@ public sealed partial class World : IBlockAccess
         byte old = c.Blocks[i];
         if (old == id && c.Meta[i] == meta) return;
         var ob = Block.ById[old]; var nb = Block.ById[id];
-        c.SetBlockRaw(lx, y, lz, id, meta);
+        c.SetBlockRaw(lx, y, lz, id, meta); BlockVersion++;
         if (ob.LightOpacity != nb.LightOpacity) c.RecalcHeight(lx, lz);
         Light.OnBlockChanged(x, y, z, ob, nb);
         if (old != id && ob.HasTileEntity && !nb.HasTileEntity) RemoveTileEntity(x, y, z);
@@ -453,7 +476,7 @@ public sealed partial class World : IBlockAccess
         foreach (var e in list)
         {
             if (EntityById.ContainsKey(e.Id)) continue;
-            Entities.Add(e); EntityById[e.Id] = e;
+            Entities.Add(e); EntityById[e.Id] = e; Grid.Add(e);
             if (e is Player p && !Players.Contains(p)) Players.Add(p);
             foreach (var l in Listeners) l.OnEntityAdded(e);
         }
@@ -467,7 +490,7 @@ public sealed partial class World : IBlockAccess
         e.Removed = true;
         if (Entities.Remove(e))
         {
-            EntityById.Remove(e.Id);
+            EntityById.Remove(e.Id); Grid.Remove(e);
             if (e is Player p) Players.Remove(p);
             foreach (var l in Listeners) l.OnEntityRemoved(e);
         }
@@ -476,10 +499,11 @@ public sealed partial class World : IBlockAccess
     public List<Entity> GetEntitiesInBox(AABB box, Entity except = null)
     {
         var res = new List<Entity>();
-        foreach (var e in Entities)
-            if (e != except && !e.Removed && e.BoundingBox.Intersects(box)) res.Add(e);
+        Grid.Query(box, except, res);
         return res;
     }
+    /// <summary>Jak wyżej, ale dopisuje do podanej listy (bez alokacji).</summary>
+    public void GetEntitiesInBox(AABB box, Entity except, List<Entity> into) => Grid.Query(box, except, into);
 
     public void DropItem(double x, double y, double z, ItemStack s, bool scatter = true)
     {
@@ -531,7 +555,17 @@ public sealed partial class World : IBlockAccess
     }
 
     // ---------- tick ----------
-    public void Tick()
+    public void Tick() { TickBegin(); TickSlice(long.MaxValue); }
+
+    /// <summary>Indeks następnej encji w trwającym ticku; -1 = brak trwającego ticku.</summary>
+    private int _tickIdx = -1;
+    private readonly List<Entity> _removedTmp = new();
+    /// <summary>Ustawiane przez ciężkie operacje (wybuch), żeby tick dzielony sprawdził zegar od razu, nie co 16 encji.</summary>
+    public bool HeavyWorkDone;
+    public bool TickInProgress => _tickIdx >= 0;
+
+    /// <summary>Pierwsza część ticku (wszystko przed pętlą encji). Potem TickSlice aż zwróci true.</summary>
+    public void TickBegin()
     {
         TotalTime++;
         if (Rules.DoDaylightCycle && Provider.HasDaylightCycle) DayTime++;
@@ -547,26 +581,56 @@ public sealed partial class World : IBlockAccess
             CheckSleeping();
             TickCommands();
         }
-        for (int i = 0; i < Entities.Count; i++)
+        _tickIdx = 0;
+    }
+
+    /// <summary>Tick encji od miejsca, w którym ostatnio przerwano, do końca albo do <paramref name="deadline"/>
+    /// (Stopwatch.GetTimestamp). Zwraca true, gdy tick się skończył. Kolejność i wynik są takie same jak w jednym
+    /// kawałku: między kawałkami gra tylko rysuje klatkę, świata nie zmienia.</summary>
+    public bool TickSlice(long deadline)
+    {
+        if (_tickIdx < 0) return true;
+        for (int i = _tickIdx; i < Entities.Count; i++)
         {
             var e = Entities[i];
             if (e.Removed) continue;
             if (!IsLoadedAt(MathUtil.FloorToInt(e.X), MathUtil.FloorToInt(e.Z)) && e is not Player) continue;
+            HeavyWorkDone = false;
             e.PrevTick();
             e.Tick();
+            Grid.Revalidate(e);
+            if (deadline != long.MaxValue && ((i & 15) == 15 || HeavyWorkDone) && System.Diagnostics.Stopwatch.GetTimestamp() >= deadline)
+            {
+                _tickIdx = i + 1;
+                if (_tickIdx < Entities.Count) return false;
+            }
         }
-        for (int i = Entities.Count - 1; i >= 0; i--)
+        _tickIdx = -1;
+        // usuwanie martwych: lista ściskana w O(N) (RemoveAt po kolei było O(N^2) przy tysiącach wybuchów),
+        // skutki uboczne w tej samej kolejności co dawniej (od końca listy)
+        int keep = 0;
+        _removedTmp.Clear();
+        for (int i = 0; i < Entities.Count; i++)
         {
             var e = Entities[i];
-            if (e.Removed || (e.Dead && e is not Player))
+            if (e.Removed || (e.Dead && e is not Player)) _removedTmp.Add(e);
+            else Entities[keep++] = e;
+        }
+        if (_removedTmp.Count > 0)
+        {
+            Entities.RemoveRange(keep, Entities.Count - keep);
+            for (int r = _removedTmp.Count - 1; r >= 0; r--)
             {
-                Entities.RemoveAt(i); EntityById.Remove(e.Id);
+                var e = _removedTmp[r];
+                EntityById.Remove(e.Id); Grid.Remove(e);
                 if (e is Player p) Players.Remove(p);
                 e.Removed = true;
                 foreach (var l in Listeners) l.OnEntityRemoved(e);
             }
+            _removedTmp.Clear();
         }
         FlushAdds();
+        return true;
     }
 
     private void CheckSleeping()
@@ -619,6 +683,30 @@ public sealed partial class World : IBlockAccess
 
     // ---------- kolizje ----------
     private readonly List<AABB> _boxTmp = new();
+    /// <summary>True, gdy wszystkie bloki w zakresie [x0..x1] x [y0..y1] x [z0..z1] to powietrze (z zakresów kolumn chunków).
+    /// Niezaładowany chunk = false (zachowawczo).</summary>
+    public bool IsAirBox(int x0, int y0, int z0, int x1, int y1, int z1)
+    {
+        for (int x = x0; x <= x1; x++)
+            for (int z = z0; z <= z1; z++)
+            {
+                var c = GetChunk(x >> 4, z >> 4);
+                if (c == null) return false;
+                int ci = ((z & 15) << 4) | (x & 15);
+                int top = c.ColTop[ci] - 1, bot = c.ColBot[ci];
+                if (top >= bot && bot <= y1 && top >= y0) return false;
+            }
+        return true;
+    }
+    [ThreadStatic] private static List<AABB> _borderTmp;
+    /// <summary>True, gdy granica świata nie dodaje ścian kolizji w boxie (jak AddBorderBoxes w GetCollisionBoxes).</summary>
+    public bool NoBorderBoxes(AABB box)
+    {
+        var l = _borderTmp ??= new List<AABB>(); l.Clear();
+        AddBorderBoxes(box, l);
+        return l.Count == 0;
+    }
+
     public List<AABB> GetCollisionBoxes(AABB box, List<AABB> res)
     {
         res.Clear();
@@ -675,6 +763,7 @@ public sealed partial class World : IBlockAccess
         public bool Hit; public int X, Y, Z, Face; public double HitX, HitY, HitZ, Distance;
     }
 
+    [ThreadStatic] private static List<AABB> _rayBoxes;
     public HitResult RayCast(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist, bool hitLiquids = false)
     {
         var res = new HitResult();
@@ -684,7 +773,7 @@ public sealed partial class World : IBlockAccess
         double tMaxY = dy != 0 ? ((stepY > 0 ? y + 1 - oy : oy - y) / Math.Abs(dy)) : double.MaxValue;
         double tMaxZ = dz != 0 ? ((stepZ > 0 ? z + 1 - oz : oz - z) / Math.Abs(dz)) : double.MaxValue;
         double tdX = dx != 0 ? 1 / Math.Abs(dx) : double.MaxValue, tdY = dy != 0 ? 1 / Math.Abs(dy) : double.MaxValue, tdZ = dz != 0 ? 1 / Math.Abs(dz) : double.MaxValue;
-        var boxes = new List<AABB>();
+        var boxes = _rayBoxes ??= new List<AABB>();
         for (int i = 0; i < 200; i++)
         {
             if (y >= 0 && y < Chunk.Height)

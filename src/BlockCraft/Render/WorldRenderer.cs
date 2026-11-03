@@ -10,7 +10,14 @@ namespace BlockCraft.Render;
 
 public sealed class SectionMesh
 {
-    public Mesh Solid, Trans;
+    /// <summary>Nieprzezroczysty teren: kawałek wspólnego bufora regionu (SolidLen = 0, gdy pusto).</summary>
+    public int SolidOff = -1, SolidLen;
+    /// <summary>Łączność ścian sekcji (VisGraph), domyślnie wszystko widać.</summary>
+    public ulong Vis = ChunkMesher.VisAll;
+    /// <summary>Kubełki kierunków ścian (FacingSort): początki w wierzchołkach i skrajne płaszczyzny.</summary>
+    public readonly int[] Start = new int[8];
+    public readonly float[] Plane = new float[6];
+    public Mesh Trans;
     public int Version;      // wersja żądana
     public int BuiltVersion = -1;
 }
@@ -18,6 +25,9 @@ public sealed class SectionMesh
 public sealed class ChunkRender
 {
     public readonly SectionMesh[] S = new SectionMesh[Chunk.Sections];
+    public TerrainRegion Region;
+    /// <summary>Bit na sekcję, która ma cokolwiek do narysowania.</summary>
+    public int Mask;
     public ChunkRender() { for (int i = 0; i < S.Length; i++) S[i] = new SectionMesh(); }
 }
 
@@ -40,7 +50,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private readonly object _jobLock = new();
     private readonly List<(int cx, int sy, int cz, int ver)> _jobs = new();
     private readonly HashSet<(int, int, int)> _jobSet = new();
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, byte[] solid, int sb, byte[] trans, int tb)> _done = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, SortedSolid solid, byte[] trans, int tb, ulong vis)> _done = new();
     private readonly Thread[] _workers;
     private volatile bool _running = true;
     private readonly ChunkMesher _mainMesher = new();
@@ -77,6 +87,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         });
         _starMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); });
         _lineMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); }, false);
+        _tnt = new TntInstancer(Entities);
         BuildStars();
         BuildCelestialTextures();
         BuildClouds();
@@ -92,8 +103,10 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         World = w;
         lock (_jobLock) { _jobs.Clear(); _jobSet.Clear(); }
         while (_done.TryDequeue(out _)) { }
-        foreach (var r in _renders.Values) foreach (var s in r.S) { s.Solid?.Dispose(); s.Trans?.Dispose(); }
+        foreach (var r in _renders.Values) foreach (var s in r.S) s.Trans?.Dispose();
         _renders.Clear();
+        foreach (var reg in _regions.Values) reg.Dispose();
+        _regions.Clear();
         Particles.Clear();
         if (w != null) w.Listeners.Add(this);
     }
@@ -146,6 +159,7 @@ void main(){ gl_Position = uViewProj*vec4(aPos,1.0); vUV=aUV; }";
     private const string SunFrag = @"#version 330 core
 in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(){ o = texture(uTex, vUV)*uColor; }";
     private Shader _sunSh;
+    private readonly TntInstancer _tnt;
 
     // ================= niebo =================
     private void BuildStars()
@@ -275,15 +289,17 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             try
             {
                 mesher.Build(w, job.cx, job.sy, job.cz);
-                var s = mesher.Solid.Count > 0 ? mesher.Solid.Data[..mesher.Solid.Bytes] : null;
+                var s = mesher.Solid.Count > 0 ? FacingSort.Sort(mesher.Solid.Data, mesher.Solid.Count) : null;
                 var t = mesher.Translucent.Count > 0 ? mesher.Translucent.Data[..mesher.Translucent.Bytes] : null;
-                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, s?.Length ?? 0, t, t?.Length ?? 0));
+                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, t, t?.Length ?? 0, mesher.Vis));
             }
             catch (Exception ex) { Log.Error("Mesher: " + ex.Message); }
         }
     }
 
-    private static Mesh NewChunkMesh() => new(VertexBuffer.Stride, () =>
+    private static Mesh NewChunkMesh() => new(VertexBuffer.Stride, SetupChunkAttribs);
+    /// <summary>Układ wierzchołka terenu (28 B), wspólny dla meshy sekcji i buforów regionów.</summary>
+    internal static void SetupChunkAttribs()
     {
         int s = VertexBuffer.Stride;
         GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, s, 0);
@@ -292,12 +308,48 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         GL.EnableVertexAttribArray(3); GL.VertexAttribPointer(3, 2, VertexAttribPointerType.UnsignedByte, false, s, 18);
         GL.EnableVertexAttribArray(4); GL.VertexAttribPointer(4, 2, VertexAttribPointerType.UnsignedByte, true, s, 20);
         GL.EnableVertexAttribArray(5); GL.VertexAttribPointer(5, 4, VertexAttribPointerType.UnsignedByte, true, s, 24);
-    });
+    }
 
-    private void Upload(SectionMesh sm, byte[] solid, int sb, byte[] trans, int tb)
+    private readonly Dictionary<long, TerrainRegion> _regions = new();
+
+    private void FreeSolid(ChunkRender cr, SectionMesh sm)
     {
-        if (sb > 0) { sm.Solid ??= NewChunkMesh(); sm.Solid.Upload(solid, sb); } else if (sm.Solid != null) { sm.Solid.Dispose(); sm.Solid = null; }
+        if (sm.SolidLen == 0) return;
+        var reg = cr.Region;
+        reg.Free(sm.SolidOff, sm.SolidLen);
+        sm.SolidOff = -1; sm.SolidLen = 0;
+        if (reg.Allocations == 0) { reg.Dispose(); _regions.Remove(MathUtil.ChunkKey(reg.Rx, reg.Rz)); foreach (var c in _renders.Values) if (c.Region == reg) c.Region = null; }
+    }
+
+    /// <summary>Pozycje z układu sekcji do układu regionu (dodaje narożnik sekcji w regionie).</summary>
+    private static unsafe void ToRegionSpace(byte[] data, int verts, float ox, float oy, float oz)
+    {
+        fixed (byte* b = data)
+            for (int i = 0; i < verts; i++)
+            {
+                float* p = (float*)(b + i * VertexBuffer.Stride);
+                p[0] += ox; p[1] += oy; p[2] += oz;
+            }
+    }
+
+    private void Upload(ChunkRender cr, int cx, int sy, int cz, SectionMesh sm, SortedSolid solid, byte[] trans, int tb)
+    {
+        FreeSolid(cr, sm);
+        if (solid != null && solid.Verts > 0)
+        {
+            int verts = solid.Verts;
+            Array.Copy(solid.Start, sm.Start, 8); Array.Copy(solid.Plane, sm.Plane, 6);
+            if (cr.Region == null)
+            {
+                long rk = MathUtil.ChunkKey(cx >> TerrainRegion.Shift, cz >> TerrainRegion.Shift);
+                if (!_regions.TryGetValue(rk, out var reg)) _regions[rk] = reg = new TerrainRegion(cx >> TerrainRegion.Shift, cz >> TerrainRegion.Shift);
+                cr.Region = reg;
+            }
+            ToRegionSpace(solid.Data, verts, (cx & (TerrainRegion.Size - 1)) * 16, sy * 16, (cz & (TerrainRegion.Size - 1)) * 16);
+            sm.SolidOff = cr.Region.Upload(solid.Data, verts); sm.SolidLen = verts;
+        }
         if (tb > 0) { sm.Trans ??= NewChunkMesh(); sm.Trans.Upload(trans, tb); } else if (sm.Trans != null) { sm.Trans.Dispose(); sm.Trans = null; }
+        if (sm.SolidLen > 0 || sm.Trans != null) cr.Mask |= 1 << sy; else cr.Mask &= ~(1 << sy);
     }
 
     private bool NeighborsReady(Chunk c)
@@ -314,16 +366,36 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     public void Update(Vector3d cam)
     {
         if (World == null) return;
+        long ut0 = Stopwatch.GetTimestamp();
+        try { UpdateInner(cam); } finally { CpuMs[0] += (Stopwatch.GetTimestamp() - ut0) * 1000.0 / Stopwatch.Frequency; }
+    }
+
+    private readonly List<Chunk> _chunkSnap = new();
+    private int _chunkSnapCount = -1; private long _chunkSnapTs; private World.World _chunkSnapWorld;
+    private readonly List<(int, int, int, int, double)> _urgent = new();
+
+    private void UpdateInner(Vector3d cam)
+    {
         _camPos = cam; _camCx = MathUtil.FloorToInt(cam.X) >> 4; _camCz = MathUtil.FloorToInt(cam.Z) >> 4;
+        // Lista chunków odświeżana co 50 ms albo przy zmianie liczby (ConcurrentDictionary.Values blokuje i kopiuje
+        // wszystko, więc nie co klatkę); flagi DirtySections czytane z niej co klatkę.
+        long nowTs = Stopwatch.GetTimestamp();
+        bool refresh = World.Chunks.Count != _chunkSnapCount || _chunkSnapWorld != World || nowTs - _chunkSnapTs > Stopwatch.Frequency / 20;
+        if (refresh)
+        {
+            _chunkSnapTs = nowTs; _chunkSnapWorld = World;
+            _chunkSnap.Clear(); foreach (var kv in World.Chunks) _chunkSnap.Add(kv.Value);
+            _chunkSnapCount = _chunkSnap.Count;
+        }
         // usuń rendery z niezaładowanych chunków
-        if (_renders.Count > 0)
+        if (refresh && _renders.Count > 0)
         {
             List<long> rem = null;
             foreach (var k in _renders.Keys) if (!World.Chunks.ContainsKey(k)) (rem ??= new()).Add(k);
-            if (rem != null) foreach (var k in rem) { foreach (var s in _renders[k].S) { s.Solid?.Dispose(); s.Trans?.Dispose(); } _renders.Remove(k); }
+            if (rem != null) foreach (var k in rem) { var cr = _renders[k]; foreach (var s in cr.S) { FreeSolid(cr, s); s.Trans?.Dispose(); } _renders.Remove(k); }
         }
-        var urgent = new List<(int, int, int, int, double)>();
-        foreach (var c in World.Chunks.Values)
+        var urgent = _urgent; urgent.Clear();
+        foreach (var c in _chunkSnap)
         {
             if (c.DirtySections == 0) continue;
             int dxc = c.Cx - _camCx, dzc = c.Cz - _camCz;
@@ -337,8 +409,8 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 if ((dirty & (1 << sy)) == 0) continue;
                 var sm = cr.S[sy];
                 sm.Version++;
-                if (c.SectionCounts[sy] == 0 && (sy == 0 || c.SectionCounts[sy - 1] == 0) && (sy == Chunk.Sections - 1 || c.SectionCounts[sy + 1] == 0) && sm.Solid == null && sm.Trans == null)
-                { sm.BuiltVersion = sm.Version; continue; }
+                if (c.SectionCounts[sy] == 0 && (sy == 0 || c.SectionCounts[sy - 1] == 0) && (sy == Chunk.Sections - 1 || c.SectionCounts[sy + 1] == 0) && sm.SolidLen == 0 && sm.Trans == null)
+                { sm.Vis = ChunkMesher.VisAll; sm.BuiltVersion = sm.Version; continue; }
                 double dist = Math.Abs(dxc) + Math.Abs(dzc) + Math.Abs(sy * 16 + 8 - cam.Y) / 16.0;
                 if (dist <= 1.5 && sm.BuiltVersion >= 0) urgent.Add((c.Cx, sy, c.Cz, sm.Version, dist));
                 else
@@ -353,8 +425,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         foreach (var (cx, sy, cz, ver, _) in urgent)
         {
             _mainMesher.Build(World, cx, sy, cz);
-            var sm = _renders[MathUtil.ChunkKey(cx, cz)].S[sy];
-            Upload(sm, _mainMesher.Solid.Data, _mainMesher.Solid.Bytes, _mainMesher.Translucent.Data, _mainMesher.Translucent.Bytes);
+            var ucr = _renders[MathUtil.ChunkKey(cx, cz)]; var sm = ucr.S[sy];
+            Upload(ucr, cx, sy, cz, sm, _mainMesher.Solid.Count > 0 ? FacingSort.Sort(_mainMesher.Solid.Data, _mainMesher.Solid.Count) : null, _mainMesher.Translucent.Data, _mainMesher.Translucent.Bytes);
+            sm.Vis = _mainMesher.Vis;
             sm.BuiltVersion = ver;
         }
         // wyniki z wątków
@@ -364,7 +437,8 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (!_renders.TryGetValue(MathUtil.ChunkKey(d.cx, d.cz), out var cr)) continue;
             var sm = cr.S[d.sy];
             if (d.ver < sm.BuiltVersion) continue;
-            Upload(sm, d.solid, d.sb, d.trans, d.tb);
+            Upload(cr, d.cx, d.sy, d.cz, sm, d.solid, d.trans, d.tb);
+            sm.Vis = d.vis;
             sm.BuiltVersion = d.ver;
         }
     }
@@ -464,9 +538,151 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         s.Set("uDimension", (int)World.Dimension);
     }
 
+    // ================= wybór sekcji =================
+    /// <summary>Cave culling jak w MC 1.8 (RenderGlobal.setupTerrain + VisGraph). --no-cave wyłącza (porównania).</summary>
+    public static bool CaveCulling = !Environment.GetCommandLineArgs().Contains("--no-cave");
+
+    private void AddSection(ChunkRender cr, SectionMesh sm, Vector3 off)
+    {
+        RenderedSections++;
+        _visible.Add((sm, off, (off + new Vector3(8)).LengthSquared));
+        if (sm.SolidLen == 0) return;
+        var reg = cr.Region;
+        if (!reg.Queued) { reg.Queued = true; _drawRegions.Add(reg); }
+        // tylko kubełki ścian, które mogą być przodem do kamery; sąsiednie łączone w jeden zakres
+        int mask = FacingSort.VisibleMask(sm.Plane, -off.X, -off.Y, -off.Z);
+        int runStart = -1, runEnd = 0;
+        for (int b = 0; b < FacingSort.Buckets; b++)
+        {
+            int s0 = sm.Start[b], s1 = sm.Start[b + 1];
+            if (s0 == s1) continue;
+            if ((mask & (1 << b)) != 0) { if (runStart < 0) runStart = s0; runEnd = s1; }
+            else if (runStart >= 0) { reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart); runStart = -1; }
+        }
+        if (runStart >= 0) reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart);
+    }
+
+    /// <summary>Bez cave cullingu: wszystkie niepuste sekcje w zasięgu i we frustum.</summary>
+    private void CollectVisibleAll(Vector3d cam, float maxD)
+    {
+        foreach (var kv in _renders)
+        {
+            var cr = kv.Value;
+            int secMask = cr.Mask;
+            if (secMask == 0) continue;
+            int cx = (int)(kv.Key >> 32), cz = (int)kv.Key;
+            double ox = cx * 16 - cam.X, oz = cz * 16 - cam.Z;
+            if (Math.Abs(ox + 8) > maxD + 8 || Math.Abs(oz + 8) > maxD + 8) continue;
+            TotalSections += System.Numerics.BitOperations.PopCount((uint)secMask);
+            // najpierw cała kolumna (od najniższej do najwyższej niepustej sekcji)
+            int lo = System.Numerics.BitOperations.TrailingZeroCount(secMask), hi = 31 - System.Numerics.BitOperations.LeadingZeroCount((uint)secMask);
+            var colMin = new Vector3((float)ox, (float)(lo * 16 - cam.Y), (float)oz);
+            if (!InFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
+            bool single = lo == hi;
+            for (int sy = lo; sy <= hi; sy++)
+            {
+                if ((secMask & (1 << sy)) == 0) continue;
+                var sm = cr.S[sy];
+                var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
+                if (!single && !InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                AddSection(cr, sm, off);
+            }
+        }
+    }
+
+    private static readonly int[] FaceDx = { 0, 0, 0, 0, -1, 1 }, FaceDy = { -1, 1, 0, 0, 0, 0 }, FaceDz = { 0, 0, -1, 1, 0, 0 };
+    private ChunkRender[] _bfsCols = Array.Empty<ChunkRender>();
+    private int[] _bfsStamp = Array.Empty<int>(), _bfsQ = Array.Empty<int>();
+    private byte[] _bfsIn = Array.Empty<byte>(), _bfsSet = Array.Empty<byte>();
+    private int _bfsFrame;
+
+    /// <summary>MC 1.8 setupTerrain: przejście wszerz od sekcji kamery; do sąsiada idziemy tylko, gdy nie wracamy
+    /// w stronę kamery, sąsiad jest we frustum, a przez bieżącą sekcję widać ze ściany wejścia ścianę wyjścia (VisGraph).
+    /// Jaskinie i podziemia zasłonięte terenem odpadają, a kolejność jest od najbliższych.</summary>
+    private void CollectVisibleBfs(Vector3d cam, float maxD)
+    {
+        int R = RenderDistance + 1, W = 2 * R + 1, N = W * W * 16;
+        if (_bfsStamp.Length < N || _bfsCols.Length != W * W)
+        {
+            _bfsStamp = new int[N]; _bfsQ = new int[N]; _bfsIn = new byte[N]; _bfsSet = new byte[N]; _bfsCols = new ChunkRender[W * W];
+            _bfsFrame = 0;
+        }
+        if (++_bfsFrame == int.MaxValue) { Array.Clear(_bfsStamp); _bfsFrame = 1; }
+        int frame = _bfsFrame;
+        int ccx = MathUtil.FloorToInt(cam.X) >> 4, ccz = MathUtil.FloorToInt(cam.Z) >> 4;
+        Array.Clear(_bfsCols);
+        foreach (var kv in _renders)
+        {
+            int gx = (int)(kv.Key >> 32) - ccx + R, gz = (int)kv.Key - ccz + R;
+            if ((uint)gx >= (uint)W || (uint)gz >= (uint)W) continue;
+            _bfsCols[gx * W + gz] = kv.Value;
+            TotalSections += System.Numerics.BitOperations.PopCount((uint)kv.Value.Mask);
+        }
+        int head = 0, tail = 0;
+        if (cam.Y >= 0 && cam.Y < Chunk.Height)
+        {
+            int n = (R * W + R) * 16 + (MathUtil.FloorToInt(cam.Y) >> 4);
+            _bfsStamp[n] = frame; _bfsIn[n] = 255; _bfsSet[n] = 0; _bfsQ[tail++] = n;
+        }
+        else
+        {
+            // kamera nad albo pod światem: start od całej górnej (dolnej) warstwy we frustum
+            int sy = cam.Y >= Chunk.Height ? Chunk.Sections - 1 : 0;
+            for (int gx = 0; gx < W; gx++)
+                for (int gz = 0; gz < W; gz++)
+                {
+                    var off = new Vector3((float)((ccx + gx - R) * 16 - cam.X), (float)(sy * 16 - cam.Y), (float)((ccz + gz - R) * 16 - cam.Z));
+                    if (Math.Abs(off.X + 8) > maxD + 8 || Math.Abs(off.Z + 8) > maxD + 8) continue;
+                    if (!InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                    int n = (gx * W + gz) * 16 + sy;
+                    _bfsStamp[n] = frame; _bfsIn[n] = 255; _bfsSet[n] = 0; _bfsQ[tail++] = n;
+                }
+        }
+        while (head < tail)
+        {
+            int n = _bfsQ[head++];
+            int sy = n & 15, col = n >> 4, gx = col / W, gz = col - gx * W;
+            var cr = _bfsCols[col];
+            var off = new Vector3((float)((ccx + gx - R) * 16 - cam.X), (float)(sy * 16 - cam.Y), (float)((ccz + gz - R) * 16 - cam.Z));
+            ulong vis = ChunkMesher.VisAll;
+            if (cr != null)
+            {
+                var sm = cr.S[sy];
+                if ((cr.Mask & (1 << sy)) != 0) AddSection(cr, sm, off);
+                if (sm.BuiltVersion >= 0) vis = sm.Vis;
+            }
+            int faceIn = _bfsIn[n], set = _bfsSet[n];
+            for (int f = 0; f < 6; f++)
+            {
+                if ((set & (1 << (f ^ 1))) != 0) continue;
+                if (faceIn != 255 && !ChunkMesher.VisConnects(vis, faceIn ^ 1, f)) continue;
+                int nsy = sy + FaceDy[f], ngx = gx + FaceDx[f], ngz = gz + FaceDz[f];
+                if ((uint)nsy >= Chunk.Sections || (uint)ngx >= (uint)W || (uint)ngz >= (uint)W) continue;
+                float nox = off.X + FaceDx[f] * 16, noz = off.Z + FaceDz[f] * 16;
+                if (Math.Abs(nox + 8) > maxD + 8 || Math.Abs(noz + 8) > maxD + 8) continue;
+                int nn = (ngx * W + ngz) * 16 + nsy;
+                if (_bfsStamp[nn] == frame) continue;
+                _bfsStamp[nn] = frame;
+                var noff = new Vector3(nox, off.Y + FaceDy[f] * 16, noz);
+                if (!InFrustum(noff, noff + new Vector3(16, 16, 16))) continue;
+                _bfsIn[nn] = (byte)f; _bfsSet[nn] = (byte)(set | (1 << f)); _bfsQ[tail++] = nn;
+            }
+        }
+    }
+
     // ================= rysowanie =================
+    private readonly List<(SectionMesh sm, Vector3 off, float d)> _visible = new();
+    private readonly List<TerrainRegion> _drawRegions = new();
+    /// <summary>Ile wywołań rysowania terenu poszło w ostatniej klatce (regiony + sekcje przezroczyste).</summary>
+    public int TerrainDrawCalls;
+    /// <summary>Czasy CPU części klatki w ms (sumy, zerowane przez pomiar): 0 Update, 1 niebo, 2 teren, 3 encje i reszta, 4 przezroczyste, 5 chmury i pogoda.</summary>
+    public static readonly double[] CpuMs = new double[10];
+    private static long _pt0;
+    private static void Mark(int slot) { long t = Stopwatch.GetTimestamp(); CpuMs[slot] += (t - _pt0) * 1000.0 / Stopwatch.Frequency; _pt0 = t; }
+
     public void Render(Vector3d cam, Matrix4 view, Matrix4 proj, float pt, Entity viewer, bool thirdPerson, World.World.HitResult? sel, int breakStage)
     {
+        _pt0 = Stopwatch.GetTimestamp();
         var w = World;
         var vp = view * proj;
         ExtractFrustum(vp);
@@ -511,6 +727,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         GL.Enable(EnableCap.DepthTest);
         GL.DepthFunc(DepthFunction.Lequal);
 
+        Mark(1);
         // --- teren nieprzezroczysty ---
         GL.Enable(EnableCap.CullFace); GL.CullFace(CullFaceMode.Back); GL.FrontFace(FrontFaceDirection.Ccw);
         GL.Disable(EnableCap.Blend);
@@ -519,47 +736,62 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         SetFog(_chunk);
         Terrain.Bind(0);
         RenderedSections = 0; TotalSections = 0;
-        var visible = new List<(SectionMesh sm, Vector3 off, float d)>();
+        var visible = _visible; visible.Clear();
         float maxD = (RenderDistance + 1) * 16;
-        foreach (var kv in _renders)
+        _drawRegions.Clear();
+        if (CaveCulling) CollectVisibleBfs(cam, maxD); else CollectVisibleAll(cam, maxD);
+        TerrainDrawCalls = _drawRegions.Count;
+        foreach (var reg in _drawRegions)
         {
-            int cx = (int)(kv.Key >> 32), cz = (int)kv.Key;
-            double ox = cx * 16 - cam.X, oz = cz * 16 - cam.Z;
-            if (Math.Abs(ox + 8) > maxD + 8 || Math.Abs(oz + 8) > maxD + 8) continue;
-            for (int sy = 0; sy < Chunk.Sections; sy++)
-            {
-                var sm = kv.Value.S[sy];
-                if (sm.Solid == null && sm.Trans == null) continue;
-                TotalSections++;
-                var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
-                if (!InFrustum(off, off + new Vector3(16, 16, 16))) continue;
-                RenderedSections++;
-                visible.Add((sm, off, (off + new Vector3(8)).LengthSquared));
-                if (sm.Solid != null) { _chunk.Set("uOffset", off); sm.Solid.DrawQuads(); }
-            }
+            reg.Queued = false;
+            _chunk.Set("uOffset", new Vector3((float)(reg.Rx * TerrainRegion.Size * 16 - cam.X), (float)-cam.Y, (float)(reg.Rz * TerrainRegion.Size * 16 - cam.Z)));
+            reg.Draw();
         }
+        GL.BindVertexArray(0);
 
+        Mark(2);
         // --- encje ---
         GL.Disable(EnableCap.CullFace);
         var er = Entities;
         er.Shader.Use(); er.Shader.Set("uViewProj", vp); SetFog(er.Shader);
         var camf = new Vector3((float)cam.X, (float)cam.Y, (float)cam.Z);
+        double rangeWeight = Math.Clamp(RenderDistance / 8.0, 1.0, 2.5); // RenderGlobal.renderEntities z MC 1.8
         foreach (var e in w.Entities)
         {
             if (e.Removed) continue;
             if (e == viewer && !thirdPerson) continue;
             if (e is Player pp && pp.Spectator) continue;
-            if (e.DistanceSq(cam.X, cam.Y, cam.Z) > maxD * maxD) continue;
+            double eds = e.DistanceSq(cam.X, cam.Y, cam.Z);
+            if (eds > maxD * maxD || !InRenderRange(e, eds, rangeWeight)) continue;
             var bb = e.BoundingBox.Grow(0.5);
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
+            if (e is TntEntity tnt && _tnt != null)
+            {
+                // jak EntityRenderer.RenderEntity dla TNT: skala lontu, błysk co 5 ticków, światło bloku 15
+                float f = 1f;
+                if (tnt.Fuse < 10) f = 1f + (1f - Math.Max(0, tnt.Fuse - pt + 1) / 10f) * 0.3f;
+                var tp = new Vector3((float)(e.IX(pt) - cam.X), (float)(e.IY(pt) - cam.Y), (float)(e.IZ(pt) - cam.Z));
+                int sbx = MathUtil.FloorToInt(e.IX(pt)), sby = MathUtil.FloorToInt(e.IY(pt) + e.Height * 0.5), sbz = MathUtil.FloorToInt(e.IZ(pt));
+                _tnt.Add(tp, f, (tnt.Fuse / 5) % 2 == 0, w.GetSkyLight(sbx, sby, sbz));
+                continue;
+            }
             er.RenderEntity(e, pt, cam_(cam), w, false);
         }
+        if (_tnt != null && _tnt.Count > 0)
+        {
+            _tnt.Shader.Use(); _tnt.Shader.Set("uViewProj", vp); SetFog(_tnt.Shader);
+            _tnt.Draw(Terrain);
+            er.Shader.Use();
+        }
+        Mark(6);
         TileRenderHook?.Invoke(er, w, pt, cam);
+        Mark(7);
         er.Flush(er.Skin, er.SkinTex);
         er.Flush(er.Terrain, Terrain);
         er.FlushMaps();
         er.FlushBanners();
 
+        Mark(8);
         // --- cząsteczki ---
         RenderParticles(pt, cam);
         er.Flush(er.Terrain, Terrain);
@@ -600,6 +832,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         }
 
+        Mark(3);
         // --- przezroczyste (woda) ---
         GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         GL.Disable(EnableCap.CullFace);
@@ -609,6 +842,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         foreach (var (sm, off, _) in visible)
             if (sm.Trans != null) { _chunk.Set("uOffset", off); sm.Trans.DrawQuads(); }
 
+        Mark(4);
         // --- chmury ---
         if (CloudsEnabled && FogMode == 0 && w.Dimension == DimensionId.Overworld) RenderClouds(cam, vp, pt);
         RenderWeather(cam, vp, pt);
@@ -636,6 +870,26 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             _lineMesh.DrawArrays(PrimitiveType.Lines);
         }
         GL.Enable(EnableCap.CullFace);
+        Mark(5);
+    }
+
+    /// <summary>Entity.isInRangeToRenderDist z MC 1.8 z nadpisaniami (fajerwerk, wiszące, haczyk, kule ognia, inni gracze):
+    /// średnia krawędź AABB x 64 x waga. Dalej MC encji nie rysuje.</summary>
+    private static bool InRenderRange(Entity e, double distSq, double weight)
+    {
+        if (e is FireworkRocketEntity) return distSq < 4096;
+        double d;
+        if (e is HangingEntity || e is LeashKnot) d = 16;
+        else
+        {
+            var bb = e.BoundingBox;
+            d = ((bb.MaxX - bb.MinX) + (bb.MaxY - bb.MinY) + (bb.MaxZ - bb.MinZ)) / 3.0;
+            if (double.IsNaN(d)) d = 1;
+            if (e is FishingHook || e is FireballEntity) d *= 4;
+            else if (e is Player) d *= 10; // EntityOtherPlayerMP
+        }
+        d *= 64 * weight;
+        return distSq < d * d;
     }
 
     private static Vector3 cam_(Vector3d c) => new((float)c.X, (float)c.Y, (float)c.Z);
@@ -796,8 +1050,23 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     public void OnEntityRemoved(Entity e) { }
     public void PlaySound(string name, double x, double y, double z, float volume, float pitch) => SoundHook?.Invoke(name, x, y, z, volume, pitch);
 
+    private static int[] _smokeLayers, _explosionLayers;
+    private static int SmokeLayer(int i) { _smokeLayers ??= Enumerable.Range(0, 8).Select(n => TextureGen.Layer("particle_smoke_" + n)).ToArray(); return _smokeLayers[i]; }
+    private static int ExplosionLayer(int i) { _explosionLayers ??= Enumerable.Range(0, 4).Select(n => TextureGen.Layer("particle_explosion_" + n)).ToArray(); return _explosionLayers[i]; }
+    /// <summary>Jak RenderGlobal.spawnEntityFX w MC 1.8: zwykłe cząsteczki dalej niż 16 bloków od kamery nie powstają
+    /// (wybuchy mają ignoreRange). Pełna pula cząsteczek też kończy wywołanie od razu.</summary>
+    private bool SkipParticle(ParticleKind kind, double x, double y, double z)
+    {
+        if (Particles.Count >= 4000) return true;
+        if (kind == ParticleKind.Explosion) return false;
+        if (kind == ParticleKind.BlockBreak) { double bx = x - _camPos.X, by = y - _camPos.Y, bz = z - _camPos.Z; return bx * bx + by * by + bz * bz > 4096.0; }
+        double dx = x - _camPos.X, dy = y - _camPos.Y, dz = z - _camPos.Z;
+        return dx * dx + dy * dy + dz * dz > 256.0;
+    }
+
     public void SpawnParticles(ParticleKind kind, double x, double y, double z, int count, int data)
     {
+        if (SkipParticle(kind, x, y, z)) return;
         var p = new Vector3((float)x, (float)y, (float)z);
         var r = _pr;
         Vector3 Rnd(float s) => new((r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s);
@@ -831,13 +1100,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             case ParticleKind.Smoke:
             case ParticleKind.LargeSmoke:
                 for (int i = 0; i < count; i++)
-                    AddParticle(p + Rnd(0.3f), new Vector3(0, 0.02f + r.NextFloat() * 0.02f, 0) + Rnd(0.02f), TextureGen.Layer("particle_smoke_" + r.Next(4)), kind == ParticleKind.LargeSmoke ? 0.5f : 0.2f, 20 + r.Next(20), -0.002f, new Vector4(0.3f, 0.3f, 0.3f, 0.8f), false, false, 0, 0, 1, 1, true);
+                    AddParticle(p + Rnd(0.3f), new Vector3(0, 0.02f + r.NextFloat() * 0.02f, 0) + Rnd(0.02f), SmokeLayer(r.Next(4)), kind == ParticleKind.LargeSmoke ? 0.5f : 0.2f, 20 + r.Next(20), -0.002f, new Vector4(0.3f, 0.3f, 0.3f, 0.8f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Explosion:
                 for (int i = 0; i < 16; i++)
-                    AddParticle(p + Rnd(4f), Rnd(0.1f), TextureGen.Layer("particle_explosion_" + r.Next(4)), 1.5f + r.NextFloat() * 1.5f, 6 + r.Next(6), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, true);
+                    AddParticle(p + Rnd(4f), Rnd(0.1f), ExplosionLayer(r.Next(4)), 1.5f + r.NextFloat() * 1.5f, 6 + r.Next(6), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, true);
                 for (int i = 0; i < 30; i++)
-                    AddParticle(p + Rnd(3f), Rnd(0.3f), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.6f, 20 + r.Next(30), -0.003f, new Vector4(0.25f, 0.25f, 0.25f, 0.9f), false, false, 0, 0, 1, 1, true);
+                    AddParticle(p + Rnd(3f), Rnd(0.3f), SmokeLayer(r.Next(8)), 0.6f, 20 + r.Next(30), -0.003f, new Vector4(0.25f, 0.25f, 0.25f, 0.9f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Flame:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.05f), new Vector3(0, 0.005f, 0), TextureGen.Layer("particle_flame"), 0.1f, 10 + r.Next(10), 0, Vector4.One, false, true);
@@ -864,7 +1133,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(.3f), new Vector3(0, .02f, 0), TextureGen.Layer("particle_smoke_0"), .12f, 24, 0, new Vector4((data >> 16 & 255) / 255f, (data >> 8 & 255) / 255f, (data & 255) / 255f, .8f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Poof:
-                for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);
+                for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), SmokeLayer(r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.RedDust:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.3f), Vector3.Zero, TextureGen.Layer("particle_white"), 0.08f, 10, 0, new Vector4(1, 0.1f, 0.1f, 1), false, true);
@@ -879,6 +1148,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         SetWorld(null);
         _chunk.Dispose(); _sky.Dispose(); _cloudSh.Dispose(); _line.Dispose(); _sunSh?.Dispose();
         _skyQuad.Dispose(); _sunMesh.Dispose(); _starMesh.Dispose(); _lineMesh.Dispose(); _cloudMesh?.Dispose();
+        foreach (var reg in _regions.Values) reg.Dispose(); _regions.Clear();
         Entities.Dispose(); Terrain.Dispose(); _sunTex.Dispose(); _moonTex.Dispose();
         _weatherTextures?.Dispose();
     }
