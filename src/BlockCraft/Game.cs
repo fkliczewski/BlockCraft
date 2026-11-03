@@ -458,7 +458,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         if (_netTestOriginalSettings != null) Settings = _netTestOriginalSettings;
-        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); if (!_stress) Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
 
         base.OnClosing(e);
     }
@@ -467,7 +467,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnRenderFrame(FrameEventArgs args)
     {
         base.OnRenderFrame(args);
-        double now = _clock.Elapsed.TotalSeconds;
+        double now = _clock.Elapsed.TotalSeconds; _frameStart = now;
         double dt = Math.Min(0.25, now - _lastTime); _lastTime = now;
         _fpsTimer += dt; _fpsCount++;
         if (_fpsTimer >= 1)
@@ -510,6 +510,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
     }
     private bool _screenshotRequested;
+    private double _frameStart;
     private long _soundTick; private int _soundsThisTick;
 
     private void MouseLook()
