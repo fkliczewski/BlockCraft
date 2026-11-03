@@ -12,6 +12,8 @@ public sealed class SectionMesh
 {
     /// <summary>Nieprzezroczysty teren: kawałek wspólnego bufora regionu (SolidLen = 0, gdy pusto).</summary>
     public int SolidOff = -1, SolidLen;
+    /// <summary>Łączność ścian sekcji (VisGraph), domyślnie wszystko widać.</summary>
+    public ulong Vis = ChunkMesher.VisAll;
     /// <summary>Kubełki kierunków ścian (FacingSort): początki w wierzchołkach i skrajne płaszczyzny.</summary>
     public readonly int[] Start = new int[8];
     public readonly float[] Plane = new float[6];
@@ -48,7 +50,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private readonly object _jobLock = new();
     private readonly List<(int cx, int sy, int cz, int ver)> _jobs = new();
     private readonly HashSet<(int, int, int)> _jobSet = new();
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, SortedSolid solid, byte[] trans, int tb)> _done = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, SortedSolid solid, byte[] trans, int tb, ulong vis)> _done = new();
     private readonly Thread[] _workers;
     private volatile bool _running = true;
     private readonly ChunkMesher _mainMesher = new();
@@ -289,7 +291,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 mesher.Build(w, job.cx, job.sy, job.cz);
                 var s = mesher.Solid.Count > 0 ? FacingSort.Sort(mesher.Solid.Data, mesher.Solid.Count) : null;
                 var t = mesher.Translucent.Count > 0 ? mesher.Translucent.Data[..mesher.Translucent.Bytes] : null;
-                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, t, t?.Length ?? 0));
+                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, t, t?.Length ?? 0, mesher.Vis));
             }
             catch (Exception ex) { Log.Error("Mesher: " + ex.Message); }
         }
@@ -408,7 +410,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 var sm = cr.S[sy];
                 sm.Version++;
                 if (c.SectionCounts[sy] == 0 && (sy == 0 || c.SectionCounts[sy - 1] == 0) && (sy == Chunk.Sections - 1 || c.SectionCounts[sy + 1] == 0) && sm.SolidLen == 0 && sm.Trans == null)
-                { sm.BuiltVersion = sm.Version; continue; }
+                { sm.Vis = ChunkMesher.VisAll; sm.BuiltVersion = sm.Version; continue; }
                 double dist = Math.Abs(dxc) + Math.Abs(dzc) + Math.Abs(sy * 16 + 8 - cam.Y) / 16.0;
                 if (dist <= 1.5 && sm.BuiltVersion >= 0) urgent.Add((c.Cx, sy, c.Cz, sm.Version, dist));
                 else
@@ -425,6 +427,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             _mainMesher.Build(World, cx, sy, cz);
             var ucr = _renders[MathUtil.ChunkKey(cx, cz)]; var sm = ucr.S[sy];
             Upload(ucr, cx, sy, cz, sm, _mainMesher.Solid.Count > 0 ? FacingSort.Sort(_mainMesher.Solid.Data, _mainMesher.Solid.Count) : null, _mainMesher.Translucent.Data, _mainMesher.Translucent.Bytes);
+            sm.Vis = _mainMesher.Vis;
             sm.BuiltVersion = ver;
         }
         // wyniki z wątków
@@ -435,6 +438,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             var sm = cr.S[d.sy];
             if (d.ver < sm.BuiltVersion) continue;
             Upload(cr, d.cx, d.sy, d.cz, sm, d.solid, d.trans, d.tb);
+            sm.Vis = d.vis;
             sm.BuiltVersion = d.ver;
         }
     }
@@ -534,6 +538,138 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         s.Set("uDimension", (int)World.Dimension);
     }
 
+    // ================= wybór sekcji =================
+    /// <summary>Cave culling jak w MC 1.8 (RenderGlobal.setupTerrain + VisGraph). --no-cave wyłącza (porównania).</summary>
+    public static bool CaveCulling = !Environment.GetCommandLineArgs().Contains("--no-cave");
+
+    private void AddSection(ChunkRender cr, SectionMesh sm, Vector3 off)
+    {
+        RenderedSections++;
+        _visible.Add((sm, off, (off + new Vector3(8)).LengthSquared));
+        if (sm.SolidLen == 0) return;
+        var reg = cr.Region;
+        if (!reg.Queued) { reg.Queued = true; _drawRegions.Add(reg); }
+        // tylko kubełki ścian, które mogą być przodem do kamery; sąsiednie łączone w jeden zakres
+        int mask = FacingSort.VisibleMask(sm.Plane, -off.X, -off.Y, -off.Z);
+        int runStart = -1, runEnd = 0;
+        for (int b = 0; b < FacingSort.Buckets; b++)
+        {
+            int s0 = sm.Start[b], s1 = sm.Start[b + 1];
+            if (s0 == s1) continue;
+            if ((mask & (1 << b)) != 0) { if (runStart < 0) runStart = s0; runEnd = s1; }
+            else if (runStart >= 0) { reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart); runStart = -1; }
+        }
+        if (runStart >= 0) reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart);
+    }
+
+    /// <summary>Bez cave cullingu: wszystkie niepuste sekcje w zasięgu i we frustum.</summary>
+    private void CollectVisibleAll(Vector3d cam, float maxD)
+    {
+        foreach (var kv in _renders)
+        {
+            var cr = kv.Value;
+            int secMask = cr.Mask;
+            if (secMask == 0) continue;
+            int cx = (int)(kv.Key >> 32), cz = (int)kv.Key;
+            double ox = cx * 16 - cam.X, oz = cz * 16 - cam.Z;
+            if (Math.Abs(ox + 8) > maxD + 8 || Math.Abs(oz + 8) > maxD + 8) continue;
+            TotalSections += System.Numerics.BitOperations.PopCount((uint)secMask);
+            // najpierw cała kolumna (od najniższej do najwyższej niepustej sekcji)
+            int lo = System.Numerics.BitOperations.TrailingZeroCount(secMask), hi = 31 - System.Numerics.BitOperations.LeadingZeroCount((uint)secMask);
+            var colMin = new Vector3((float)ox, (float)(lo * 16 - cam.Y), (float)oz);
+            if (!InFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
+            bool single = lo == hi;
+            for (int sy = lo; sy <= hi; sy++)
+            {
+                if ((secMask & (1 << sy)) == 0) continue;
+                var sm = cr.S[sy];
+                var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
+                if (!single && !InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                AddSection(cr, sm, off);
+            }
+        }
+    }
+
+    private static readonly int[] FaceDx = { 0, 0, 0, 0, -1, 1 }, FaceDy = { -1, 1, 0, 0, 0, 0 }, FaceDz = { 0, 0, -1, 1, 0, 0 };
+    private ChunkRender[] _bfsCols = Array.Empty<ChunkRender>();
+    private int[] _bfsStamp = Array.Empty<int>(), _bfsQ = Array.Empty<int>();
+    private byte[] _bfsIn = Array.Empty<byte>(), _bfsSet = Array.Empty<byte>();
+    private int _bfsFrame;
+
+    /// <summary>MC 1.8 setupTerrain: przejście wszerz od sekcji kamery; do sąsiada idziemy tylko, gdy nie wracamy
+    /// w stronę kamery, sąsiad jest we frustum, a przez bieżącą sekcję widać ze ściany wejścia ścianę wyjścia (VisGraph).
+    /// Jaskinie i podziemia zasłonięte terenem odpadają, a kolejność jest od najbliższych.</summary>
+    private void CollectVisibleBfs(Vector3d cam, float maxD)
+    {
+        int R = RenderDistance + 1, W = 2 * R + 1, N = W * W * 16;
+        if (_bfsStamp.Length < N || _bfsCols.Length != W * W)
+        {
+            _bfsStamp = new int[N]; _bfsQ = new int[N]; _bfsIn = new byte[N]; _bfsSet = new byte[N]; _bfsCols = new ChunkRender[W * W];
+            _bfsFrame = 0;
+        }
+        if (++_bfsFrame == int.MaxValue) { Array.Clear(_bfsStamp); _bfsFrame = 1; }
+        int frame = _bfsFrame;
+        int ccx = MathUtil.FloorToInt(cam.X) >> 4, ccz = MathUtil.FloorToInt(cam.Z) >> 4;
+        Array.Clear(_bfsCols);
+        foreach (var kv in _renders)
+        {
+            int gx = (int)(kv.Key >> 32) - ccx + R, gz = (int)kv.Key - ccz + R;
+            if ((uint)gx >= (uint)W || (uint)gz >= (uint)W) continue;
+            _bfsCols[gx * W + gz] = kv.Value;
+            TotalSections += System.Numerics.BitOperations.PopCount((uint)kv.Value.Mask);
+        }
+        int head = 0, tail = 0;
+        if (cam.Y >= 0 && cam.Y < Chunk.Height)
+        {
+            int n = (R * W + R) * 16 + (MathUtil.FloorToInt(cam.Y) >> 4);
+            _bfsStamp[n] = frame; _bfsIn[n] = 255; _bfsSet[n] = 0; _bfsQ[tail++] = n;
+        }
+        else
+        {
+            // kamera nad albo pod światem: start od całej górnej (dolnej) warstwy we frustum
+            int sy = cam.Y >= Chunk.Height ? Chunk.Sections - 1 : 0;
+            for (int gx = 0; gx < W; gx++)
+                for (int gz = 0; gz < W; gz++)
+                {
+                    var off = new Vector3((float)((ccx + gx - R) * 16 - cam.X), (float)(sy * 16 - cam.Y), (float)((ccz + gz - R) * 16 - cam.Z));
+                    if (Math.Abs(off.X + 8) > maxD + 8 || Math.Abs(off.Z + 8) > maxD + 8) continue;
+                    if (!InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                    int n = (gx * W + gz) * 16 + sy;
+                    _bfsStamp[n] = frame; _bfsIn[n] = 255; _bfsSet[n] = 0; _bfsQ[tail++] = n;
+                }
+        }
+        while (head < tail)
+        {
+            int n = _bfsQ[head++];
+            int sy = n & 15, col = n >> 4, gx = col / W, gz = col - gx * W;
+            var cr = _bfsCols[col];
+            var off = new Vector3((float)((ccx + gx - R) * 16 - cam.X), (float)(sy * 16 - cam.Y), (float)((ccz + gz - R) * 16 - cam.Z));
+            ulong vis = ChunkMesher.VisAll;
+            if (cr != null)
+            {
+                var sm = cr.S[sy];
+                if ((cr.Mask & (1 << sy)) != 0) AddSection(cr, sm, off);
+                if (sm.BuiltVersion >= 0) vis = sm.Vis;
+            }
+            int faceIn = _bfsIn[n], set = _bfsSet[n];
+            for (int f = 0; f < 6; f++)
+            {
+                if ((set & (1 << (f ^ 1))) != 0) continue;
+                if (faceIn != 255 && !ChunkMesher.VisConnects(vis, faceIn ^ 1, f)) continue;
+                int nsy = sy + FaceDy[f], ngx = gx + FaceDx[f], ngz = gz + FaceDz[f];
+                if ((uint)nsy >= Chunk.Sections || (uint)ngx >= (uint)W || (uint)ngz >= (uint)W) continue;
+                float nox = off.X + FaceDx[f] * 16, noz = off.Z + FaceDz[f] * 16;
+                if (Math.Abs(nox + 8) > maxD + 8 || Math.Abs(noz + 8) > maxD + 8) continue;
+                int nn = (ngx * W + ngz) * 16 + nsy;
+                if (_bfsStamp[nn] == frame) continue;
+                _bfsStamp[nn] = frame;
+                var noff = new Vector3(nox, off.Y + FaceDy[f] * 16, noz);
+                if (!InFrustum(noff, noff + new Vector3(16, 16, 16))) continue;
+                _bfsIn[nn] = (byte)f; _bfsSet[nn] = (byte)(set | (1 << f)); _bfsQ[tail++] = nn;
+            }
+        }
+    }
+
     // ================= rysowanie =================
     private readonly List<(SectionMesh sm, Vector3 off, float d)> _visible = new();
     private readonly List<TerrainRegion> _drawRegions = new();
@@ -603,46 +739,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         var visible = _visible; visible.Clear();
         float maxD = (RenderDistance + 1) * 16;
         _drawRegions.Clear();
-        foreach (var kv in _renders)
-        {
-            var cr = kv.Value;
-            int secMask = cr.Mask;
-            if (secMask == 0) continue;
-            var reg = cr.Region;
-            int cx = (int)(kv.Key >> 32), cz = (int)kv.Key;
-            double ox = cx * 16 - cam.X, oz = cz * 16 - cam.Z;
-            if (Math.Abs(ox + 8) > maxD + 8 || Math.Abs(oz + 8) > maxD + 8) continue;
-            TotalSections += System.Numerics.BitOperations.PopCount((uint)secMask);
-            // najpierw cała kolumna (od najniższej do najwyższej niepustej sekcji)
-            int lo = System.Numerics.BitOperations.TrailingZeroCount(secMask), hi = 31 - System.Numerics.BitOperations.LeadingZeroCount((uint)secMask);
-            var colMin = new Vector3((float)ox, (float)(lo * 16 - cam.Y), (float)oz);
-            if (!InFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
-            bool single = lo == hi;
-            for (int sy = lo; sy <= hi; sy++)
-            {
-                if ((secMask & (1 << sy)) == 0) continue;
-                var sm = cr.S[sy];
-                var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
-                if (!single && !InFrustum(off, off + new Vector3(16, 16, 16))) continue;
-                RenderedSections++;
-                visible.Add((sm, off, (off + new Vector3(8)).LengthSquared));
-                if (sm.SolidLen > 0)
-                {
-                    if (!reg.Queued) { reg.Queued = true; _drawRegions.Add(reg); }
-                    // tylko kubełki ścian, które mogą być przodem do kamery; sąsiednie łączone w jeden zakres
-                    int mask = FacingSort.VisibleMask(sm.Plane, -off.X, -off.Y, -off.Z);
-                    int runStart = -1, runEnd = 0;
-                    for (int b = 0; b < FacingSort.Buckets; b++)
-                    {
-                        int s0 = sm.Start[b], s1 = sm.Start[b + 1];
-                        if (s0 == s1) continue;
-                        if ((mask & (1 << b)) != 0) { if (runStart < 0) runStart = s0; runEnd = s1; }
-                        else if (runStart >= 0) { reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart); runStart = -1; }
-                    }
-                    if (runStart >= 0) reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart);
-                }
-            }
-        }
+        if (CaveCulling) CollectVisibleBfs(cam, maxD); else CollectVisibleAll(cam, maxD);
         TerrainDrawCalls = _drawRegions.Count;
         foreach (var reg in _drawRegions)
         {
