@@ -79,7 +79,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnLoad()
     {
         base.OnLoad();
-        Log.Info("Start BlockCraft, GL: " + GL.GetString(StringName.Renderer) + " / " + GL.GetString(StringName.Version));
+        string glRenderer = GL.GetString(StringName.Renderer);
+        Log.Info("Start BlockCraft, GL: " + glRenderer + " / " + GL.GetString(StringName.Version));
+        // Pierwsze uruchomienie na danej karcie: słaba grafika (zintegrowana, programowa) dostaje profil "laptop".
+        if (Settings.GpuProfileFor != glRenderer && !_autotest && !_showcase && !_stress)
+        {
+            var kind = GpuProfile.Detect(glRenderer);
+            if (kind != GpuProfile.Kind.Dedicated) { GpuProfile.ApplyLaptop(Settings, kind); Log.Info("Profil grafiki: " + kind + " (zasięg " + Settings.RenderDistance + ", skala " + Settings.RenderScale + "%)"); }
+            Settings.GpuProfileFor = glRenderer; Settings.Save();
+        }
         SharedQuadIndices.Init();
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
@@ -494,7 +502,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (World != null && _screen != null && _screen.PausesGame && _sessionStarted) pt = 1f;
 
         MouseLook();
+        bool gpuQ = _stressMeasure;
+        if (gpuQ) StressGpuBegin();
         try { RenderFrame(pt); } catch (Exception ex) { Log.Error("Render: " + ex); }
+        if (gpuQ) StressGpuEnd();
         _frames++;
         if (_autotest) AutotestStep();
         else if (_showcase) ShowcaseFrame();

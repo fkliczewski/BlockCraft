@@ -67,6 +67,7 @@ public static partial class SelfTest
         try { TestEnchantEffects(); } catch (Exception e) { Check(false, "Działanie zaklęć", e.ToString()); }
         try { TestAnvil(); } catch (Exception e) { Check(false, "Kowadło", e.ToString()); }
         try { TestUtilityItems(); } catch (Exception e) { Check(false, "Kompas, zegar, płyty", e.ToString()); }
+        try { TestPerf(); } catch (Exception e) { Check(false, "Optymalizacje", e.ToString()); }
         try { TestMobSpeed(); } catch (Exception e) { Check(false, "Prędkość mobów", e.ToString()); }
         try { TestHanging(); } catch (Exception e) { Check(false, "Obrazy, ramki, stojaki", e.ToString()); }
         try { TestMaps(); } catch (Exception e) { Check(false, "Mapy", e.ToString()); }

@@ -21,6 +21,10 @@ public sealed class Settings
     public int Difficulty { get; set; } = 2;
     public string PlayerName { get; set; } = "Steve";
     public bool ShowFps { get; set; }
+    /// <summary>Skala renderu świata 3D w procentach (25-100); HUD zawsze w pełnej rozdzielczości.</summary>
+    public int RenderScale { get; set; } = 100;
+    /// <summary>GL_RENDERER, dla którego sprawdzono profil grafiki (przy zmianie karty sprawdzamy jeszcze raz).</summary>
+    public string GpuProfileFor { get; set; } = "";
     /// <summary>Głośności kategorii dźwięku (master, music, record, weather, block, hostile, neutral, player, ambient), 0..1.</summary>
     public Dictionary<string, float> SoundVolumes { get; set; } = new();
 

@@ -105,6 +105,8 @@ public sealed partial class Game
         int ri = Array.IndexOf(_args, "--rd");
         int rd = ri >= 0 && ri + 1 < _args.Length && int.TryParse(_args[ri + 1], out var r) ? r : Settings.RenderDistance;
         Settings.RenderDistance = rd; ApplySettings();
+        int si = Array.IndexOf(_args, "--scale");
+        if (si >= 0 && si + 1 < _args.Length && int.TryParse(_args[si + 1], out var scl)) Settings.RenderScale = scl;
         int t0 = 0;
         WaitUntil(() => HasMenuWorld || ++t0 > 600);
         Step(5, () => CreateWorld("Stress " + DateTime.Now.ToString("HHmmss"), 12345, 1, false, WorldType.Default, true));
@@ -135,7 +137,7 @@ public sealed partial class Game
         {
             Step(1, () =>
             {
-                _stressFrames.Clear(); _stressCpu.Clear(); _stressSections = 0; Array.Clear(BlockCraft.Render.WorldRenderer.CpuMs); _stressClock.Restart(); _stressMeasure = true;
+                _stressFrames.Clear(); _stressCpu.Clear(); _stressSections = 0; StressGpuReset(); Array.Clear(BlockCraft.Render.WorldRenderer.CpuMs); _stressClock.Restart(); _stressMeasure = true;
                 phase.Restart();
                 float yaw0 = Player.Yaw;
                 _stressPerFrame = spin ? () => { Player.Yaw = Player.PrevYaw = yaw0 + (float)(phase.Elapsed.TotalSeconds * 60.0); } : null;
@@ -149,8 +151,8 @@ public sealed partial class Game
                 double sum = 0; foreach (var v in f) sum += v;
                 double csum = 0; foreach (var v in c) csum += v;
                 int worst = Math.Max(1, f.Length / 100); double wsum = 0; for (int k = f.Length - worst; k < f.Length; k++) wsum += f[k];
-                Log.Info($"STRESS render {name}: RD={rd} klatki={f.Length} srednio={f.Length / Math.Max(0.001, sum / 1000):F0} FPS " +
-                         $"1%low={1000 / Math.Max(0.001, wsum / worst):F0} FPS cpu={csum / Math.Max(1, c.Length):F3} ms sekcje={_stressSections / Math.Max(1, f.Length)} " +
+                Log.Info($"STRESS render {name}: RD={rd} skala={Settings.RenderScale}% klatki={f.Length} srednio={f.Length / Math.Max(0.001, sum / 1000):F0} FPS " +
+                         $"1%low={1000 / Math.Max(0.001, wsum / worst):F0} FPS cpu={csum / Math.Max(1, c.Length):F3} ms gpu={StressGpuAvgMs:F3} ms sekcje={_stressSections / Math.Max(1, f.Length)} " +
                          $"GL={GL.GetString(OpenTK.Graphics.OpenGL4.StringName.Renderer)}");
                 var pm = BlockCraft.Render.WorldRenderer.CpuMs; int fn = Math.Max(1, f.Length);
                 Log.Info($"STRESS render {name} cpu/klatke: update={pm[0] / fn:F3} niebo={pm[1] / fn:F3} teren={pm[2] / fn:F3} encje={pm[3] / fn:F3} przezr={pm[4] / fn:F3} chmury={pm[5] / fn:F3} ms [encje {pm[6] / fn:F3} tile {pm[7] / fn:F3} flush {pm[8] / fn:F3}]");
