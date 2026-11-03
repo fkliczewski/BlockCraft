@@ -126,6 +126,10 @@ public sealed class Navigator
         return true;
     }
     public void SetSpeed(double s) => _speed = s;
+    /// <summary>Prędkość zlecona przez AI (atrybut x mnożnik zadania).</summary>
+    public double Speed => _speed;
+    /// <summary>Wysokość bieżącego punktu ścieżki (królik skacze wyżej, gdy cel jest powyżej).</summary>
+    public int NextY => HasPath ? _path[_idx].y : int.MinValue;
     public void Stop() { _path = null; _m.MoveForward = 0; }
 
     public void Tick()

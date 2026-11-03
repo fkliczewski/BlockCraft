@@ -42,6 +42,7 @@ public static partial class SelfTest
         try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
         var sw = Stopwatch.StartNew();
         Console.WriteLine("=== BlockCraft self-test ===");
+        if (args.Contains("--mob-survey")) { MobSpeedSurveyReport(args.SkipWhile(a => a != "--mob-survey").Skip(1).FirstOrDefault()); return 0; }
         if (args.Contains("--cmd-only"))
         {
             try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
