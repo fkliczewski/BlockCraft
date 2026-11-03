@@ -11,6 +11,8 @@ public static class Program
     private static extern bool AttachConsole(int pid);
     [DllImport("kernel32.dll")]
     private static extern bool AllocConsole();
+    [DllImport("winmm.dll")]
+    private static extern uint timeBeginPeriod(uint ms);
 
     public static void ShowError(string text)
     {
@@ -43,6 +45,8 @@ public static class Program
             if (args.Contains("--bench")) { EnsureConsole(); return Bench.Run(args); }
             if (args.Contains("--missing")) return MissingReport.Run(args);
             if (args.Contains("--server")) { EnsureConsole(); return Net.DedicatedServer.Run(args); }
+            // zegar systemu co 1 ms: dokładny limiter FPS i krótsze uśpienia wątków
+            try { if (OperatingSystem.IsWindows()) timeBeginPeriod(1); } catch { }
             using var game = new Game(args);
             game.Run();
             return 0;

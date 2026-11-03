@@ -515,11 +515,18 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         int maxFps = _fpsOverride > 0 ? _fpsOverride : Settings.MaxFps;
         if ((!Settings.VSync || _fpsOverride > 0) && maxFps < 1000)
         {
+            // Limiter z harmonogramem (bez dryfu): sen po 1 ms (timeBeginPeriod), końcówka dokręcana Yield,
+            // bo sam Thread.Sleep na Windows ma rozdzielczość do 15,6 ms (limit 120 dawał ~64 FPS).
             double target = 1.0 / maxFps;
-            double spent = _clock.Elapsed.TotalSeconds - now;
-            if (spent < target) Thread.Sleep((int)((target - spent) * 1000));
+            _nextFrame += target;
+            double t = _clock.Elapsed.TotalSeconds;
+            if (_nextFrame < t - target) _nextFrame = t; // duże opóźnienie: nie nadrabiamy klatek
+            while (_nextFrame - t > 0.0015) { Thread.Sleep(1); t = _clock.Elapsed.TotalSeconds; }
+            while (_clock.Elapsed.TotalSeconds < _nextFrame) Thread.Yield();
         }
+        else _nextFrame = _clock.Elapsed.TotalSeconds;
     }
+    private double _nextFrame;
     private bool _screenshotRequested;
     private double _frameStart;
     private long _soundTick; private int _soundsThisTick;

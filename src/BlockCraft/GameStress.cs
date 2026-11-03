@@ -104,6 +104,7 @@ public sealed partial class Game
     {
         int ri = Array.IndexOf(_args, "--rd");
         int rd = ri >= 0 && ri + 1 < _args.Length && int.TryParse(_args[ri + 1], out var r) ? r : Settings.RenderDistance;
+        if (_args.Contains("--laptop")) { BlockCraft.Render.GpuProfile.ApplyLaptop(Settings, BlockCraft.Render.GpuProfile.Kind.Integrated); if (ri < 0) rd = Settings.RenderDistance; }
         Settings.RenderDistance = rd; ApplySettings();
         int si = Array.IndexOf(_args, "--scale");
         if (si >= 0 && si + 1 < _args.Length && int.TryParse(_args[si + 1], out var scl)) Settings.RenderScale = scl;
