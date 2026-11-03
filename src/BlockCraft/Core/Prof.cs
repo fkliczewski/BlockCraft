@@ -8,7 +8,7 @@ public static class Prof
 {
     public static bool On;
     public const int ExpRays = 0, ExpEntities = 1, ExpExposureRef = 2, ExpDestroy = 3, TntTick = 4, Light = 5, Notify = 6, OtherTick = 7, Count = 8;
-    private static readonly string[] Names = { "eksplozja: promienie", "eksplozja: encje", "  w tym ekspozycja raycast", "eksplozja: niszczenie", "tick TNT (ruch)", "światło", "powiadomienia sąsiadów", "tick encji innych" };
+    private static readonly string[] Names = { "eksplozja: promienie", "eksplozja: encje", "  w tym ekspozycja raycast", "eksplozja: niszczenie", "tick TNT (ruch)", "światło", "powiadomienia sąsiadów", "  w tym zapytanie siatki" };
     public static readonly long[] Ticks = new long[Count];
     public static readonly long[] Calls = new long[Count];
 

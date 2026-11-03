@@ -66,7 +66,8 @@ public abstract class Entity
     internal BlockCraft.World.EntityGrid GridOwner;
     internal long GridKey, GridSeq;
     internal int GridIndex;
-    internal bool GridBig;
+    internal bool GridBig, GridCustomBox, GridPure;
+    internal BlockCraft.World.EntityGrid.Cell GridCell;
     public float Yaw, Pitch, PrevYaw, PrevPitch;
     public float Width = 0.6f, Height = 1.8f;
     public bool OnGround, CollidedH, CollidedV, InWater, InLava, Dead, Removed, NoClip, NoGravity;
