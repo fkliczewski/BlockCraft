@@ -43,6 +43,7 @@ public static partial class SelfTest
         var sw = Stopwatch.StartNew();
         Console.WriteLine("=== BlockCraft self-test ===");
         if (args.Contains("--mob-survey")) { MobSpeedSurveyReport(args.SkipWhile(a => a != "--mob-survey").Skip(1).FirstOrDefault()); return 0; }
+        if (args.Contains("--audio-only")) { TestAudioMix(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); return _fail == 0 ? 0 : 2; }
         if (args.Contains("--cmd-only"))
         {
             try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }

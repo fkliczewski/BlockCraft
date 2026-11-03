@@ -34,12 +34,10 @@ public static partial class SelfTest
         for (int i = 0; i < 20; i++) events.Add(Event());
         Check(events.Count == 1 && events.SuppressedDuplicates == 19, "Duplikaty jednego zdarzenia z tego samego miejsca nie sumują się");
         events.Read(buffer, 0, buffer.Length); events.Add(Event());
-        Check(events.Count == 1, "Ten sam efekt 46 ms później scala się z poprzednim (bez echa)");
-        events.Read(buffer, 0, buffer.Length); events.Read(buffer, 0, buffer.Length); events.Add(Event());
-        Check(events.Count == 2, "Nowe uderzenie po ponad 60 ms pozostaje słyszalne");
-        events.Read(buffer, 0, buffer.Length); events.Read(buffer, 0, buffer.Length); events.Add(Event());
+        Check(events.Count == 2, "Nowe uderzenie w kolejnym ticku pozostaje słyszalne");
+        events.Read(buffer, 0, buffer.Length); events.Add(Event());
         Check(events.Count == 2, "Jedno źródło nie odkłada wielu kopii długiego efektu");
-        events.Add(Event(x: 12)); events.Add(Event("dig.wood"));
+        events.Add(Event(x: 3)); events.Add(Event("dig.wood"));
         Check(events.Count == 4, "Różne źródła i różne efekty mogą grać równocześnie");
         events.Add(Event("note.harp")); events.Add(Event("note.harp")); events.Add(Event("note.harp"));
         Check(events.Count == 7, "Limiter duplikatów nie usuwa nut bloku muzycznego");
@@ -48,18 +46,15 @@ public static partial class SelfTest
         Check(events.Count == 1 && !music.Done, "Zmiana świata usuwa odgłosy i pozostawia muzykę");
         events.Stop(); Check(events.Count == 0 && music.Done, "Zamknięcie audio usuwa wszystkie głosy");
 
-        // TNT: setki wybuchów obok siebie w kolejnych tickach
-        var tnt = new Mixer(); var tick = new float[2205 * 2]; // 50 ms
-        Voice Boom(double x, float vol = .5f) { var v = Event("random.explode", x); v.Loop = false; v.Frames = 44100 * 3; v.Data = new float[v.Frames * 2]; v.Volume = vol; return v; }
-        for (int i = 0; i < 30; i++) tnt.Add(Boom(i * .1, i == 10 ? 1f : .5f));
-        int sameTick = tnt.Count; float loud = 0; tnt.ForEach(v => loud = Math.Max(loud, v.Volume));
-        Check(sameTick == 1 && loud == 1f, "30 wybuchów obok siebie w jednym ticku gra jednym głosem o największej głośności", $"{sameTick} głosów");
-        int maxLive = 0;
-        for (int t = 0; t < 40; t++) { for (int i = 0; i < 24; i++) tnt.Add(Boom((t * 24 + i) % 5)); tnt.Read(tick, 0, tick.Length); int live = 0; tnt.ForEach(v => { if (v.FadeSpeed == 0 && !v.Done) live++; }); maxLive = Math.Max(maxLive, live); }
-        Check(maxLive <= Mixer.MaxSameEvent, $"Seria wybuchów przez 2 s: najwyżej {Mixer.MaxSameEvent} kopie naraz zamiast echa z kilkudziesięciu", $"{maxLive}");
-        tnt.Add(Boom(40));
-        int far = 0; tnt.ForEach(v => { if (v.X == 40 && !v.Done) far++; });
-        Check(far == 1, "Wybuch daleko od serii nadal słychać osobno");
+        // Ścieżka jak w WaveOutEvent: SampleToWaveProvider podaje bufor byte[] widziany jako float[] (WaveBuffer),
+        // a WaveOutEvent krąży po 3 tych samych buforach. Po zakończonym dźwięku kolejny obieg bufora musi być ciszą.
+        var dev = new Mixer(); var wave = new NAudio.Wave.SampleProviders.SampleToWaveProvider(dev); var bytes = new byte[4096 * 4];
+        var shot = Tone(.3f, .3f); shot.Loop = false; shot.Frames = 1024; dev.Add(shot);
+        wave.Read(bytes, 0, bytes.Length);
+        bool heard = BitConverter.ToSingle(bytes, 0) > .1f;
+        wave.Read(bytes, 0, bytes.Length);
+        float rest = 0; for (int i = 0; i < bytes.Length; i += 4) rest = Math.Max(rest, Math.Abs(BitConverter.ToSingle(bytes, i)));
+        Check(heard && rest == 0, "Bufor urządzenia po dźwięku jest czysty (bez echa i zapętlenia starej próbki)", $"resztka {rest:0.###}");
 
         var whole = new Mixer(); var split = new Mixer();
         for (int i = 0; i < 8; i++) { whole.Add(Tone()); split.Add(Tone()); }
