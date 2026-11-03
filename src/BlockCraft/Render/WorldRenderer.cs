@@ -77,6 +77,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         });
         _starMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); });
         _lineMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); }, false);
+        _tnt = new TntInstancer(Entities);
         BuildStars();
         BuildCelestialTextures();
         BuildClouds();
@@ -146,6 +147,7 @@ void main(){ gl_Position = uViewProj*vec4(aPos,1.0); vUV=aUV; }";
     private const string SunFrag = @"#version 330 core
 in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(){ o = texture(uTex, vUV)*uColor; }";
     private Shader _sunSh;
+    private readonly TntInstancer _tnt;
 
     // ================= niebo =================
     private void BuildStars()
@@ -552,7 +554,23 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (e.DistanceSq(cam.X, cam.Y, cam.Z) > maxD * maxD) continue;
             var bb = e.BoundingBox.Grow(0.5);
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
+            if (e is TntEntity tnt && _tnt != null)
+            {
+                // jak EntityRenderer.RenderEntity dla TNT: skala lontu, błysk co 5 ticków, światło bloku 15
+                float f = 1f;
+                if (tnt.Fuse < 10) f = 1f + (1f - Math.Max(0, tnt.Fuse - pt + 1) / 10f) * 0.3f;
+                var tp = new Vector3((float)(e.IX(pt) - cam.X), (float)(e.IY(pt) - cam.Y), (float)(e.IZ(pt) - cam.Z));
+                int sbx = MathUtil.FloorToInt(e.IX(pt)), sby = MathUtil.FloorToInt(e.IY(pt) + e.Height * 0.5), sbz = MathUtil.FloorToInt(e.IZ(pt));
+                _tnt.Add(tp, f, (tnt.Fuse / 5) % 2 == 0, w.GetSkyLight(sbx, sby, sbz));
+                continue;
+            }
             er.RenderEntity(e, pt, cam_(cam), w, false);
+        }
+        if (_tnt != null && _tnt.Count > 0)
+        {
+            _tnt.Shader.Use(); _tnt.Shader.Set("uViewProj", vp); SetFog(_tnt.Shader);
+            _tnt.Draw(Terrain);
+            er.Shader.Use();
         }
         TileRenderHook?.Invoke(er, w, pt, cam);
         er.Flush(er.Skin, er.SkinTex);
@@ -796,8 +814,23 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     public void OnEntityRemoved(Entity e) { }
     public void PlaySound(string name, double x, double y, double z, float volume, float pitch) => SoundHook?.Invoke(name, x, y, z, volume, pitch);
 
+    private static int[] _smokeLayers, _explosionLayers;
+    private static int SmokeLayer(int i) { _smokeLayers ??= Enumerable.Range(0, 8).Select(n => TextureGen.Layer("particle_smoke_" + n)).ToArray(); return _smokeLayers[i]; }
+    private static int ExplosionLayer(int i) { _explosionLayers ??= Enumerable.Range(0, 4).Select(n => TextureGen.Layer("particle_explosion_" + n)).ToArray(); return _explosionLayers[i]; }
+    /// <summary>Jak RenderGlobal.spawnEntityFX w MC 1.8: zwykłe cząsteczki dalej niż 16 bloków od kamery nie powstają
+    /// (wybuchy mają ignoreRange). Pełna pula cząsteczek też kończy wywołanie od razu.</summary>
+    private bool SkipParticle(ParticleKind kind, double x, double y, double z)
+    {
+        if (Particles.Count >= 4000) return true;
+        if (kind == ParticleKind.Explosion) return false;
+        if (kind == ParticleKind.BlockBreak) { double bx = x - _camPos.X, by = y - _camPos.Y, bz = z - _camPos.Z; return bx * bx + by * by + bz * bz > 4096.0; }
+        double dx = x - _camPos.X, dy = y - _camPos.Y, dz = z - _camPos.Z;
+        return dx * dx + dy * dy + dz * dz > 256.0;
+    }
+
     public void SpawnParticles(ParticleKind kind, double x, double y, double z, int count, int data)
     {
+        if (SkipParticle(kind, x, y, z)) return;
         var p = new Vector3((float)x, (float)y, (float)z);
         var r = _pr;
         Vector3 Rnd(float s) => new((r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s);
@@ -831,13 +864,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             case ParticleKind.Smoke:
             case ParticleKind.LargeSmoke:
                 for (int i = 0; i < count; i++)
-                    AddParticle(p + Rnd(0.3f), new Vector3(0, 0.02f + r.NextFloat() * 0.02f, 0) + Rnd(0.02f), TextureGen.Layer("particle_smoke_" + r.Next(4)), kind == ParticleKind.LargeSmoke ? 0.5f : 0.2f, 20 + r.Next(20), -0.002f, new Vector4(0.3f, 0.3f, 0.3f, 0.8f), false, false, 0, 0, 1, 1, true);
+                    AddParticle(p + Rnd(0.3f), new Vector3(0, 0.02f + r.NextFloat() * 0.02f, 0) + Rnd(0.02f), SmokeLayer(r.Next(4)), kind == ParticleKind.LargeSmoke ? 0.5f : 0.2f, 20 + r.Next(20), -0.002f, new Vector4(0.3f, 0.3f, 0.3f, 0.8f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Explosion:
                 for (int i = 0; i < 16; i++)
-                    AddParticle(p + Rnd(4f), Rnd(0.1f), TextureGen.Layer("particle_explosion_" + r.Next(4)), 1.5f + r.NextFloat() * 1.5f, 6 + r.Next(6), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, true);
+                    AddParticle(p + Rnd(4f), Rnd(0.1f), ExplosionLayer(r.Next(4)), 1.5f + r.NextFloat() * 1.5f, 6 + r.Next(6), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, true);
                 for (int i = 0; i < 30; i++)
-                    AddParticle(p + Rnd(3f), Rnd(0.3f), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.6f, 20 + r.Next(30), -0.003f, new Vector4(0.25f, 0.25f, 0.25f, 0.9f), false, false, 0, 0, 1, 1, true);
+                    AddParticle(p + Rnd(3f), Rnd(0.3f), SmokeLayer(r.Next(8)), 0.6f, 20 + r.Next(30), -0.003f, new Vector4(0.25f, 0.25f, 0.25f, 0.9f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Flame:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.05f), new Vector3(0, 0.005f, 0), TextureGen.Layer("particle_flame"), 0.1f, 10 + r.Next(10), 0, Vector4.One, false, true);
@@ -864,7 +897,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(.3f), new Vector3(0, .02f, 0), TextureGen.Layer("particle_smoke_0"), .12f, 24, 0, new Vector4((data >> 16 & 255) / 255f, (data >> 8 & 255) / 255f, (data & 255) / 255f, .8f), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.Poof:
-                for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), TextureGen.Layer("particle_smoke_" + r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);
+                for (int i = 0; i < count; i++) AddParticle(p + Rnd(1f), Rnd(0.1f) + new Vector3(0, 0.02f, 0), SmokeLayer(r.Next(8)), 0.3f, 15 + r.Next(10), 0, new Vector4(0.9f, 0.9f, 0.9f, 1), false, false, 0, 0, 1, 1, true);
                 break;
             case ParticleKind.RedDust:
                 for (int i = 0; i < count; i++) AddParticle(p + Rnd(0.3f), Vector3.Zero, TextureGen.Layer("particle_white"), 0.08f, 10, 0, new Vector4(1, 0.1f, 0.1f, 1), false, true);

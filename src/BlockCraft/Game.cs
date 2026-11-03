@@ -91,6 +91,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             if (World == null || !_sessionStarted) return;
             // szafa grająca: "record:cat" gra płytę w bloku x,y,z, "record:" ją zatrzymuje
             if (n.StartsWith("record:")) { if (n.Length > 7) Sound.PlayRecord(n[7..], x, y, z); else Sound.StopRecord(x, y, z); return; }
+            // Limit dźwięków na tick: przy masowych wybuchach mikser i tak gra najwyżej Mixer.MaxVoices głosów,
+            // a każde wywołanie kosztuje (dekodowanie, wyszukiwanie duplikatów). Mechanika gry bez zmian.
+            if (_soundTick != _tickCount) { _soundTick = _tickCount; _soundsThisTick = 0; }
+            if (++_soundsThisTick > 24) return;
             Sound.Play(n, x, y, z, v, p);
         };
         UpdateGuiScale();
@@ -493,6 +497,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
     }
     private bool _screenshotRequested;
+    private long _soundTick; private int _soundsThisTick;
 
     private void MouseLook()
     {
