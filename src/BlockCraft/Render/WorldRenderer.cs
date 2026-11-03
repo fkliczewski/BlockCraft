@@ -12,6 +12,9 @@ public sealed class SectionMesh
 {
     /// <summary>Nieprzezroczysty teren: kawałek wspólnego bufora regionu (SolidLen = 0, gdy pusto).</summary>
     public int SolidOff = -1, SolidLen;
+    /// <summary>Kubełki kierunków ścian (FacingSort): początki w wierzchołkach i skrajne płaszczyzny.</summary>
+    public readonly int[] Start = new int[8];
+    public readonly float[] Plane = new float[6];
     public Mesh Trans;
     public int Version;      // wersja żądana
     public int BuiltVersion = -1;
@@ -21,6 +24,8 @@ public sealed class ChunkRender
 {
     public readonly SectionMesh[] S = new SectionMesh[Chunk.Sections];
     public TerrainRegion Region;
+    /// <summary>Bit na sekcję, która ma cokolwiek do narysowania.</summary>
+    public int Mask;
     public ChunkRender() { for (int i = 0; i < S.Length; i++) S[i] = new SectionMesh(); }
 }
 
@@ -43,7 +48,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private readonly object _jobLock = new();
     private readonly List<(int cx, int sy, int cz, int ver)> _jobs = new();
     private readonly HashSet<(int, int, int)> _jobSet = new();
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, byte[] solid, int sb, byte[] trans, int tb)> _done = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, SortedSolid solid, byte[] trans, int tb)> _done = new();
     private readonly Thread[] _workers;
     private volatile bool _running = true;
     private readonly ChunkMesher _mainMesher = new();
@@ -282,9 +287,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             try
             {
                 mesher.Build(w, job.cx, job.sy, job.cz);
-                var s = mesher.Solid.Count > 0 ? mesher.Solid.Data[..mesher.Solid.Bytes] : null;
+                var s = mesher.Solid.Count > 0 ? FacingSort.Sort(mesher.Solid.Data, mesher.Solid.Count) : null;
                 var t = mesher.Translucent.Count > 0 ? mesher.Translucent.Data[..mesher.Translucent.Bytes] : null;
-                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, s?.Length ?? 0, t, t?.Length ?? 0));
+                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, t, t?.Length ?? 0));
             }
             catch (Exception ex) { Log.Error("Mesher: " + ex.Message); }
         }
@@ -325,22 +330,24 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             }
     }
 
-    private void Upload(ChunkRender cr, int cx, int sy, int cz, SectionMesh sm, byte[] solid, int sb, byte[] trans, int tb)
+    private void Upload(ChunkRender cr, int cx, int sy, int cz, SectionMesh sm, SortedSolid solid, byte[] trans, int tb)
     {
         FreeSolid(cr, sm);
-        if (sb > 0)
+        if (solid != null && solid.Verts > 0)
         {
-            int verts = sb / VertexBuffer.Stride;
+            int verts = solid.Verts;
+            Array.Copy(solid.Start, sm.Start, 8); Array.Copy(solid.Plane, sm.Plane, 6);
             if (cr.Region == null)
             {
                 long rk = MathUtil.ChunkKey(cx >> TerrainRegion.Shift, cz >> TerrainRegion.Shift);
                 if (!_regions.TryGetValue(rk, out var reg)) _regions[rk] = reg = new TerrainRegion(cx >> TerrainRegion.Shift, cz >> TerrainRegion.Shift);
                 cr.Region = reg;
             }
-            ToRegionSpace(solid, verts, (cx & (TerrainRegion.Size - 1)) * 16, sy * 16, (cz & (TerrainRegion.Size - 1)) * 16);
-            sm.SolidOff = cr.Region.Upload(solid, verts); sm.SolidLen = verts;
+            ToRegionSpace(solid.Data, verts, (cx & (TerrainRegion.Size - 1)) * 16, sy * 16, (cz & (TerrainRegion.Size - 1)) * 16);
+            sm.SolidOff = cr.Region.Upload(solid.Data, verts); sm.SolidLen = verts;
         }
         if (tb > 0) { sm.Trans ??= NewChunkMesh(); sm.Trans.Upload(trans, tb); } else if (sm.Trans != null) { sm.Trans.Dispose(); sm.Trans = null; }
+        if (sm.SolidLen > 0 || sm.Trans != null) cr.Mask |= 1 << sy; else cr.Mask &= ~(1 << sy);
     }
 
     private bool NeighborsReady(Chunk c)
@@ -361,18 +368,32 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         try { UpdateInner(cam); } finally { CpuMs[0] += (Stopwatch.GetTimestamp() - ut0) * 1000.0 / Stopwatch.Frequency; }
     }
 
+    private readonly List<Chunk> _chunkSnap = new();
+    private int _chunkSnapCount = -1; private long _chunkSnapTs; private World.World _chunkSnapWorld;
+    private readonly List<(int, int, int, int, double)> _urgent = new();
+
     private void UpdateInner(Vector3d cam)
     {
         _camPos = cam; _camCx = MathUtil.FloorToInt(cam.X) >> 4; _camCz = MathUtil.FloorToInt(cam.Z) >> 4;
+        // Lista chunków odświeżana co 50 ms albo przy zmianie liczby (ConcurrentDictionary.Values blokuje i kopiuje
+        // wszystko, więc nie co klatkę); flagi DirtySections czytane z niej co klatkę.
+        long nowTs = Stopwatch.GetTimestamp();
+        bool refresh = World.Chunks.Count != _chunkSnapCount || _chunkSnapWorld != World || nowTs - _chunkSnapTs > Stopwatch.Frequency / 20;
+        if (refresh)
+        {
+            _chunkSnapTs = nowTs; _chunkSnapWorld = World;
+            _chunkSnap.Clear(); foreach (var kv in World.Chunks) _chunkSnap.Add(kv.Value);
+            _chunkSnapCount = _chunkSnap.Count;
+        }
         // usuń rendery z niezaładowanych chunków
-        if (_renders.Count > 0)
+        if (refresh && _renders.Count > 0)
         {
             List<long> rem = null;
             foreach (var k in _renders.Keys) if (!World.Chunks.ContainsKey(k)) (rem ??= new()).Add(k);
             if (rem != null) foreach (var k in rem) { var cr = _renders[k]; foreach (var s in cr.S) { FreeSolid(cr, s); s.Trans?.Dispose(); } _renders.Remove(k); }
         }
-        var urgent = new List<(int, int, int, int, double)>();
-        foreach (var c in World.Chunks.Values)
+        var urgent = _urgent; urgent.Clear();
+        foreach (var c in _chunkSnap)
         {
             if (c.DirtySections == 0) continue;
             int dxc = c.Cx - _camCx, dzc = c.Cz - _camCz;
@@ -403,7 +424,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         {
             _mainMesher.Build(World, cx, sy, cz);
             var ucr = _renders[MathUtil.ChunkKey(cx, cz)]; var sm = ucr.S[sy];
-            Upload(ucr, cx, sy, cz, sm, _mainMesher.Solid.Data, _mainMesher.Solid.Bytes, _mainMesher.Translucent.Data, _mainMesher.Translucent.Bytes);
+            Upload(ucr, cx, sy, cz, sm, _mainMesher.Solid.Count > 0 ? FacingSort.Sort(_mainMesher.Solid.Data, _mainMesher.Solid.Count) : null, _mainMesher.Translucent.Data, _mainMesher.Translucent.Bytes);
             sm.BuiltVersion = ver;
         }
         // wyniki z wątków
@@ -413,7 +434,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (!_renders.TryGetValue(MathUtil.ChunkKey(d.cx, d.cz), out var cr)) continue;
             var sm = cr.S[d.sy];
             if (d.ver < sm.BuiltVersion) continue;
-            Upload(cr, d.cx, d.sy, d.cz, sm, d.solid, d.sb, d.trans, d.tb);
+            Upload(cr, d.cx, d.sy, d.cz, sm, d.solid, d.trans, d.tb);
             sm.BuiltVersion = d.ver;
         }
     }
@@ -584,23 +605,41 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         _drawRegions.Clear();
         foreach (var kv in _renders)
         {
-            var reg = kv.Value.Region;
+            var cr = kv.Value;
+            int secMask = cr.Mask;
+            if (secMask == 0) continue;
+            var reg = cr.Region;
             int cx = (int)(kv.Key >> 32), cz = (int)kv.Key;
             double ox = cx * 16 - cam.X, oz = cz * 16 - cam.Z;
             if (Math.Abs(ox + 8) > maxD + 8 || Math.Abs(oz + 8) > maxD + 8) continue;
-            for (int sy = 0; sy < Chunk.Sections; sy++)
+            TotalSections += System.Numerics.BitOperations.PopCount((uint)secMask);
+            // najpierw cała kolumna (od najniższej do najwyższej niepustej sekcji)
+            int lo = System.Numerics.BitOperations.TrailingZeroCount(secMask), hi = 31 - System.Numerics.BitOperations.LeadingZeroCount((uint)secMask);
+            var colMin = new Vector3((float)ox, (float)(lo * 16 - cam.Y), (float)oz);
+            if (!InFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
+            bool single = lo == hi;
+            for (int sy = lo; sy <= hi; sy++)
             {
-                var sm = kv.Value.S[sy];
-                if (sm.SolidLen == 0 && sm.Trans == null) continue;
-                TotalSections++;
+                if ((secMask & (1 << sy)) == 0) continue;
+                var sm = cr.S[sy];
                 var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
-                if (!InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                if (!single && !InFrustum(off, off + new Vector3(16, 16, 16))) continue;
                 RenderedSections++;
                 visible.Add((sm, off, (off + new Vector3(8)).LengthSquared));
                 if (sm.SolidLen > 0)
                 {
                     if (!reg.Queued) { reg.Queued = true; _drawRegions.Add(reg); }
-                    reg.AddDraw(sm.SolidOff, sm.SolidLen);
+                    // tylko kubełki ścian, które mogą być przodem do kamery; sąsiednie łączone w jeden zakres
+                    int mask = FacingSort.VisibleMask(sm.Plane, -off.X, -off.Y, -off.Z);
+                    int runStart = -1, runEnd = 0;
+                    for (int b = 0; b < FacingSort.Buckets; b++)
+                    {
+                        int s0 = sm.Start[b], s1 = sm.Start[b + 1];
+                        if (s0 == s1) continue;
+                        if ((mask & (1 << b)) != 0) { if (runStart < 0) runStart = s0; runEnd = s1; }
+                        else if (runStart >= 0) { reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart); runStart = -1; }
+                    }
+                    if (runStart >= 0) reg.AddDraw(sm.SolidOff + runStart, runEnd - runStart);
                 }
             }
         }
