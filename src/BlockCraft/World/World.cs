@@ -644,6 +644,30 @@ public sealed partial class World : IBlockAccess
 
     // ---------- kolizje ----------
     private readonly List<AABB> _boxTmp = new();
+    /// <summary>True, gdy wszystkie bloki w zakresie [x0..x1] x [y0..y1] x [z0..z1] to powietrze (z zakresów kolumn chunków).
+    /// Niezaładowany chunk = false (zachowawczo).</summary>
+    public bool IsAirBox(int x0, int y0, int z0, int x1, int y1, int z1)
+    {
+        for (int x = x0; x <= x1; x++)
+            for (int z = z0; z <= z1; z++)
+            {
+                var c = GetChunk(x >> 4, z >> 4);
+                if (c == null) return false;
+                int ci = ((z & 15) << 4) | (x & 15);
+                int top = c.ColTop[ci] - 1, bot = c.ColBot[ci];
+                if (top >= bot && bot <= y1 && top >= y0) return false;
+            }
+        return true;
+    }
+    [ThreadStatic] private static List<AABB> _borderTmp;
+    /// <summary>True, gdy granica świata nie dodaje ścian kolizji w boxie (jak AddBorderBoxes w GetCollisionBoxes).</summary>
+    public bool NoBorderBoxes(AABB box)
+    {
+        var l = _borderTmp ??= new List<AABB>(); l.Clear();
+        AddBorderBoxes(box, l);
+        return l.Count == 0;
+    }
+
     public List<AABB> GetCollisionBoxes(AABB box, List<AABB> res)
     {
         res.Clear();
