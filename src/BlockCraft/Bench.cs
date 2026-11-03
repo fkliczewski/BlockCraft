@@ -48,6 +48,7 @@ public static class Bench
         }
         w.Tick(); // FlushAdds
         Console.WriteLine($"bench tnt: N={n} ({side}^3) lit={lit} setup={setup.ElapsedMilliseconds} ms");
+        Prof.On = true; Prof.Reset();
         var total = Stopwatch.StartNew();
         var tick = new Stopwatch();
         double maxMs = 0, sumMs = 0; int ticks = 0, maxTnt = 0;
@@ -66,6 +67,7 @@ public static class Bench
             if (ticks > 20000) break;
         }
         Console.WriteLine($"wynik: ticki={ticks} sredni={sumMs / Math.Max(1, ticks):F2} ms max={maxMs:F1} ms suma={total.Elapsed.TotalSeconds:F2} s maxTNT={maxTnt}");
+        Prof.Print();
         Console.WriteLine($"suma kontrolna: {Checksum(w, x0 - 40, z0 - 40, side + 80):X16} encji={w.Entities.Count}");
         return 0;
     }

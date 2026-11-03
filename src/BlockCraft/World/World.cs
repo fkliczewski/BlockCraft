@@ -148,9 +148,24 @@ public sealed partial class World : IBlockAccess
     }
 
     // ---------- dostęp do chunków ----------
-    public Chunk GetChunk(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) ? c : null;
-    public Chunk GetChunkIfLit(int cx, int cz) => Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c) && c.Lit ? c : null;
-    public bool IsChunkLoaded(int cx, int cz) => Chunks.ContainsKey(MathUtil.ChunkKey(cx, cz));
+    // Bezpośrednio mapowana pamięć podręczna chunków (64x64 sloty): GetBlock bez słownika współbieżnego.
+    // Wpis jest ważny, gdy chunk ma te same współrzędne i nie jest wyładowany (każde usunięcie z Chunks ustawia Unloaded).
+    private readonly Chunk[] _chunkCache = new Chunk[64 * 64];
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public Chunk GetChunk(int cx, int cz)
+    {
+        var c = _chunkCache[((cx & 63) << 6) | (cz & 63)];
+        if (c != null && c.Cx == cx && c.Cz == cz && !c.Unloaded) return c;
+        return GetChunkSlow(cx, cz);
+    }
+    private Chunk GetChunkSlow(int cx, int cz)
+    {
+        if (!Chunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c)) return null;
+        if (!c.Unloaded) _chunkCache[((cx & 63) << 6) | (cz & 63)] = c;
+        return c;
+    }
+    public Chunk GetChunkIfLit(int cx, int cz) { var c = GetChunk(cx, cz); return c != null && c.Lit ? c : null; }
+    public bool IsChunkLoaded(int cx, int cz) => GetChunk(cx, cz) != null;
     public bool IsLoadedAt(int x, int z) => IsChunkLoaded(x >> 4, z >> 4);
     public bool IsAreaLoaded(int x, int z, int r)
     {
@@ -163,13 +178,13 @@ public sealed partial class World : IBlockAccess
     public byte GetBlock(int x, int y, int z)
     {
         if ((uint)y >= Chunk.Height) return 0;
-        if (!Chunks.TryGetValue(MathUtil.ChunkKey(x >> 4, z >> 4), out var c)) return 0;
+        var c = GetChunk(x >> 4, z >> 4); if (c == null) return 0;
         return c.Blocks[(y << 8) | ((z & 15) << 4) | (x & 15)];
     }
     public int GetMeta(int x, int y, int z)
     {
         if ((uint)y >= Chunk.Height) return 0;
-        if (!Chunks.TryGetValue(MathUtil.ChunkKey(x >> 4, z >> 4), out var c)) return 0;
+        var c = GetChunk(x >> 4, z >> 4); if (c == null) return 0;
         return c.Meta[(y << 8) | ((z & 15) << 4) | (x & 15)];
     }
     public int GetSkyLight(int x, int y, int z)
@@ -215,7 +230,9 @@ public sealed partial class World : IBlockAccess
             if (nb.LightOpacity > 0 && y >= h) c.HeightMap[(lz << 4) | lx] = (short)(y + 1);
             else if (nb.LightOpacity == 0 && y == h - 1) c.RecalcHeight(lx, lz);
         }
+        long pt = Prof.Begin();
         Light.OnBlockChanged(x, y, z, ob, nb);
+        Prof.End(Prof.Light, pt);
         MarkDirty(x, y, z);
         foreach (var l in Listeners) l.OnBlockChanged(x, y, z, id, meta);
         if (!IsRemote)
@@ -225,7 +242,9 @@ public sealed partial class World : IBlockAccess
                 ob.OnRemoved(this, x, y, z, oldMeta);
                 if (GetBlock(x, y, z) == id) nb.OnAdded(this, x, y, z);
             }
+            pt = Prof.Begin();
             if (notify) NotifyNeighbors(x, y, z, id);
+            Prof.End(Prof.Notify, pt);
         }
         return true;
     }

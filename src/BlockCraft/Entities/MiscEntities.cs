@@ -187,12 +187,14 @@ public sealed class TntEntity : Entity
     public override string TypeKey => "tnt";
     public override void Tick()
     {
+        long pt = Prof.Begin();
         base.Tick();
         if (IsRemoteControlled) { Fuse--; return; }
         MotionY -= 0.04;
         MoveWithCollision(MotionX, MotionY, MotionZ);
         MotionX *= 0.98; MotionY *= 0.98; MotionZ *= 0.98;
         if (OnGround) { MotionX *= 0.7; MotionZ *= 0.7; MotionY *= -0.5; }
+        Prof.End(Prof.TntTick, pt);
         if (Fuse-- <= 0)
         {
             Kill();

@@ -102,7 +102,9 @@ public sealed class EntityGrid
     private static readonly IComparer<Entity> BySeq = Comparer<Entity>.Create((a, b) => a.GridSeq.CompareTo(b.GridSeq));
 
     /// <summary>Encje (nieusunięte, różne od except), których ramka przecina box; w kolejności World.Entities.</summary>
-    public void Query(AABB box, Entity except, List<Entity> res)
+    public static void SortBySeq(List<Entity> list) { if (list.Count > 1) list.Sort(BySeq); }
+
+    public void Query(AABB box, Entity except, List<Entity> res, bool sorted = true)
     {
         int x0 = CellCoord(box.MinX - MarginH), x1 = CellCoord(box.MaxX + MarginH);
         int z0 = CellCoord(box.MinZ - MarginH), z1 = CellCoord(box.MaxZ + MarginH);
@@ -129,7 +131,7 @@ public sealed class EntityGrid
         }
         foreach (var e in _big)
             if (e != except && !e.Removed && e.BoundingBox.Intersects(box)) res.Add(e);
-        if (res.Count - start > 1) res.Sort(start, res.Count - start, BySeq);
+        if (sorted && res.Count - start > 1) res.Sort(start, res.Count - start, BySeq);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

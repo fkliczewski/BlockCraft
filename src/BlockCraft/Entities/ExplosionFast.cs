@@ -30,13 +30,18 @@ public static partial class Explosion
         w.PlaySound("explode", x, y, z, 4f, (1f + (w.Rand.NextFloat() - w.Rand.NextFloat()) * 0.2f) * 0.7f);
         w.SpawnParticles(power >= 2 ? ParticleKind.Explosion : ParticleKind.LargeSmoke, x, y, z, 1, (int)(power * 10));
         s.Affected.Clear();
+        long pt = Prof.Begin();
         if (breakBlocks && (w.Rules.MobGriefing || source is TntEntity)) Rays(w, s, x, y, z, power);
+        Prof.End(Prof.ExpRays, pt); pt = Prof.Begin();
 
         // encje (jak w ExplodeReference)
         float r2 = power * 2f;
         var box = new AABB(x - r2 - 1, y - r2 - 1, z - r2 - 1, x + r2 + 1, y + r2 + 1, z + r2 + 1);
         var ents = s.Ents; ents.Clear();
-        w.GetEntitiesInBox(box, null, ents);
+        w.Grid.Query(box, null, ents, sorted: false);
+        // Kolejność ma znaczenie tylko dla encji z efektami ubocznymi (Attack: losowość, dropy, zagnieżdżone wybuchy).
+        // Same "czyste" encje (TNT, przedmioty, kule XP, bloki spadające) można liczyć w dowolnej kolejności.
+        for (int n = 0; n < ents.Count; n++) if (ents[n].CanBeAttacked) { EntityGrid.SortBySeq(ents); break; }
         s.ExposureReady = false;
         for (int n = 0; n < ents.Count; n++)
         {
@@ -48,7 +53,9 @@ public static partial class Explosion
             if (d == 0) continue;
             ex /= d; ey /= d; ez /= d;
             var bb = e.BoundingBox;
-            double exposure = HullIsAir(w, s, x, y, z, bb, r2) ? 1.0 : ExposureReference(w, x, y, z, bb);
+            double exposure;
+            if (HullIsAir(w, s, x, y, z, bb, r2)) exposure = 1.0;
+            else { long pe = Prof.Begin(); exposure = ExposureFast(w, s, x, y, z, bb); Prof.End(Prof.ExpExposureRef, pe); }
             double impact = (1 - dist) * exposure;
             float dmg = (float)((impact * impact + impact) / 2 * 8 * r2 + 1);
             if (e.CanBeAttacked) e.Attack(DamageSource.Explosion(source is TntEntity t ? (t.Igniter ?? source) : source), dmg);
@@ -57,6 +64,7 @@ public static partial class Explosion
             e.MotionX += ex * push; e.MotionY += ey * push; e.MotionZ += ez * push;
         }
         ents.Clear();
+        Prof.End(Prof.ExpEntities, pt); pt = Prof.Begin();
 
         // niszczenie bloków (kolejność jak w HashSet oryginału, bez komórek powietrza)
         var drops = s.Drops;
@@ -79,6 +87,7 @@ public static partial class Explosion
             w.SetBlock(bx, by, bz, B.Air);
         }
         aff.Clear();
+        Prof.End(Prof.ExpDestroy, pt);
     }
 
     // ---------------- promienie ----------------
@@ -136,6 +145,13 @@ public static partial class Explosion
                                 if (f > 0 && by >= 0 && by < Chunk.Height) s.AddAffected(bx, by, bz);
                             }
                         }
+                        else
+                        {
+                            // poza ramką bloków: jeśli się oddala albo nie zdąży jej osiągnąć, reszta promienia to samo powietrze
+                            if ((bx > mxx && sx >= 0) || (bx < mnx && sx <= 0) || (by > mxy && sy >= 0) || (by < mny && sy <= 0) || (bz > mxz && sz >= 0) || (bz < mnz && sz <= 0)) break;
+                            double gap = Math.Max(Math.Max(bx > mxx ? px - (mxx + 1) : bx < mnx ? mnx - px : 0, by > mxy ? py - (mxy + 1) : by < mny ? mny - py : 0), bz > mxz ? pz - (mxz + 1) : bz < mnz ? mnz - pz : 0);
+                            if (gap > 0.3 * (f / 0.225 + 1) + 0.01) break;
+                        }
                         px += sx; py += sy; pz += sz;
                     }
                 }
@@ -191,6 +207,67 @@ public static partial class Explosion
         return true;
     }
 
+    /// <summary>ExposureReference z odczytem bloków przez ChunkArea (ten sam DDA i te same testy co World.RayCast).</summary>
+    private static double ExposureFast(World.World w, Scratch s, double x, double y, double z, AABB bb)
+    {
+        int hx0 = MathUtil.FloorToInt(Math.Min(x, bb.MinX)) - 2, hx1 = MathUtil.FloorToInt(Math.Max(x, bb.MaxX)) + 2;
+        int hz0 = MathUtil.FloorToInt(Math.Min(z, bb.MinZ)) - 2, hz1 = MathUtil.FloorToInt(Math.Max(z, bb.MaxZ)) + 2;
+        if (!s.ExposureReady || hx0 < s.ExpX0 || hz0 < s.ExpZ0 || hx1 >= s.ExpX0 + s.ExpW || hz1 >= s.ExpZ0 + s.ExpD)
+            return ExposureReference(w, x, y, z, bb);
+        var a = s.ExpArea;
+        int hit = 0, total = 0;
+        for (double fx = 0; fx <= 1; fx += 0.5)
+            for (double fy = 0; fy <= 1; fy += 0.5)
+                for (double fz = 0; fz <= 1; fz += 0.5)
+                {
+                    double tx = bb.MinX + (bb.MaxX - bb.MinX) * fx, ty = bb.MinY + (bb.MaxY - bb.MinY) * fy, tz = bb.MinZ + (bb.MaxZ - bb.MinZ) * fz;
+                    double dx = tx - x, dy = ty - y, dz = tz - z;
+                    double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                    total++;
+                    if (len < 0.01) { hit++; continue; }
+                    if (!RayBlocked(w, a, x, y, z, dx / len, dy / len, dz / len, len)) hit++;
+                }
+        return (double)hit / total;
+    }
+
+    [ThreadStatic] private static List<AABB> _boxes;
+    /// <summary>Kopia World.RayCast (hitLiquids = false): true, gdy promień trafia blok i ten blok jest nieprzezroczysty.</summary>
+    private static bool RayBlocked(World.World w, ChunkArea a, double ox, double oy, double oz, double dx, double dy, double dz, double maxDist)
+    {
+        int x = MathUtil.FloorToInt(ox), y = MathUtil.FloorToInt(oy), z = MathUtil.FloorToInt(oz);
+        int stepX = Math.Sign(dx), stepY = Math.Sign(dy), stepZ = Math.Sign(dz);
+        double tMaxX = dx != 0 ? ((stepX > 0 ? x + 1 - ox : ox - x) / Math.Abs(dx)) : double.MaxValue;
+        double tMaxY = dy != 0 ? ((stepY > 0 ? y + 1 - oy : oy - y) / Math.Abs(dy)) : double.MaxValue;
+        double tMaxZ = dz != 0 ? ((stepZ > 0 ? z + 1 - oz : oz - z) / Math.Abs(dz)) : double.MaxValue;
+        double tdX = dx != 0 ? 1 / Math.Abs(dx) : double.MaxValue, tdY = dy != 0 ? 1 / Math.Abs(dy) : double.MaxValue, tdZ = dz != 0 ? 1 / Math.Abs(dz) : double.MaxValue;
+        var boxes = _boxes ??= new List<AABB>();
+        for (int i = 0; i < 200; i++)
+        {
+            if (y >= 0 && y < Chunk.Height)
+            {
+                byte id = a.Get(x, y, z);
+                if (id != 0)
+                {
+                    var b = Block.ById[id];
+                    boxes.Clear();
+                    if (!b.IsLiquid) b.GetSelectionBoxes(w, x, y, z, a.GetMeta(x, y, z), boxes);
+                    double best = double.MaxValue; int bf = -1;
+                    foreach (var bb in boxes)
+                    {
+                        if (bb.Offset(x, y, z).RayIntersect(ox, oy, oz, dx, dy, dz, out double t, out int f) && t < best && f >= 0) { best = t; bf = f; }
+                    }
+                    if (bf >= 0 && best <= maxDist) return Block.Get(id).Opaque;
+                }
+            }
+            double tNext = Math.Min(tMaxX, Math.Min(tMaxY, tMaxZ));
+            if (tNext > maxDist) break;
+            if (tMaxX < tMaxY && tMaxX < tMaxZ) { x += stepX; tMaxX += tdX; }
+            else if (tMaxY < tMaxZ) { y += stepY; tMaxY += tdY; }
+            else { z += stepZ; tMaxZ += tdZ; }
+        }
+        return false;
+    }
+
     // ---------------- dane robocze ----------------
     /// <summary>Siatka referencji chunków dla prostokąta bloków: odczyt bez słownika.</summary>
     internal sealed class ChunkArea
@@ -218,6 +295,13 @@ public static partial class Explosion
             if ((uint)by >= World.Chunk.Height) return 0;
             var c = Chunk(bx, bz);
             return c == null ? (byte)0 : c.Blocks[(by << 8) | ((bz & 15) << 4) | (bx & 15)];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetMeta(int bx, int by, int bz)
+        {
+            if ((uint)by >= World.Chunk.Height) return 0;
+            var c = Chunk(bx, bz);
+            return c == null ? 0 : c.Meta[(by << 8) | ((bz & 15) << 4) | (bx & 15)];
         }
     }
 
