@@ -113,16 +113,29 @@ public sealed class DimensionSet : IDisposable
         entity.SetPositionAndPrev(x,y,z); next.AddEntityNow(entity);
         EntityTransferred?.Invoke(entity,old,next);
     }
-    public void Tick()
+    public void Tick() { TickBegin(); TickSlice(long.MaxValue); }
+
+    // tick dzielony na kawałki (Game rysuje klatki między nimi), wynik jak w jednym kawałku
+    private World[] _tickWorlds; private int _tickW = -1; private bool _tickWStarted;
+    public bool TickInProgress => _tickW >= 0;
+    public void TickBegin() { _tickWorlds = _worlds.Values.ToArray(); _tickW = 0; _tickWStarted = false; }
+    /// <summary>Zwraca true, gdy tick wszystkich wymiarów się skończył.</summary>
+    public bool TickSlice(long deadline)
     {
-        foreach (var w in _worlds.Values.ToArray())
+        if (_tickW < 0) return true;
+        while (_tickW < _tickWorlds.Length)
         {
-            CopyRules(w); w.Tick();
+            var w = _tickWorlds[_tickW];
+            if (!_tickWStarted) { CopyRules(w); w.TickBegin(); _tickWStarted = true; }
+            if (!w.TickSlice(deadline)) return false;
+            _tickWStarted = false; _tickW++;
             if (w.IsRemote) continue;
             DimensionPortals.TickContacts(w);
             if (w != _overworld && _overworld.Rules.DoMobSpawning) DimensionSpawner.Tick(w);
         }
+        _tickW = -1; _tickWorlds = null;
         FlushTransfers();
+        return true;
     }
     public void SaveAll() { foreach (var w in _worlds.Values) w.ChunkManager?.SaveAll(); }
     public void Dispose() { foreach (var w in _worlds.Values) w.ChunkManager?.Dispose(); }

@@ -18,7 +18,7 @@ public sealed partial class Game
     private long _recStart, _recSeen;
     private Action<int> _recPerTick;
 
-    private bool Scripted => _autotest || _showcase;
+    private bool Scripted => _autotest || _showcase || _stress;
 
     /// <summary>Nagrywa scenę przez <paramref name="ticks"/> ticków, klatka co <paramref name="every"/> ticków.</summary>
     private void Record(string scene, int ticks, int every, Action start = null, Action<int> perTick = null)

@@ -555,7 +555,17 @@ public sealed partial class World : IBlockAccess
     }
 
     // ---------- tick ----------
-    public void Tick()
+    public void Tick() { TickBegin(); TickSlice(long.MaxValue); }
+
+    /// <summary>Indeks następnej encji w trwającym ticku; -1 = brak trwającego ticku.</summary>
+    private int _tickIdx = -1;
+    private readonly List<Entity> _removedTmp = new();
+    /// <summary>Ustawiane przez ciężkie operacje (wybuch), żeby tick dzielony sprawdził zegar od razu, nie co 16 encji.</summary>
+    public bool HeavyWorkDone;
+    public bool TickInProgress => _tickIdx >= 0;
+
+    /// <summary>Pierwsza część ticku (wszystko przed pętlą encji). Potem TickSlice aż zwróci true.</summary>
+    public void TickBegin()
     {
         TotalTime++;
         if (Rules.DoDaylightCycle && Provider.HasDaylightCycle) DayTime++;
@@ -571,27 +581,56 @@ public sealed partial class World : IBlockAccess
             CheckSleeping();
             TickCommands();
         }
-        for (int i = 0; i < Entities.Count; i++)
+        _tickIdx = 0;
+    }
+
+    /// <summary>Tick encji od miejsca, w którym ostatnio przerwano, do końca albo do <paramref name="deadline"/>
+    /// (Stopwatch.GetTimestamp). Zwraca true, gdy tick się skończył. Kolejność i wynik są takie same jak w jednym
+    /// kawałku: między kawałkami gra tylko rysuje klatkę, świata nie zmienia.</summary>
+    public bool TickSlice(long deadline)
+    {
+        if (_tickIdx < 0) return true;
+        for (int i = _tickIdx; i < Entities.Count; i++)
         {
             var e = Entities[i];
             if (e.Removed) continue;
             if (!IsLoadedAt(MathUtil.FloorToInt(e.X), MathUtil.FloorToInt(e.Z)) && e is not Player) continue;
+            HeavyWorkDone = false;
             e.PrevTick();
             e.Tick();
             Grid.Revalidate(e);
+            if (deadline != long.MaxValue && ((i & 15) == 15 || HeavyWorkDone) && System.Diagnostics.Stopwatch.GetTimestamp() >= deadline)
+            {
+                _tickIdx = i + 1;
+                if (_tickIdx < Entities.Count) return false;
+            }
         }
-        for (int i = Entities.Count - 1; i >= 0; i--)
+        _tickIdx = -1;
+        // usuwanie martwych: lista ściskana w O(N) (RemoveAt po kolei było O(N^2) przy tysiącach wybuchów),
+        // skutki uboczne w tej samej kolejności co dawniej (od końca listy)
+        int keep = 0;
+        _removedTmp.Clear();
+        for (int i = 0; i < Entities.Count; i++)
         {
             var e = Entities[i];
-            if (e.Removed || (e.Dead && e is not Player))
+            if (e.Removed || (e.Dead && e is not Player)) _removedTmp.Add(e);
+            else Entities[keep++] = e;
+        }
+        if (_removedTmp.Count > 0)
+        {
+            Entities.RemoveRange(keep, Entities.Count - keep);
+            for (int r = _removedTmp.Count - 1; r >= 0; r--)
             {
-                Entities.RemoveAt(i); EntityById.Remove(e.Id); Grid.Remove(e);
+                var e = _removedTmp[r];
+                EntityById.Remove(e.Id); Grid.Remove(e);
                 if (e is Player p) Players.Remove(p);
                 e.Removed = true;
                 foreach (var l in Listeners) l.OnEntityRemoved(e);
             }
+            _removedTmp.Clear();
         }
         FlushAdds();
+        return true;
     }
 
     private void CheckSleeping()

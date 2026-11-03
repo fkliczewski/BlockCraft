@@ -19,6 +19,7 @@ public static partial class Explosion
 
     public static void Explode(World.World w, Entity source, double x, double y, double z, float power, bool breakBlocks)
     {
+        w.HeavyWorkDone = true; // tick dzielony sprawdzi zegar zaraz po tej encji
         if (UseReference || source is IExplosionBlockRules) { ExplodeReference(w, source, x, y, z, power, breakBlocks); return; }
         var s = Scratch.Rent();
         try { ExplodeFast(w, source, x, y, z, power, breakBlocks, s); }

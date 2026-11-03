@@ -19,14 +19,20 @@ public static class Bench
         double limit = li >= 0 && li + 1 < args.Length ? double.Parse(args[li + 1], System.Globalization.CultureInfo.InvariantCulture) : 120;
         switch (kind)
         {
-            case "tnt": return Tnt(n, args.Contains("--lit"), limit);
+            case "tnt":
+                {
+                    int si = Array.IndexOf(args, "--slice");
+                    double slice = si >= 0 && si + 1 < args.Length ? double.Parse(args[si + 1], System.Globalization.CultureInfo.InvariantCulture) : 0;
+                    return Tnt(n, args.Contains("--lit"), limit, slice);
+                }
             default: Console.WriteLine("Nieznany benchmark: " + kind); return 1;
         }
     }
 
     /// <summary>Kostka N bloków TNT na superpłaskim świecie zapalona w środku (reakcja łańcuchowa)
-    /// albo (--lit) N zapalonych TNT naraz w tej samej kostce.</summary>
-    private static int Tnt(int n, bool lit, double limitSec)
+    /// albo (--lit) N zapalonych TNT naraz w tej samej kostce. --slice MS: tick cięty na kawałki z budżetem MS
+    /// (jak w grze między klatkami); suma kontrolna musi wyjść ta sama, max kawałek = najdłuższy przestój klatki.</summary>
+    private static int Tnt(int n, bool lit, double limitSec, double sliceMs)
     {
         int side = Math.Max(1, (int)Math.Round(Math.Cbrt(n)));
         n = side * side * side;
@@ -51,7 +57,8 @@ public static class Bench
         Prof.On = true; Prof.Reset();
         var total = Stopwatch.StartNew();
         var tick = new Stopwatch();
-        double maxMs = 0, sumMs = 0; int ticks = 0, maxTnt = 0;
+        double maxMs = 0, sumMs = 0, maxSliceMs = 0; int ticks = 0, maxTnt = 0, slices = 0;
+        var sl = new Stopwatch();
         while (true)
         {
             int tnt = 0;
@@ -59,7 +66,19 @@ public static class Bench
             maxTnt = Math.Max(maxTnt, tnt);
             if (tnt == 0 && ticks > 0) break;
             tick.Restart();
-            w.Tick();
+            if (sliceMs <= 0) w.Tick();
+            else
+            {
+                w.TickBegin();
+                while (true)
+                {
+                    sl.Restart(); slices++;
+                    bool done = w.TickSlice(Stopwatch.GetTimestamp() + (long)(sliceMs / 1000 * Stopwatch.Frequency));
+                    double sms = sl.Elapsed.TotalMilliseconds; maxSliceMs = Math.Max(maxSliceMs, sms);
+                    if (sms > 15) Console.WriteLine($"  dlugi kawalek {sms:F1} ms w ticku {ticks}, gc0={GC.CollectionCount(0)} gc2={GC.CollectionCount(2)} done={done}");
+                    if (done) break;
+                }
+            }
             double ms = tick.Elapsed.TotalMilliseconds;
             sumMs += ms; maxMs = Math.Max(maxMs, ms); ticks++;
             if (ticks % 20 == 0) Console.WriteLine($"  tick {ticks}: {ms:F1} ms, TNT {tnt}, encji {w.Entities.Count}");
@@ -67,6 +86,7 @@ public static class Bench
             if (ticks > 20000) break;
         }
         Console.WriteLine($"wynik: ticki={ticks} sredni={sumMs / Math.Max(1, ticks):F2} ms max={maxMs:F1} ms suma={total.Elapsed.TotalSeconds:F2} s maxTNT={maxTnt}");
+        if (sliceMs > 0) Console.WriteLine($"kawalki: {slices} (budzet {sliceMs} ms), najdluzszy {maxSliceMs:F1} ms");
         Prof.Print();
         Console.WriteLine($"suma kontrolna: {Checksum(w, x0 - 40, z0 - 40, side + 80):X16} encji={w.Entities.Count}");
         return 0;

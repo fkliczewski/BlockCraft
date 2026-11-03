@@ -276,6 +276,9 @@ dotnet publish src/BlockCraft -c Release -r win-x64 --self-contained -o BlockCra
 | `--selftest` | Testy logiki w konsoli (`SelfTest.cs`) |
 | `--autotest` | Automatyczny przebieg gry ze zrzutami do weryfikacji wizualnej (`GameAutotest.cs`) |
 | `--showcase` | Nagrywa sceny i zrzuty do tego README (`GameShowcase.cs`) |
+| `--bench tnt N [--lit] [--slice MS]` | Pomiar TNT bez okna z sumą kontrolną świata (`Bench.cs`, wyniki w `docs/perf/TNT_POMIARY.md`) |
+| `--stress tnt N [--lit]` | Pomiar płynności klatek w oknie przy N TNT, wynik w `blockcraft.log` (linia `STRESS`); zostawia świat "Stress ..." w zapisach |
+| `--no-slice` | Wyłącza cięcie ciężkiego ticku na kawałki między klatkami (do porównań) |
 
 Zapisy światów i zrzuty ekranu (F2) trafiają do `%APPDATA%\.blockcraft`.
 
