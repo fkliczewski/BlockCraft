@@ -66,8 +66,72 @@ public static partial class TextureGen
                 _tex[i] = target;
             }
             if (PackOverridden.Count > 0) Log.Info($"Paczki zasobów: {PackOverridden.Count} tekstur z paczek, {PackAnimations.Count} animacji");
+            BuildAtlas(packs, ctx.MaxNative);
             return changed;
         }
+    }
+
+    // ================= atlas HD =================
+
+    /// <summary>Największy bok atlasu terenu (ustawienie graficzne „Tekstury paczek”); 16 = jak w 1.8 bez HD.</summary>
+    public static int MaxAtlasSize = 64;
+    /// <summary>Bok warstwy atlasu terenu na GPU: 16 albo rozdzielczość paczek HD (potęga dwójki, najwyżej MaxAtlasSize).</summary>
+    public static int AtlasSize { get; private set; } = 16;
+    /// <summary>Warstwy HD z paczek (indeks warstwy -> piksele AtlasSize²); pozostałe są powiększane z 16x16.</summary>
+    private static readonly Dictionary<int, uint[]> _atlasHd = new();
+    /// <summary>Animacje z paczek w rozmiarze atlasu (przy 16 te same co PackAnimations).</summary>
+    public static readonly Dictionary<string, PackAnim> AtlasAnimations = new();
+
+    /// <summary>Drugi przebieg nakładania w rozdzielczości paczek HD (gdy większa niż 16).</summary>
+    private static void BuildAtlas(IReadOnlyList<Func<string, byte[]>> packs, int maxNative)
+    {
+        _atlasHd.Clear(); AtlasAnimations.Clear();
+        int cap = 16;
+        while (cap * 2 <= MaxAtlasSize && cap < 256) cap *= 2; // potęga dwójki 16..256
+        int size = 16;
+        while (size < maxNative && size < cap) size *= 2;
+        AtlasSize = size;
+        if (size == 16 || packs == null)
+        {
+            AtlasSize = 16;
+            foreach (var (k, v) in PackAnimations) AtlasAnimations[k] = v;
+            return;
+        }
+        var hd = new PackSource(packs, size);
+        foreach (var name in PackOverridden)
+        {
+            uint[] px = null; PackAnim anim = null;
+            try { px = ResolvePackTexture(name, hd, out anim); }
+            catch (Exception ex) { Log.Error("Paczka zasobów: tekstura HD " + name + ": " + ex.Message); }
+            if (px == null || px.Length != size * size) continue;
+            _atlasHd[_index[name]] = px;
+            if (anim != null) AtlasAnimations[name] = anim;
+        }
+        // animacje bez wersji HD: klatki 16x16 powiększone
+        foreach (var (k, v) in PackAnimations)
+            if (!AtlasAnimations.ContainsKey(k)) AtlasAnimations[k] = new PackAnim(v.Frames.Select(ToAtlas).ToList(), v.Steps);
+        Log.Info($"Paczki zasobów: atlas terenu {size}x{size}, {_atlasHd.Count} tekstur HD (limit {MaxAtlasSize})");
+    }
+
+    /// <summary>Warstwy atlasu terenu w rozmiarze AtlasSize.</summary>
+    public static List<uint[]> AtlasLayers()
+    {
+        Ensure();
+        lock (Lock) return _tex.Select((t, i) => _atlasHd.TryGetValue(i, out var hd) ? hd : ToAtlas(t)).ToList();
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<uint[], uint[]> _upscaledCache = new();
+
+    /// <summary>Tekstura 16x16 powiększona bez wygładzania do rozmiaru atlasu (np. wygenerowane klatki wody przy atlasie HD).</summary>
+    public static uint[] ToAtlas(uint[] px16)
+    {
+        int n = AtlasSize;
+        if (n == 16 || px16.Length != 256) return px16;
+        if (_upscaledCache.TryGetValue(px16, out var cached) && cached.Length == n * n) return cached;
+        int k = n / 16; var d = new uint[n * n];
+        for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) d[y * n + x] = px16[(y / k) * 16 + x / k];
+        _upscaledCache.AddOrUpdate(px16, d);
+        return d;
     }
 
     private static uint[] ResolvePackTexture(string name, PackSource src, out PackAnim anim)
@@ -219,14 +283,14 @@ public static partial class TextureGen
         for (int i = 0; i < 4; i++) { int cell = i * 5; c["particle_explosion_" + i] = s => s.Cell("entity/explosion", 4, cell); }
 
         // skrzynie: ściany składane z tekstur modelu (entity/chest/*.png, 64x64 jak ModelChest 1.8)
-        c["chest_front"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Front);
-        c["chest_side"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Side);
-        c["chest_top"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Top);
-        c["trapped_chest_front"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Front);
-        c["trapped_chest_side"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Side);
-        c["trapped_chest_top"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Top);
+        c["chest_front"] = s => ChestFace(s.Raw("entity/chest/normal", 64), ChestPart.Front, s.Size);
+        c["chest_side"] = s => ChestFace(s.Raw("entity/chest/normal", 64), ChestPart.Side, s.Size);
+        c["chest_top"] = s => ChestFace(s.Raw("entity/chest/normal", 64), ChestPart.Top, s.Size);
+        c["trapped_chest_front"] = s => ChestFace(s.Raw("entity/chest/trapped", 64), ChestPart.Front, s.Size);
+        c["trapped_chest_side"] = s => ChestFace(s.Raw("entity/chest/trapped", 64), ChestPart.Side, s.Size);
+        c["trapped_chest_top"] = s => ChestFace(s.Raw("entity/chest/trapped", 64), ChestPart.Top, s.Size);
         foreach (var part in new[] { ChestPart.Front, ChestPart.Side, ChestPart.Top, ChestPart.Lock })
-            c["ender_chest_" + part.ToString().ToLowerInvariant()] = s => EnderChestTile(s.Raw("entity/chest/ender"), part);
+            c["ender_chest_" + part.ToString().ToLowerInvariant()] = s => EnderChestTile(s.Raw("entity/chest/ender", 64), part, s.Size);
 
         // inny układ niż blok 16x16 albo inna paczka plików: kolejne etapy (encje, cząsteczki, GUI, modele)
         foreach (var n in new[] { "minecart_side", "minecart_inside", "end_sky", "end_portal", "world_border", "beacon_beam", "fishing_hook", "me_brewing", "me_cauldron",
@@ -239,51 +303,58 @@ public static partial class TextureGen
 
     public enum ChestPart { Front, Side, Top, Lock }
 
-    /// <summary>Tekstura modelu skrzyni 1.8 (64x64 albo wielokrotność); null = zły rozmiar albo brak.</summary>
-    private static Func<int, int, uint> ChestSampler(RawImage src)
+    /// <summary>Tekstura modelu skrzyni 1.8 (64x64 albo wielokrotność) jako próbnik: piksel UV (u,v) plus część piksela
+    /// (su,sv w 0..1) dla tekstur HD; null = zły rozmiar albo brak.</summary>
+    private static Func<int, int, float, float, uint> ChestSampler(RawImage src)
     {
         if (src?.RequireSize(i => i.W == i.H && i.W >= 64 && i.W % 64 == 0, "kwadrat 64x64 albo wielokrotność") == null) return null;
         int k = src.W / 64;
-        return (u, v) => src.At(u * k, v * k);
+        return (u, v, su, sv) => src.At(u * k + Math.Min(k - 1, (int)(su * k)), v * k + Math.Min(k - 1, (int)(sv * k)));
+    }
+
+    /// <summary>Kafel size x size: ściana modelPx x modelPx rozciągnięta na piksele atlasu; pixel(u, v, su, sv)
+    /// daje kolor dla pozycji w modelu (u,v) i części piksela (su, sv w 0..1).</summary>
+    private static uint[] ChestTile(int size, int modelPx, Func<int, int, float, float, uint> pixel)
+    {
+        var p = new uint[size * size];
+        for (int Y = 0; Y < size; Y++)
+            for (int X = 0; X < size; X++)
+            {
+                float fu = (X + .5f) * modelPx / size, fv = (Y + .5f) * modelPx / size;
+                int u = (int)fu, v = (int)fv;
+                p[Y * size + X] = pixel(u, v, fu - u, fv - v);
+            }
+        return p;
     }
 
     /// <summary>Ściana zwykłej skrzyni (model gry: jeden prostopadłościan 14x14x14 z pełnym UV na ścianę):
-    /// 5 wierszy wieka i 9 wierszy podstawy jak w ModelChest, na przodzie zamek 2x4; 14x14 rozciągnięte do 16x16.</summary>
-    private static uint[] ChestFace(RawImage src, ChestPart part)
+    /// 5 wierszy wieka i 9 wierszy podstawy jak w ModelChest, na przodzie zamek 2x4; 14x14 rozciągnięte do size x size.</summary>
+    private static uint[] ChestFace(RawImage src, ChestPart part, int size)
     {
         var S = ChestSampler(src); if (S == null) return null;
-        var face = new RawImage { W = 14, H = 14, Px = new uint[196] };
-        for (int y = 0; y < 14; y++)
-            for (int x = 0; x < 14; x++)
-            {
-                int u0 = part == ChestPart.Side ? 0 : 14;
-                face.Px[y * 14 + x] = part == ChestPart.Top ? S(14 + x, y)
-                    : y < 5 ? S(u0 + x, 14 + y)        // wieko: ściana 14x5 od (u0,14)
-                    : S(u0 + x, 33 + y - 4);           // podstawa: ściana 14x10 od (u0,33), wiersze 1-9 pod wiekiem
-            }
-        if (part == ChestPart.Front)
-            for (int y = 0; y < 4; y++) for (int x = 0; x < 2; x++) face.Px[(3 + y) * 14 + 6 + x] = S(1 + x, 1 + y); // zamek: przód 2x4 od (1,1)
-        return face.Resize(16, 16).Px;
+        int u0 = part == ChestPart.Side ? 0 : 14;
+        return ChestTile(size, 14, (x, y, su, sv) => part == ChestPart.Front && x is 6 or 7 && y is >= 3 and <= 6 ? S(1 + x - 6, 1 + y - 3, su, sv) // zamek: przód 2x4 od (1,1)
+            : part == ChestPart.Top ? S(14 + x, y, su, sv)
+            : y < 5 ? S(u0 + x, 14 + y, su, sv)        // wieko: ściana 14x5 od (u0,14)
+            : S(u0 + x, 33 + y - 4, su, sv));          // podstawa: ściana 14x10 od (u0,33), wiersze 1-9 pod wiekiem
     }
 
-    /// <summary>Kafle skrzyni Endu w układzie modelu gry (UV wg pozycji, jak EnderChestTextures).</summary>
-    private static uint[] EnderChestTile(RawImage src, ChestPart part)
+    /// <summary>Kafle skrzyni Endu w układzie modelu gry (UV wg pozycji, jak EnderChestTextures), size x size.</summary>
+    private static uint[] EnderChestTile(RawImage src, ChestPart part, int size)
     {
         var S = ChestSampler(src); if (S == null) return null;
-        var p = New();
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
+        return ChestTile(size, 16, (x, y, su, sv) =>
+        {
+            int cx = Math.Clamp(x - 1, 0, 13);
+            float lx = (x + su) * 2 / 16, ly = (y + sv) * 4 / 16;
+            return part switch
             {
-                int cx = Math.Clamp(x - 1, 0, 13);
-                p[y * 16 + x] = part switch
-                {
-                    ChestPart.Front => y <= 6 ? S(14 + cx, 14 + Math.Clamp(y - 2, 0, 4)) : S(14 + cx, 33 + Math.Clamp(y - 6, 0, 9)),
-                    ChestPart.Side => y <= 6 ? S(cx, 14 + Math.Clamp(y - 2, 0, 4)) : S(cx, 33 + Math.Clamp(y - 6, 0, 9)),
-                    ChestPart.Top => S(14 + Math.Clamp(x - 1, 0, 13), Math.Clamp(y - 1, 0, 13)),
-                    _ => S(1 + Math.Clamp(x * 2 / 16, 0, 1), 1 + Math.Clamp(y * 4 / 16, 0, 3)),
-                };
-            }
-        return p;
+                ChestPart.Front => y <= 6 ? S(14 + cx, 14 + Math.Clamp(y - 2, 0, 4), su, sv) : S(14 + cx, 33 + Math.Clamp(y - 6, 0, 9), su, sv),
+                ChestPart.Side => y <= 6 ? S(cx, 14 + Math.Clamp(y - 2, 0, 4), su, sv) : S(cx, 33 + Math.Clamp(y - 6, 0, 9), su, sv),
+                ChestPart.Top => S(14 + Math.Clamp(x - 1, 0, 13), Math.Clamp(y - 1, 0, 13), su, sv),
+                _ => S(1 + Math.Clamp((int)lx, 0, 1), 1 + Math.Clamp((int)ly, 0, 3), lx - (int)lx, ly - (int)ly),
+            };
+        });
     }
 
     // ================= przekształcenia =================
@@ -291,7 +362,7 @@ public static partial class TextureGen
     private static uint[] GrassSide(PackSource s, uint[] b)
     {
         if (s.Still("blocks/grass_side_overlay") is { } o)
-            for (int i = 0; i < 256; i++) if (A(o[i]) >= 128) b[i] = WithA(o[i], 250);
+            for (int i = 0; i < Math.Min(b.Length, o.Length); i++) if (A(o[i]) >= 128) b[i] = WithA(o[i], 250);
         return b;
     }
     /// <summary>Barwi piksele oznaczone do zabarwienia (alfa &lt; 252) i robi je nieprzezroczystymi.</summary>
@@ -315,16 +386,17 @@ public static partial class TextureGen
                 (int)(Bl(dst[i]) + (Bl(src[i]) - Bl(dst[i])) * t), Math.Max(A(dst[i]), sa));
         }
     }
-    /// <summary>Obrót 16x16 o rot * 90 stopni.</summary>
+    /// <summary>Obrót kwadratowej tekstury (16x16 albo HD) o rot * 90 stopni.</summary>
     public static uint[] Rotate(uint[] s, int rot)
     {
-        var d = new uint[256];
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
+        int n = (int)Math.Sqrt(s.Length);
+        var d = new uint[n * n];
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
             {
                 int sx = x, sy = y;
-                for (int k = 0; k < rot; k++) { int t = sx; sx = sy; sy = 15 - t; }
-                d[y * 16 + x] = s[sy * 16 + sx];
+                for (int k = 0; k < rot; k++) { int t = sx; sx = sy; sy = n - 1 - t; }
+                d[y * n + x] = s[sy * n + sx];
             }
         return d;
     }
@@ -336,6 +408,8 @@ public static partial class TextureGen
         public List<uint[]> Frames;
         public uint[] Still;
         public PackAnim Anim;
+        /// <summary>Szerokość klatki w pliku (16 dla 1.8, 32/64/... dla paczek HD).</summary>
+        public int NativeSize;
     }
 
     /// <summary>Obrazy z paczek z pamięcią podręczną na czas jednego nakładania.</summary>
@@ -343,7 +417,12 @@ public static partial class TextureGen
     {
         private readonly IReadOnlyList<Func<string, byte[]>> _packs;
         private readonly Dictionary<string, PackImage> _cache = new();
-        public PackSource(IReadOnlyList<Func<string, byte[]>> packs) { _packs = packs; }
+        /// <summary>Bok tekstur wynikowych: 16 (atlas gry) albo rozmiar atlasu HD.</summary>
+        public readonly int Size;
+        /// <summary>Największa rozdzielczość tekstury z paczki w przeliczeniu na blok (np. 32 dla paczki 32x).</summary>
+        public int MaxNative { get; private set; } = 16;
+        public PackSource(IReadOnlyList<Func<string, byte[]>> packs, int size = 16) { _packs = packs; Size = size; }
+        private void Native(int perBlock) => MaxNative = Math.Max(MaxNative, perBlock);
 
         /// <summary>Obraz "blocks/stone" albo null, gdy żadna paczka go nie ma.</summary>
         public PackImage Img(string path)
@@ -360,19 +439,29 @@ public static partial class TextureGen
             foreach (var read in _packs)
             {
                 var png = read(TexturesRoot + path + ".png");
-                if (png != null) return DecodePackImage(png, read(TexturesRoot + path + ".png.mcmeta"), path);
+                if (png != null)
+                {
+                    var img = DecodePackImage(png, read(TexturesRoot + path + ".png.mcmeta"), path, Size);
+                    if (img != null) Native(img.NativeSize);
+                    return img;
+                }
             }
             return null;
         }
         private readonly Dictionary<string, RawImage> _raw = new();
-        /// <summary>Cały obraz bez dzielenia na klatki (np. arkusz cząsteczek), z pierwszej paczki, która go ma.</summary>
-        public RawImage Raw(string path)
+        /// <summary>Cały obraz bez dzielenia na klatki (np. arkusz cząsteczek), z pierwszej paczki, która go ma.
+        /// vanillaW: szerokość w 1.8 (do wyliczenia rozdzielczości HD); 0 = nie liczy się do rozmiaru atlasu.</summary>
+        public RawImage Raw(string path, int vanillaW = 0)
         {
             if (_packs == null) return null;
-            if (_raw.TryGetValue(path, out var r)) return r;
-            foreach (var read in _packs)
-                if (read(TexturesRoot + path + ".png") is { } png) { r = RawImage.Decode(png, path); break; }
-            return _raw[path] = r;
+            if (!_raw.TryGetValue(path, out var r))
+            {
+                foreach (var read in _packs)
+                    if (read(TexturesRoot + path + ".png") is { } png) { r = RawImage.Decode(png, path); break; }
+                _raw[path] = r;
+            }
+            if (r != null && vanillaW > 0) Native(r.W * 16 / vanillaW);
+            return r;
         }
         private readonly Dictionary<string, RawImage> _sheets = new();
         /// <summary>Arkusz grid x grid komórek; złe wymiary: jeden wpis w logu i null (cząsteczki jak bez paczki).</summary>
@@ -388,7 +477,7 @@ public static partial class TextureGen
             if (img == null) return null;
             int cs = img.W / grid;
             var cell = img.Crop(index % grid * cs, index / grid * cs, cs, cs);
-            return ScaleTo16(cell.Px, cs);
+            return ScaleTo(cell.Px, cs, 0, Size);
         }
         public uint[] Still(string path) => Img(path)?.Still is { } s ? (uint[])s.Clone() : null;
         public uint[] Frame(string path, int i)
@@ -399,8 +488,8 @@ public static partial class TextureGen
         }
     }
 
-    /// <summary>PNG z paczki -> klatki 16x16. Tekstura N razy wyższa niż szeroka to pasek N klatek (animacja z .mcmeta).</summary>
-    public static PackImage DecodePackImage(byte[] png, byte[] mcmeta, string path)
+    /// <summary>PNG z paczki -> klatki size x size (domyślnie 16). Tekstura N razy wyższa niż szeroka to pasek N klatek (animacja z .mcmeta).</summary>
+    public static PackImage DecodePackImage(byte[] png, byte[] mcmeta, string path, int size = 16)
     {
         StbImageSharp.ImageResult img;
         try { img = StbImageSharp.ImageResult.FromMemory(png, StbImageSharp.ColorComponents.RedGreenBlueAlpha); }
@@ -411,11 +500,11 @@ public static partial class TextureGen
         Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
         int n = h / w;
         var frames = new List<uint[]>(n);
-        for (int f = 0; f < n; f++) frames.Add(ScaleTo16(px, w, f * w * w));
+        for (int f = 0; f < n; f++) frames.Add(ScaleTo(px, w, f * w * w, size));
         AnimStep[] steps;
         try { steps = AnimationSequence(mcmeta, n); }
         catch (JsonException ex) { Log.Error("Paczka zasobów: " + path + ".mcmeta: " + ex.Message); return null; }
-        var r = new PackImage { Frames = frames, Still = frames[steps?[0].Frame ?? 0] };
+        var r = new PackImage { Frames = frames, Still = frames[steps?[0].Frame ?? 0], NativeSize = w };
         if (steps != null && steps.Select(st => st.Frame).Distinct().Skip(1).Any()) r.Anim = new PackAnim(frames, steps);
         return r;
     }
@@ -465,22 +554,25 @@ public static partial class TextureGen
         return an.Clone();
     }
 
-    /// <summary>Klatka w×w (od przesunięcia off) do 16×16: większe uśredniane blokami (tekstury wycinane
+    /// <summary>Klatka w×w (od przesunięcia off) do 16×16.</summary>
+    public static uint[] ScaleTo16(uint[] src, int w, int off = 0) => ScaleTo(src, w, off, 16);
+
+    /// <summary>Klatka w×w (od przesunięcia off) do size×size: większe uśredniane blokami (tekstury wycinane
     /// alfą zostają ostre), mniejsze powiększane bez wygładzania.</summary>
-    public static uint[] ScaleTo16(uint[] src, int w, int off = 0)
+    public static uint[] ScaleTo(uint[] src, int w, int off, int size)
     {
-        var d = new uint[256];
-        if (w == 16) { Array.Copy(src, off, d, 0, 256); return d; }
-        if (w < 16 || w % 16 != 0)
+        var d = new uint[size * size];
+        if (w == size) { Array.Copy(src, off, d, 0, size * size); return d; }
+        if (w < size || w % size != 0)
         {
-            for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) d[y * 16 + x] = src[off + y * w / 16 * w + x * w / 16];
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) d[y * size + x] = src[off + y * w / size * w + x * w / size];
             return d;
         }
-        int k = w / 16;
+        int k = w / size;
         bool binary = true;
         for (int i = 0; i < w * w && binary; i++) { int a = (int)(src[off + i] >> 24); binary = a == 0 || a == 255; }
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
             {
                 long r = 0, g = 0, b = 0, aw = 0; int opaque = 0;
                 for (int j = 0; j < k; j++)
@@ -492,7 +584,7 @@ public static partial class TextureGen
                     }
                 int n = k * k;
                 int outA = binary ? (opaque * 2 >= n ? 255 : 0) : (int)(aw / n);
-                d[y * 16 + x] = aw == 0 ? 0 : Rgba((int)(r / aw), (int)(g / aw), (int)(b / aw), outA);
+                d[y * size + x] = aw == 0 ? 0 : Rgba((int)(r / aw), (int)(g / aw), (int)(b / aw), outA);
             }
         return d;
     }

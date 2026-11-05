@@ -34,6 +34,7 @@ public static class GpuProfile
         s.FancyGraphics = false;                      // szybkie liście (jak "Fast" w MC)
         s.Clouds = false;
         s.FarEntities = false;
+        s.MaxPackTextureSize = k == Kind.Software ? 16 : 32; // atlas HD paczek: mniej pamięci karty
         s.RenderDistance = k == Kind.Software ? 4 : 6;
         s.RenderScale = k == Kind.Software ? 50 : 75;
         s.VSync = true;

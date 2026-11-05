@@ -233,11 +233,32 @@ public sealed class VideoScreen : Screen
         Add(new Slider(r, y + 72, 150, 20, (s.MaxFps - 30) / 230f, v => "Maks. FPS: " + (v >= 0.99f ? "Bez limitu" : ((int)(30 + v * 230)).ToString()), v => s.MaxFps = v >= 0.99f ? 1000 : (int)(30 + v * 230)));
         Add(new Slider(l, y + 96, 150, 20, s.Brightness, v => "Jasność: " + (int)(v * 100) + "%", v => s.Brightness = v));
         Add(new Slider(r, y + 96, 150, 20, (s.RenderScale - 25) / 75f, v => "Skala renderu 3D: " + (25 + (int)Math.Round(v * 15) * 5) + "%", v => s.RenderScale = 25 + (int)Math.Round(v * 15) * 5, 15));
-        Add(new Button(l, y + 120, 150, 20, "Profil słabego GPU", () => { BlockCraft.Render.GpuProfile.ApplyLaptop(s, BlockCraft.Render.GpuProfile.Kind.Integrated); G.ApplySettings(); G.SetScreen(new VideoScreen(_parent)); }));
+        Add(new Button(l, y + 120, 150, 20, "Profil słabego GPU", () => {
+            BlockCraft.Render.GpuProfile.ApplyLaptop(s, BlockCraft.Render.GpuProfile.Kind.Integrated);
+            G.ApplySettings();
+            RequestPackReloadIfLimitChanged(); // limit rozdzielczości z profilu (albo ze slajdera): nowy atlas
+            G.SetScreen(new VideoScreen(_parent));
+        }));
         Add(new Button(r, y + 120, 150, 20, () => "Dalekie postacie: " + (s.FarEntities ? "TAK" : "NIE"), () => s.FarEntities = !s.FarEntities));
+        _packTexSize ??= s.MaxPackTextureSize;
+        Add(new Button(l, y + 144, 150, 20, () => "Tekstury paczek: do " + s.MaxPackTextureSize + "x",
+            () => s.MaxPackTextureSize = s.MaxPackTextureSize >= 128 ? 16 : Math.Max(16, s.MaxPackTextureSize * 2)));
         Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
     }
-    private void Done() { G.Settings.Save(); G.ApplySettings(); G.SetScreen(_parent); }
+    /// <summary>Limit rozdzielczości tekstur paczek przy otwarciu ekranu (zmiana = przeładowanie atlasu).</summary>
+    private int? _packTexSize;
+    private void Done()
+    {
+        G.Settings.Save(); G.ApplySettings();
+        RequestPackReloadIfLimitChanged();
+        G.SetScreen(_parent);
+    }
+    /// <summary>Limit rozdzielczości paczek zmieniony od otwarcia ekranu: przeładowanie atlasu przed następną klatką.</summary>
+    private void RequestPackReloadIfLimitChanged()
+    {
+        if (_packTexSize != G.Settings.MaxPackTextureSize) G.RequestPackReload();
+        _packTexSize = G.Settings.MaxPackTextureSize;
+    }
     protected override void Escape() => Done();
     public override void Render(int mx, int my, float pt)
     {

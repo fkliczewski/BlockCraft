@@ -35,6 +35,8 @@ public sealed class Settings
     public List<string> PackSources { get; set; } = new();
     /// <summary>Język nazw przedmiotów z plików .lang MC 1.8 (np. "en_US"); pusty = polskie nazwy gry.</summary>
     public string Language { get; set; } = "";
+    /// <summary>Największa rozdzielczość tekstur bloków z paczek (16, 32, 64, 128); większe paczki są zmniejszane.</summary>
+    public int MaxPackTextureSize { get; set; } = 64;
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

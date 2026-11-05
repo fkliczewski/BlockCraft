@@ -76,7 +76,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     public WorldRenderer()
     {
         ItemRegistry.Init();
-        Terrain = new TextureArray(16, TextureGen.Textures, true, 4);
+        Terrain = NewTerrainArray();
         Entities = new EntityRenderer { TerrainTex = Terrain };
         _waterLayer = TextureGen.Layer("water_still"); _lavaLayer = TextureGen.Layer("lava_still");
         _chunk = new Shader(ChunkVert, ChunkFrag, "chunk");
@@ -990,21 +990,31 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     public void TickAnimations()
     {
         _animTick++;
-        foreach (var (name, anim) in TextureGen.PackAnimations)
+        foreach (var (name, anim) in TextureGen.AtlasAnimations)
         {
             int frame = anim.FrameAt(_animTick);
             if (!_packAnim.TryGetValue(name, out var st)) st = (TextureGen.Layer(name), -1);
             if (st.frame != frame) { Terrain.UpdateLayer(st.layer, anim.Frames[frame]); _packAnim[name] = (st.layer, frame); }
         }
         if (_animTick % 2 != 0) return;
-        if (!TextureGen.PackOverridden.Contains("water_still") && TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, wf[(_animTick / 2) % wf.Count]);
-        if (_animTick % 4 == 0 && !TextureGen.PackOverridden.Contains("lava_still") && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, lf[(_animTick / 4) % lf.Count]);
+        if (!TextureGen.PackOverridden.Contains("water_still") && TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, TextureGen.ToAtlas(wf[(_animTick / 2) % wf.Count]));
+        if (_animTick % 4 == 0 && !TextureGen.PackOverridden.Contains("lava_still") && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, TextureGen.ToAtlas(lf[(_animTick / 4) % lf.Count]));
     }
 
-    /// <summary>Po zmianie paczek zasobów: wgrywa zmienione warstwy atlasu.</summary>
-    public void ReloadTextures(IEnumerable<int> changedLayers)
+    /// <summary>Atlas terenu w rozmiarze TextureGen.AtlasSize; mipmapy aż do 1x1 (16: 4 poziomy jak dotąd).</summary>
+    private static TextureArray NewTerrainArray()
     {
-        foreach (int i in changedLayers) Terrain.UpdateLayer(i, TextureGen.Textures[i]);
+        int size = TextureGen.AtlasSize;
+        return new TextureArray(size, TextureGen.AtlasLayers(), true, (int)Math.Log2(size));
+    }
+
+    /// <summary>Po zmianie paczek zasobów: atlas terenu od nowa (rozmiar mógł się zmienić przy paczce HD).</summary>
+    public void ReloadTextures()
+    {
+        var old = Terrain;
+        Terrain = NewTerrainArray();
+        Entities.TerrainTex = Terrain;
+        old.Dispose();
         _packAnim.Clear();
         Entities.ClearTextureCaches();
     }

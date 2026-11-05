@@ -82,6 +82,9 @@ public sealed partial class Game
         ResourcePacks.CloseAll();
     }
 
+    /// <summary>Po zmianie ustawień wpływających na tekstury (np. limit rozdzielczości paczek): przeładowanie przed następną klatką.</summary>
+    public void RequestPackReload() => _reloadPacks = true;
+
     /// <summary>Paczki do użycia: z parametru uruchomienia albo z ustawień.</summary>
     public List<string> ActivePackIds => _packOverride ?? Settings.ResourcePacks ?? new();
 
@@ -97,6 +100,7 @@ public sealed partial class Game
     private void LoadResourcePacksAtStart()
     {
         ResourcePacks.SetActive(ActivePackIds);
+        TextureGen.MaxAtlasSize = Settings.MaxPackTextureSize;
         TextureGen.ApplyPacks(ResourcePacks.Readers);
         if (ResourcePacks.Active.Count > 0) SkinGen.Rebuild(ResourcePacks.ReadImage);
         Lang.Load(ActiveLanguage, ResourcePacks.Readers);
@@ -109,10 +113,9 @@ public sealed partial class Game
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         ResourcePacks.SetActive(ActivePackIds);
-        // warstwy animowane (przez poprzednie paczki albo przez grę) mogły zostać na innej klatce niż w atlasie
-        var animated = TextureGen.PackAnimations.Keys.Concat(TextureGen.Animations.Keys).Select(TextureGen.Layer).ToList();
+        TextureGen.MaxAtlasSize = Settings.MaxPackTextureSize;
         var changed = TextureGen.ApplyPacks(ResourcePacks.Readers);
-        Renderer.ReloadTextures(changed.Concat(animated).Distinct());
+        Renderer.ReloadTextures();
         Func<string, RawImage> packImages = ResourcePacks.Active.Count > 0 ? ResourcePacks.ReadImage : null;
         SkinGen.Rebuild(packImages);
         Renderer.Entities.ReloadSkins(packImages);
