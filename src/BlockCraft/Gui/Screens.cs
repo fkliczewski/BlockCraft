@@ -200,6 +200,7 @@ public sealed class OptionsScreen : Screen
         Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));
         Add(new Button(W / 2 + 5, y + 72, 150, 20, () => "Licznik FPS: " + (s.ShowFps ? "TAK" : "NIE"), () => s.ShowFps = !s.ShowFps));
         Add(new Button(W / 2 - 155, y + 24, 150, 20, "Muzyka i dźwięki...", () => G.SetScreen(new BlockCraft.Audio.SoundOptionsScreen(this))));
+        Add(new Button(W / 2 + 5, y + 24, 150, 20, "Paczki zasobów...", () => G.SetScreen(new ResourcePackScreen(this, G.ActivePackIds))));
         Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
     }
     public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };

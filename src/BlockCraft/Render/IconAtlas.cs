@@ -37,7 +37,7 @@ public sealed class IconAtlas : IDisposable
         var proj = Matrix4.CreateOrthographicOffCenter(-1, 1, -1, 1, -10, 10);
         er.Shader.Use(); er.Shader.Set("uViewProj", proj);
         er.Shader.Set("uFogColor", Vector3.Zero); er.Shader.Set("uFogStart", 1000f); er.Shader.Set("uFogEnd", 2000f); er.Shader.Set("uFogMode", 0);
-        er.Shader.Set("uSun", 1f); er.Shader.Set("uGamma", 0f);
+        er.Shader.Set("uSun", 1f); er.Shader.Set("uGamma", 0f); er.Shader.Set("uDimension", 0);
         var b = er.Terrain;
         b.Sky = 15; b.Blk = 0; b.Color = Vector4.One; b.Overlay = Vector4.Zero;
         for (int i = 0; i < keys.Count; i++)

@@ -1,0 +1,212 @@
+using System.IO.Compression;
+using System.Text;
+using System.Text.Json;
+using BlockCraft.World;
+
+namespace BlockCraft.Core;
+
+/// <summary>Paczka zasobów MC 1.8: plik .zip albo folder z pack.mcmeta i assets/minecraft/...
+/// Ścieżki zasobów jak w MC, np. "assets/minecraft/textures/blocks/stone.png".</summary>
+public sealed class ResourcePack : IDisposable
+{
+    /// <summary>Nazwa pliku albo folderu w resourcepacks/ (dla wbudowanej: <see cref="ResourcePacks.BuiltinId"/>).</summary>
+    public readonly string Id;
+    public readonly string Path;
+    public readonly bool Builtin;
+    public string Name => Builtin ? "Minecraft 1.8 (oryginalne)" : _zip ? System.IO.Path.GetFileNameWithoutExtension(Id) : Id;
+    public string Description { get; private set; } = "";
+    public int Format { get; private set; } = -1;
+    public uint[] Icon { get; private set; }
+    public int IconW { get; private set; }
+    public int IconH { get; private set; }
+    /// <summary>Czemu paczki nie da się użyć (null = w porządku).</summary>
+    public string Error { get; private set; }
+
+    private readonly bool _zip;
+    private readonly object _lock = new();
+    private ZipArchive _arc;
+    private Dictionary<string, ZipArchiveEntry> _entries;
+    /// <summary>Zip z paczką w podfolderze (częsty błąd przy pakowaniu): prefiks ścieżek wewnątrz archiwum.</summary>
+    private string _prefix = "";
+
+    public ResourcePack(string id, string path, bool builtin = false)
+    {
+        Id = id; Path = path; Builtin = builtin;
+        _zip = File.Exists(path);
+        try { ReadInfo(); }
+        catch (Exception ex) { Error = "uszkodzona paczka (" + ex.Message + ")"; Close(); }
+    }
+
+    private void ReadInfo()
+    {
+        if (_zip) OpenZip();
+        byte[] meta = Read("pack.mcmeta");
+        if (meta == null && !Builtin) { Error = "brak pliku pack.mcmeta"; return; }
+        if (meta != null)
+        {
+            using var doc = JsonDocument.Parse(meta, new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            if (!TryReadPackSection(doc.RootElement, out var pack, out int format))
+            {
+                if (!Builtin) { Error = "nieprawidłowy pack.mcmeta (brak sekcji pack z liczbowym pack_format)"; Close(); return; }
+            }
+            else
+            {
+                Format = format;
+                if (pack.TryGetProperty("description", out var d)) Description = TextOf(d);
+            }
+        }
+        if (Builtin) { Format = 1; Description = "Tekstury z pobranego klienta 1.8"; }
+        byte[] png = Read("pack.png");
+        if (png != null)
+        {
+            try
+            {
+                var img = StbImageSharp.ImageResult.FromMemory(png, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+                var px = new uint[img.Width * img.Height];
+                Buffer.BlockCopy(img.Data, 0, px, 0, px.Length * 4);
+                Icon = px; IconW = img.Width; IconH = img.Height;
+            }
+            catch (Exception ex) { Log.Error("Paczka " + Id + ": pack.png: " + ex.Message); }
+        }
+        Close();
+    }
+
+    /// <summary>Sekcja "pack" z liczbowym "pack_format" – bez nich pack.mcmeta jest nieprawidłowy.</summary>
+    private static bool TryReadPackSection(JsonElement root, out JsonElement pack, out int format)
+    {
+        format = -1; pack = default;
+        return root.ValueKind == JsonValueKind.Object && root.TryGetProperty("pack", out pack) && pack.ValueKind == JsonValueKind.Object
+            && pack.TryGetProperty("pack_format", out var f) && f.ValueKind == JsonValueKind.Number && f.TryGetInt32(out format);
+    }
+
+    /// <summary>Opis z pack.mcmeta: zwykły tekst albo komponent JSON ({"text":..., "extra":[...]}).</summary>
+    private static string TextOf(JsonElement e)
+    {
+        switch (e.ValueKind)
+        {
+            case JsonValueKind.String: return e.GetString();
+            case JsonValueKind.Array: return string.Concat(e.EnumerateArray().Select(TextOf));
+            case JsonValueKind.Object:
+                var sb = new StringBuilder();
+                if (e.TryGetProperty("text", out var t)) sb.Append(TextOf(t));
+                if (e.TryGetProperty("extra", out var x)) sb.Append(TextOf(x));
+                return sb.ToString();
+            default: return "";
+        }
+    }
+
+    private void OpenZip()
+    {
+        if (_arc != null) return;
+        _arc = ZipFile.OpenRead(Path);
+        _entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
+        foreach (var e in _arc.Entries) if (!string.IsNullOrEmpty(e.Name)) _entries[e.FullName.Replace('\\', '/')] = e;
+        _prefix = "";
+        if (!Builtin && !_entries.ContainsKey("pack.mcmeta"))
+        {
+            // jedyny najpłycej położony podfolder (dowolnej głębokości) z pack.mcmeta w środku
+            var inner = _entries.Keys.Where(k => k.EndsWith("/pack.mcmeta")).GroupBy(k => k.Count(c => c == '/')).OrderBy(g => g.Key).FirstOrDefault()?.ToList();
+            if (inner?.Count == 1) _prefix = inner[0][..^"pack.mcmeta".Length];
+        }
+    }
+
+    /// <summary>Zawartość pliku albo null, gdy go nie ma.</summary>
+    public byte[] Read(string rel)
+    {
+        if (Error != null) return null;
+        lock (_lock)
+        {
+            try
+            {
+                if (_zip)
+                {
+                    OpenZip();
+                    if (!_entries.TryGetValue(_prefix + rel, out var e)) return null;
+                    using var s = e.Open(); using var ms = new MemoryStream((int)Math.Max(0, Math.Min(e.Length, int.MaxValue)));
+                    s.CopyTo(ms); return ms.ToArray();
+                }
+                if (rel.Contains("..")) return null;
+                string full = System.IO.Path.Combine(Path, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                return File.Exists(full) ? File.ReadAllBytes(full) : null;
+            }
+            catch (Exception ex) { Log.Error("Paczka " + Id + ": " + rel + ": " + ex.Message); return null; }
+        }
+    }
+
+    /// <summary>Zwalnia uchwyt archiwum (Windows blokuje otwarty plik); kolejny odczyt otworzy je ponownie.</summary>
+    public void Close()
+    {
+        lock (_lock) { _arc?.Dispose(); _arc = null; _entries = null; }
+    }
+
+    public void Dispose() => Close();
+}
+
+/// <summary>Lista paczek zasobów: dostępne w folderze resourcepacks/ i aktywne (kolejność: pierwsza ma pierwszeństwo).</summary>
+public static class ResourcePacks
+{
+    public const string BuiltinId = "minecraft-1.8";
+    /// <summary>pack_format paczek dla MC 1.8.</summary>
+    public const int Format18 = 1;
+
+    public static string Dir
+    {
+        get { var d = Path.Combine(WorldStorage.Root, "resourcepacks"); Directory.CreateDirectory(d); return d; }
+    }
+
+    private static List<ResourcePack> _active = new();
+    public static IReadOnlyList<ResourcePack> Active => _active;
+
+    /// <summary>Dostępne paczki: wbudowana (gdy klient 1.8 jest pobrany), pliki .zip i foldery z pack.mcmeta.</summary>
+    public static List<ResourcePack> Scan(string dir = null)
+    {
+        dir ??= Dir;
+        var list = new List<ResourcePack>();
+        string jar = Path.Combine(ClientAssets.Root, "client.jar");
+        if (dir == Dir && File.Exists(jar)) list.Add(new ResourcePack(BuiltinId, jar, true));
+        try
+        {
+            foreach (var f in Directory.EnumerateFiles(dir, "*.zip").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                AddUnique(list, Path.GetFileName(f), f);
+            foreach (var d in Directory.EnumerateDirectories(dir).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                if (File.Exists(Path.Combine(d, "pack.mcmeta"))) AddUnique(list, Path.GetFileName(d), d);
+        }
+        catch (Exception ex) { Log.Error("Paczki zasobów: " + ex.Message); }
+        return list;
+    }
+
+    /// <summary>Dodaje paczkę, chyba że jej nazwa jest już zajęta (np. folder o nazwie wbudowanej paczki 1.8).</summary>
+    private static void AddUnique(List<ResourcePack> list, string id, string path)
+    {
+        if (list.Any(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase))) { Log.Info("Paczka zasobów pominięta: nazwa " + id + " jest już zajęta"); return; }
+        list.Add(new ResourcePack(id, path));
+    }
+
+    /// <summary>Ustawia aktywne paczki wg identyfikatorów (nieznane i uszkodzone pomija).</summary>
+    public static void SetActive(IEnumerable<string> ids, string dir = null)
+    {
+        foreach (var p in _active) p.Dispose();
+        var avail = Scan(dir).ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+        var list = new List<ResourcePack>();
+        foreach (var id in ids ?? Enumerable.Empty<string>())
+        {
+            if (avail.TryGetValue(id, out var p) && p.Error == null && !list.Contains(p)) list.Add(p);
+            else Log.Info("Paczka zasobów pominięta: " + id + (p?.Error != null ? " (" + p.Error + ")" : " (nie znaleziono)"));
+        }
+        foreach (var p in avail.Values) if (!list.Contains(p)) p.Dispose();
+        _active = list;
+        if (list.Count > 0) Log.Info("Paczki zasobów: " + string.Join(", ", list.Select(p => p.Id)));
+    }
+
+    /// <summary>Plik z pierwszej aktywnej paczki, która go ma (null = zasób wbudowany w grę).</summary>
+    public static byte[] Read(string rel)
+    {
+        foreach (var p in _active) { var b = p.Read(rel); if (b != null) return b; }
+        return null;
+    }
+
+    /// <summary>Odczyt z każdej aktywnej paczki osobno, w kolejności pierwszeństwa.</summary>
+    public static IReadOnlyList<Func<string, byte[]>> Readers => _active.Select(p => (Func<string, byte[]>)p.Read).ToList();
+
+    public static void CloseAll() { foreach (var p in _active) p.Close(); }
+}

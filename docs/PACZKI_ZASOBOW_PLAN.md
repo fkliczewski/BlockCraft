@@ -1,0 +1,118 @@
+# Paczki zasobów Minecraft 1.8 — plan
+
+Cel: BlockCraft wczytuje oficjalne paczki zasobów 1.8 (`.zip` albo folder z `pack.mcmeta`
+i `assets/minecraft/...`) — tak jak menu „Paczki zasobów” w MC 1.8.
+Mody Java (Forge, LiteLoader, Bukkit) są poza zakresem: wymagałyby JVM i odtworzenia API Minecrafta.
+
+Zasada ogólna: każda tekstura/dźwięk ma trzy źródła, od najważniejszego:
+1. aktywne paczki (kolejność z listy, górna wygrywa),
+2. *(opcjonalnie)* wbudowana paczka „Minecraft 1.8 (oryginalne)” = pobrany `client.jar`,
+3. obecne zasoby generowane w kodzie (zawsze dostępne, gra działa bez paczek).
+
+Po każdym etapie: kompilacja, selftest, ręczne sprawdzenie w grze, **stop i odbiór przez użytkownika**.
+
+---
+
+## Etap 1 — Paczki, ekran i tekstury bloków/przedmiotów  *(łączy pkt 1–3 z analizy)*
+
+- `resourcepacks/` w katalogu gry (`%APPDATA%\.blockcraft\resourcepacks`): paczki `.zip` i foldery.
+- Odczyt `pack.mcmeta` (`pack_format`, `description`) i `pack.png`; ostrzeżenie, gdy `pack_format` ≠ 1.
+- Wbudowana pozycja „Minecraft 1.8 (oryginalne)” — czyta `client.jar`, który gra już pobiera.
+- Ekran „Paczki zasobów...” w Ustawieniach: dwie listy (dostępne / aktywne), dodawanie, usuwanie,
+  zmiana kolejności, „Otwórz folder paczek”, „Gotowe” = zastosuj bez restartu.
+- Ustawienie `ResourcePacks` (lista nazw) w `options.json`; parametr `--resourcepack <nazwa>` do testów.
+- Tabela przypisań: nazwa tekstury BlockCraft → plik 1.8 (`blocks/…`, `items/…`) + przekształcenia
+  (klatka z paska animacji, barwienie skórzanej zbroi, nakładki itp.). ~380 nazw zgodnych automatycznie,
+  reszta jawnie w tabeli; nazwy bez odpowiednika zostają generowane.
+- Animacje z `.mcmeta` (woda, lawa, ogień, portal, …): klatki, `frametime`, `frames`.
+- Tekstury większe niż 16×16 (HD) w tym etapie są zmniejszane do 16×16 (pełne HD w etapie 2).
+- Przeładowanie bez restartu: podmiana warstw atlasu, odbudowa ikon bloków i tła menu.
+- Selftest: parsowanie mcmeta, kolejność paczek, przypisania, klatki animacji, paczka uszkodzona/pusta.
+
+## Etap 1b — Źródła paczek: wiele folderów i repozytoria git  *(TODO, proponuję jako następny)*
+
+Cel: paczki zasobów (a później mody) nie tylko z `resourcepacks/`, ale z dowolnych miejsc,
+w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
+(lokalnie `D:\work\sources\blockcraft-plugins`). Zmiany w repo są pobierane automatycznie przy starcie gry.
+
+- **Rodzaje źródeł:**
+  - folder lokalny: każdy podfolder z `pack.mcmeta` i każdy `.zip` to paczka; folderów może być wiele;
+  - repozytorium git (URL + opcjonalnie gałąź/tag): klon w `%APPDATA%\.blockcraft\sources\<nazwa>`, przy starcie
+    `git pull --ff-only` w tle z limitem czasu; bez sieci gra używa ostatniej pobranej wersji;
+  - lokalny checkout repo (do testów, np. `D:\work\sources\blockcraft-plugins`): czytany wprost, bez pobierania.
+- **Konfiguracja na trzy sposoby:**
+  - w grze: ekran „Paczki zasobów” → „Źródła...” (dodaj folder lub URL, usuń, „Odśwież teraz”);
+  - w pliku: lista `PackSources` w `options.json` (albo osobny `sources.json` obok);
+  - w parametrze: `--pack-source <ścieżka|url>` (można powtórzyć, tylko na tę sesję), np.
+    `python run.py -- --pack-source D:\work\sources\blockcraft-plugins`.
+- **Proponowany układ repo** (do uzgodnienia): `resourcepacks/<nazwa>/pack.mcmeta + assets/...`,
+  później `mods/<nazwa>/mod.json + ...`; opcjonalny manifest `blockcraft-source.json` (nazwa, opis, wersja gry).
+- **Pobieranie bez gita:** gdy na komputerze nie ma `git`, gra ściąga archiwum zip z GitHuba
+  (`/archive/refs/heads/<gałąź>.zip`) i sprawdza ETag, żeby nie pobierać, gdy nic się nie zmieniło.
+- **Nazwy:** identyfikator paczki z prefiksem źródła (`blockcraft-plugins:moja-paczka`), żeby uniknąć kolizji;
+  na liście w grze widać, skąd paczka pochodzi.
+- **Wygoda przy tworzeniu paczek:** dla folderów lokalnych obserwator plików (FileSystemWatcher) i przeładowanie
+  tekstur w trakcie gry po zapisaniu pliku (to samo przeładowanie co po „Gotowe” w ekranie paczek).
+- **Bezpieczeństwo (mody):** paczki zasobów to same dane, więc ich pobieranie jest bezpieczne. Mody z kodem
+  z repozytorium oznaczają uruchamianie cudzego kodu: każde źródło modów trzeba wyraźnie zaufać (potwierdzenie
+  w grze), z opcją przypięcia do konkretnego commita.
+- **Selftest:** wiele folderów, kolejność źródeł, kolizje nazw, repo bez sieci (ostatnia kopia), uszkodzone archiwum.
+
+## Etap 2 — Tekstury HD (32×, 64×, 128×)
+
+- Atlas terenu w rozdzielczości największej paczki (limit 128 / pamięć GPU), tekstury generowane
+  powiększane bez wygładzania.
+- Poprawki miejsc zakładających 16×16 (wyciągane przedmioty 3D, cząsteczki z bloków, ikony).
+- Mipmapy i opcja „Poziom mipmap” jak w 1.8.
+
+## Etap 3 — GUI, czcionka, cząsteczki, niebo, kolory biomów
+
+- `gui/widgets.png`, `gui/icons.png`, okna kontenerów (`gui/container/*.png`), `gui/options_background.png`,
+  logo `gui/title/minecraft.png`.
+- Czcionka `font/ascii.png` (szerokości znaków jak w MC), polskie znaki z `font/unicode_page_*`.
+- `particle/particles.png`, `environment/` (słońce, księżyc, chmury), `misc/` (winieta, nakładki).
+- `colormap/grass.png`, `colormap/foliage.png` — kolory trawy i liści zależne od biomu.
+
+## Etap 4 — Encje
+
+- Moby, gracz (domyślne skórki Steve/Alex), skrzynie, zbroje na postaci, obrazy, banery, czaszki, łódka, wózki.
+- Tekstury encji mają własne wymiary (64×32, 64×64…) — mapowanie na nasze modele, kontrola UV.
+
+## Etap 5 — Dźwięki, muzyka i język
+
+- `sounds.json` (zastępowanie i dopisywanie dźwięków), pliki `.ogg`, muzyka i płyty.
+- `lang/pl_PL.lang` i inne: nazwy przedmiotów/bloków przez klucze tłumaczeń (`tile.stone.name`),
+  wybór języka w ustawieniach.
+
+## Etap 6 — Modele bloków z JSON  *(największy, opcjonalny)*
+
+- `blockstates/*.json` + `models/block/*.json`: elementy, obroty, UV, `cull`, `tintindex`.
+- Mesher korzysta z modelu z paczki, gdy go podano; w przeciwnym razie z obecnego kodu.
+- Modele przedmiotów `models/item/*.json` (pozycja w ręce, na GUI).
+
+---
+
+## Stan
+
+| Etap | Stan |
+|---|---|
+| 1 | zrobiony — do odbioru |
+| 1b | TODO: źródła paczek (foldery, git) |
+| 2–6 | do zrobienia |
+
+### Etap 1 — co jest i jak sprawdzić
+
+- Kod: `Core/ResourcePacks.cs` (paczki), `Render/PackTextures.cs` (przypisania, .mcmeta, skalowanie),
+  `Gui/ResourcePackScreen.cs` (ekran), `GameResourcePacks.cs` (przeładowanie), `ResourcePackSelfTest.cs`.
+- Gra: Ustawienia → „Paczki zasobów...”. Paczki `.zip` do `%APPDATA%\.blockcraft\resourcepacks`.
+- Uruchomienie z paczką na jedną sesję: `python run.py -- --resourcepack minecraft-1.8`.
+- Zrzuty porównawcze (bez paczki / z paczką): `BlockCraft.exe --showcase --packs-preview [--resourcepack NAZWA]`
+  → `bin/Release/net10.0/showcase/`.
+- Selftest: `--selftest --packs-only`. Oryginalne tekstury 1.8 pokrywają 662 z 723 tekstur gry.
+
+Świadomie pominięte w etapie 1 (zostają tekstury gry):
+- skrzynie, skrzynia Endu, wózki (w 1.8 to tekstury encji) → etap 4;
+- cząsteczki, pogoda, niebo Endu, granica świata, promień latarni, spławik → etapy 3–4;
+- statyw alchemiczny i kocioł (inny model niż w 1.8) → etap 6;
+- rama portalu Endu: ten sam obraz na wszystkich ścianach (bok) → etap 6;
+- `interpolate` w animacjach .mcmeta (klatki przełączane bez płynnego przejścia).

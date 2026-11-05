@@ -958,12 +958,28 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
     // ================= animowane tekstury =================
     private int _animTick;
+    /// <summary>Animacje z paczek zasobów: warstwa atlasu i ostatnio wgrana klatka.</summary>
+    private readonly Dictionary<string, (int layer, int frame)> _packAnim = new();
     public void TickAnimations()
     {
         _animTick++;
+        foreach (var (name, anim) in TextureGen.PackAnimations)
+        {
+            int frame = anim.FrameAt(_animTick);
+            if (!_packAnim.TryGetValue(name, out var st)) st = (TextureGen.Layer(name), -1);
+            if (st.frame != frame) { Terrain.UpdateLayer(st.layer, anim.Frames[frame]); _packAnim[name] = (st.layer, frame); }
+        }
         if (_animTick % 2 != 0) return;
-        if (TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, wf[(_animTick / 2) % wf.Count]);
-        if (_animTick % 4 == 0 && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, lf[(_animTick / 4) % lf.Count]);
+        if (!TextureGen.PackOverridden.Contains("water_still") && TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, wf[(_animTick / 2) % wf.Count]);
+        if (_animTick % 4 == 0 && !TextureGen.PackOverridden.Contains("lava_still") && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, lf[(_animTick / 4) % lf.Count]);
+    }
+
+    /// <summary>Po zmianie paczek zasobów: wgrywa zmienione warstwy atlasu.</summary>
+    public void ReloadTextures(IEnumerable<int> changedLayers)
+    {
+        foreach (int i in changedLayers) Terrain.UpdateLayer(i, TextureGen.Textures[i]);
+        _packAnim.Clear();
+        Entities.ClearTextureCaches();
     }
 
     // ================= cząsteczki =================

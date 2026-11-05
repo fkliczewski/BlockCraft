@@ -84,6 +84,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _showcase = args.Contains("--showcase");
         _stress = !_autotest && !_showcase && args.Contains("--stress");
         Settings = Settings.Load();
+        ParsePackArgs(args);
         int fps = Array.IndexOf(args, "--fps");
         if (fps >= 0 && fps + 1 < args.Length && int.TryParse(args[fps + 1], out int f) && f > 0) _fpsOverride = f;
         VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
@@ -106,6 +107,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         SharedQuadIndices.Init();
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
+        LoadResourcePacksAtStart();
         Gui = new GuiTextures();
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
@@ -128,6 +130,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _lastTime = _clock.Elapsed.TotalSeconds;
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
+        else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
         else if (_showcase) SetupShowcase();
         else if (_stress) SetupStress();
     }
@@ -568,6 +571,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
 
         MouseLook();
+        if (_reloadPacks) { _reloadPacks = false; try { ReloadResourcePacksNow(); } catch (Exception ex) { Log.Error("Paczki zasobów: " + ex); } }
         bool gpuQ = _stressMeasure;
         if (gpuQ) StressGpuBegin();
         try { RenderFrame(pt); } catch (Exception ex) { Log.Error("Render: " + ex); }
