@@ -295,22 +295,36 @@ public sealed class CreativeScreen : Screen
     public CreativeScreen(Player p, int tab = -1) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; if (tab >= 0) _tab = Math.Clamp(tab, 0, TabNames.Length - 1); }
     public override bool PausesGame => false;
 
+    /// <summary>Zakładka wyszukiwania (indeks w TabNames).</summary>
+    private const int SearchTab = 8;
+    /// <summary>Ostatnie zapytanie: zostaje po zamknięciu ekwipunku, jak w 1.8.</summary>
+    private static string _query = "";
+
     protected override void Init()
     {
         _left = (W - PW) / 2; _top = (H - PH) / 2;
-        _search = Add(new TextField(_left + 82, _top + 6, 89, 10) { Visible = _tab == 8, Focused = _tab == 8, MaxLength = 30 });
+        _search = Add(new TextField(_left + 82, _top + 6, 89, 10) { Visible = _tab == SearchTab, Focused = _tab == SearchTab, MaxLength = 30, Text = _query });
         Refresh();
     }
 
     private void Refresh()
     {
-        if (_tab == 8)
+        if (_tab == SearchTab)
         {
-            string q = _search?.Text.ToLowerInvariant() ?? "";
-            _items = ItemRegistry.CreativeItems(-1).Where(s => s.Name.ToLowerInvariant().Contains(q) || (s.Item?.Key ?? "").Contains(q)).ToList();
+            _query = _search?.Text ?? "";
+            _items = ItemSearch.Filter(ItemRegistry.CreativeItems(-1), _query);
         }
         else if (_tab != 9) _items = ItemRegistry.CreativeItems(_tab);
         _scroll = 0;
+    }
+
+    /// <summary>Przejście do wyszukiwania z wpisanym tekstem (pisanie w innej zakładce, T, kliknięcie w zakładkę).</summary>
+    private void OpenSearch(string text)
+    {
+        _tab = SearchTab;
+        _search.Visible = _search.Focused = true;
+        if (text != null) _search.Text = text;
+        Refresh();
     }
 
     private int Rows => (_items.Count + 8) / 9;
@@ -332,6 +346,7 @@ public sealed class CreativeScreen : Screen
         GuiDraw.Panel(G, _left, _top, PW, PH);
         DrawTab(_tab, true);
         sb.Text(TabNames[_tab], _left + 8, _top + 6, 0xFF404040, false);
+        if (_tab == SearchTab && _items.Count == 0) sb.TextCentered("Brak wyników", _left + 89, _top + 56, 0xFF404040, false);
         ItemStack hoverStack = null;
         if (_tab != 9)
         {
@@ -384,6 +399,8 @@ public sealed class CreativeScreen : Screen
             if (mx >= x - 1 && my >= y - 1 && mx < x + 17 && my < y + 17) { sb.Fill(x, y, 16, 16, 0x80FFFFFF); hoverStack = st; }
         }
         base.Render(mx, my, pt);
+        // podpowiedź w pustym polu wyszukiwania (rysowana na polu)
+        if (_tab == SearchTab && _search.Text.Length == 0) sb.Text("§8np. zelazny kilof", _search.X + 4, _search.Y + 1, 0xFFFFFFFF, false);
         for (int t = 0; t < TabNames.Length; t++)
         {
             var (tx, ty) = TabPos(t);
@@ -413,8 +430,15 @@ public sealed class CreativeScreen : Screen
         for (int t = 0; t < TabNames.Length; t++)
         {
             var (tx, ty) = TabPos(t);
-            if (mx >= tx && my >= ty && mx < tx + 28 && my < ty + 32) { _tab = t; G.PlayUiClick(); _search.Visible = t == 8; _search.Focused = t == 8; Refresh(); return; }
+            if (mx >= tx && my >= ty && mx < tx + 28 && my < ty + 32)
+            {
+                G.PlayUiClick();
+                if (t == SearchTab) { OpenSearch(null); return; }
+                _tab = t; _search.Visible = _search.Focused = false; Refresh(); return;
+            }
         }
+        // prawy przycisk na polu wyszukiwania czyści je (jak w 1.8)
+        if (btn == 1 && _tab == SearchTab && _search.Hover(mx, my)) { OpenSearch(""); return; }
         base.MouseDown(mx, my, btn);
         bool shift = G.IsShiftDown;
         // hotbar
@@ -474,8 +498,10 @@ public sealed class CreativeScreen : Screen
     }
     public override void KeyDown(Keys k, bool ctrl, bool shift)
     {
-        if (_search.Focused && _tab == 8)
+        if (_tab == SearchTab)
         {
+            // w zakładce Szukaj pole zawsze przyjmuje klawisze (nawet po kliknięciu w siatkę): Backspace działa, a „e” się wpisuje
+            _search.Focused = true;
             if (k == Keys.Escape) { G.SetScreen(null); return; }
             if (_search.Key(G, k, ctrl, shift)) Refresh();
             return;
@@ -484,7 +510,15 @@ public sealed class CreativeScreen : Screen
     }
     public override void CharTyped(char c)
     {
-        if (_tab != 8) { if (c == 't' || c == 'T') { } return; }
+        if (_tab != SearchTab)
+        {
+            // T otwiera puste wyszukiwanie (jak klawisz czatu w 1.8); inne litery i cyfry od razu szukają.
+            // E zamyka ekwipunek (KeyDown), więc go tu nie łapiemy.
+            if (c is 't' or 'T') OpenSearch("");
+            else if (char.IsLetterOrDigit(c) && c is not ('e' or 'E')) OpenSearch(c.ToString());
+            return;
+        }
+        _search.Focused = true; // po kliknięciu w siatkę dalsze pisanie wraca do pola (klawisze i tak trafiają do pola — KeyDown)
         if (_search.Char(G, c)) Refresh();
     }
     public override void OnClose()

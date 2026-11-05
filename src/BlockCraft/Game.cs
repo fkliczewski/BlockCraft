@@ -505,7 +505,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 if (Client != null) { Client.Out.Begin(Net.C2S.OpenInventory); Client.Out.End(); }
                 else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
-                break;
+                _ignoreNextChar = !ctrl && !e.Alt; break; // znak „e” z tego wciśnięcia nie ma trafić do pola wyszukiwania
             case Keys.T: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("")); break; // Ctrl/Alt+T nie daje znaku
             case Keys.Slash: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("/")); break;
             case Keys.F1: HideGui = !HideGui; break;

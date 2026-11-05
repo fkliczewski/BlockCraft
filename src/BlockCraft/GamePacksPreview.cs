@@ -140,6 +140,15 @@ public sealed partial class Game
             foreach (var s in new[] { new ItemStack(I.IronPickaxe), new ItemStack(B.Wool, 1, 14), new ItemStack(I.SpawnEgg, 1, 50), new ItemStack(I.Potion, 1, 16385), new ItemStack(B.Stone, 1, 2) })
                 Log.Info("NAZWA [" + Lang.Code + "] " + s.Item.Key + ":" + s.Damage + " = " + s.Name);
         });
+        // wyszukiwanie: pisanie w zakładce Budulce przełącza na „Szukaj”
+        Step(5, () =>
+        {
+            if (Player == null) return;
+            Cmds.Execute(Player, "/gamemode creative"); _chat.Clear(); HideGui = false;
+            SetScreen(new CreativeScreen(Player, 0));
+            foreach (char ch in "zelazny") _screen.CharTyped(ch);
+        });
+        Step(8, () => Snap("search"));
         Step(5, () => SetScreen(new LanguageScreen(new TitleScreen())));
         Step(10, () => Snap("language"));
         Step(5, () => { Log.Info("PACKS PREVIEW DONE"); Close(); });

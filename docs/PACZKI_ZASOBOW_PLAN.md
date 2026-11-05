@@ -163,7 +163,15 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 
 # Inne zadania (spoza paczek zasobów)
 
-## A. Wyszukiwanie przedmiotów po nazwie
+## A. Wyszukiwanie przedmiotów po nazwie  *(zrobione — do odbioru)*
+
+Zrobione (`Items/ItemSearch.cs`, zakładka „Szukaj” w `CreativeScreen`): bez wielkości liter i polskich znaków, słowa w dowolnej
+kolejności, po nazwie (także polskiej nazwie gry przy innym języku), kluczu (`iron_pickaxe`) i zaklęciach; wyniki zaczynające
+się od zapytania pierwsze; pisanie liter/cyfr w innej zakładce od razu szuka (T = puste wyszukiwanie, E dalej zamyka),
+prawy przycisk czyści pole, ostatnie zapytanie zostaje, „Brak wyników”, podpowiedź w pustym polu. Selftest `--search-only`.
+Nie zrobione: podświetlanie w ekwipunku przetrwania i skrzyniach.
+
+Pierwotny plan:
 
 Stan: w trybie kreatywnym jest zakładka „Szukaj” (ikona książki, prawa górna), filtruje po nazwie i kluczu.
 Do zrobienia:
