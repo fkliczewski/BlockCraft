@@ -199,6 +199,21 @@ public static class Biome
     /// <summary>Mapy kolorów 256x256 z paczki zasobów (colormap/grass.png, colormap/foliage.png); null = tabela gry.</summary>
     public static uint[] GrassMap, FoliageMap;
 
+    /// <summary>Wczytuje mapy kolorów czytnikiem obrazów paczek (ścieżka względem textures/, null = brak).
+    /// Zwraca true, gdy któraś mapa się zmieniła (siatki chunków do przebudowy).</summary>
+    public static bool LoadColorMaps(Func<string, RawImage> readImage)
+    {
+        uint[] grass = GrassMap, foliage = FoliageMap;
+        GrassMap = ColorMap(readImage, "colormap/grass.png");
+        FoliageMap = ColorMap(readImage, "colormap/foliage.png");
+        return !SameMap(grass, GrassMap) || !SameMap(foliage, FoliageMap);
+    }
+
+    private static uint[] ColorMap(Func<string, RawImage> readImage, string path) =>
+        readImage(path)?.RequireSize(m => m.W >= 2 && m.H >= 2, "co najmniej 2x2")?.Resize(256, 256).Px;
+
+    private static bool SameMap(uint[] a, uint[] b) => a == null ? b == null : b != null && a.AsSpan().SequenceEqual(b);
+
     /// <summary>ColorizerGrass/ColorizerFoliage: punkt mapy wg temperatury i wilgotności biomu, wynik 0xRRGGBB.</summary>
     private static uint FromMap(uint[] map, BiomeDef d)
     {

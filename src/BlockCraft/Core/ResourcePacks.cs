@@ -230,7 +230,7 @@ public static class ResourcePacks
     /// <summary>Obraz z pierwszej aktywnej paczki ("gui/widgets.png" względem assets/minecraft/textures/), null = brak.</summary>
     public static RawImage ReadImage(string texturePath)
     {
-        var data = Read("assets/minecraft/textures/" + texturePath);
+        var data = Read(Render.TextureGen.TexturesRoot + texturePath);
         return data == null ? null : RawImage.Decode(data, texturePath);
     }
 }
@@ -240,6 +240,7 @@ public sealed class RawImage
 {
     public int W, H;
     public uint[] Px;
+    public string Name = "";
 
     public static RawImage Decode(byte[] png, string name = "")
     {
@@ -248,9 +249,17 @@ public sealed class RawImage
             var img = StbImageSharp.ImageResult.FromMemory(png, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
             var px = new uint[img.Width * img.Height];
             Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
-            return new RawImage { W = img.Width, H = img.Height, Px = px };
+            return new RawImage { W = img.Width, H = img.Height, Px = px, Name = name };
         }
         catch (Exception ex) { Log.Error("Paczka zasobów: " + name + ": " + ex.Message); return null; }
+    }
+
+    /// <summary>Ten obraz, gdy ma wymiary spełniające warunek; inaczej błąd w logu i null (element jak bez paczki).</summary>
+    public RawImage RequireSize(Func<RawImage, bool> valid, string expected)
+    {
+        if (valid(this)) return this;
+        Log.Error($"Paczka zasobów: {Name}: złe wymiary {W}x{H}, oczekiwano {expected}");
+        return null;
     }
 
     public uint At(int x, int y) => x >= 0 && y >= 0 && x < W && y < H ? Px[y * W + x] : 0;
@@ -264,13 +273,7 @@ public sealed class RawImage
     }
 
     /// <summary>Powiększenie bez wygładzania o całkowity współczynnik.</summary>
-    public RawImage Upscale(int k)
-    {
-        if (k <= 1) return this;
-        var r = new RawImage { W = W * k, H = H * k, Px = new uint[W * k * H * k] };
-        for (int y = 0; y < r.H; y++) for (int x = 0; x < r.W; x++) r.Px[y * r.W + x] = Px[(y / k) * W + x / k];
-        return r;
-    }
+    public RawImage Upscale(int k) => k <= 1 ? this : Resize(W * k, H * k);
 
     /// <summary>Skalowanie do dowolnego rozmiaru metodą najbliższego piksela.</summary>
     public RawImage Resize(int w, int h)

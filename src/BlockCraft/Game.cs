@@ -108,7 +108,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
         LoadResourcePacksAtStart();
-        Gui = new GuiTextures();
+        Gui = new GuiTextures(ResourcePacks.ReadImage);
+        Biome.LoadColorMaps(ResourcePacks.ReadImage);
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         ResourcePacks.CloseAll();

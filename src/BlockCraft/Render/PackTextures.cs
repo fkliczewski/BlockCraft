@@ -314,11 +314,18 @@ public static partial class TextureGen
                 if (read(TexturesRoot + path + ".png") is { } png) { r = RawImage.Decode(png, path); break; }
             return _raw[path] = r;
         }
+        private readonly Dictionary<string, RawImage> _sheets = new();
+        /// <summary>Arkusz grid x grid komórek; złe wymiary: jeden wpis w logu i null (cząsteczki jak bez paczki).</summary>
+        private RawImage Sheet(string path, int grid)
+        {
+            if (_sheets.TryGetValue(path, out var s)) return s;
+            return _sheets[path] = Raw(path)?.RequireSize(i => i.W == i.H && i.W % grid == 0, $"kwadrat podzielny na {grid}x{grid} komórek");
+        }
         /// <summary>Komórka index z arkusza grid x grid (np. particle/particles: 16x16 komórek), przeskalowana do 16x16.</summary>
         public uint[] Cell(string path, int grid, int index)
         {
-            var img = Raw(path);
-            if (img == null || img.W != img.H || img.W % grid != 0) return null;
+            var img = Sheet(path, grid);
+            if (img == null) return null;
             int cs = img.W / grid;
             var cell = img.Crop(index % grid * cs, index / grid * cs, cs, cs);
             return ScaleTo16(cell.Px, cs);

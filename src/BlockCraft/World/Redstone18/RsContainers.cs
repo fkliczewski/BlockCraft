@@ -654,7 +654,7 @@ namespace BlockCraft.World
         }
         public RsContainer CreateContainer(World w, Player p, int x, int y, int z)
             => w.GetTileEntity(x,y,z) is ChestTileEntity te
-                ? new RsContainer(p.Inventory, te, "Skrzynia-pułapka", RsContainer.Layout.Chest27,
+                ? new RsContainer(p.Inventory, ChestPairing.Inventory(w, te, x, y, z), "Skrzynia-pułapka", RsContainer.Layout.Chest27,
                     w.IsRemote ? null : () => Viewers(w,x,y,z,te,1), w.IsRemote ? null : () => Viewers(w,x,y,z,te,-1)) : null;
         private void Viewers(World w, int x, int y, int z, ChestTileEntity te, int d)
         {
@@ -676,6 +676,7 @@ namespace BlockCraft.World
         public enum Layout { Hopper, Grid3, Chest27 }
         public readonly IInventory Inv;
         public readonly Layout Kind;
+        public override string PackWindow => Kind == Layout.Chest27 ? "generic_54" : null;
         private readonly Action _onClose;
         public RsContainer(PlayerInventory pinv, IInventory inv, string title, Layout layout, Action onOpen = null, Action onClose = null)
         {
@@ -691,10 +692,8 @@ namespace BlockCraft.World
                     for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) Slots.Add(new Slot(inv, r * 3 + c, 62 + c * 18, 17 + r * 18));
                     AddPlayerSlots(pinv, 84, 142);
                     break;
-                default:
-                    Height = 114 + 3 * 18;
-                    for (int r = 0; r < 3; r++) for (int c = 0; c < 9; c++) Slots.Add(new Slot(inv, r * 9 + c, 8 + c * 18, 18 + r * 18));
-                    AddPlayerSlots(pinv, 85, 143);
+                default: // skrzynia: 3 rzędy, duża skrzynia-pułapka 6
+                    AddChestLayout(pinv, inv);
                     break;
             }
             onOpen?.Invoke();
@@ -703,11 +702,13 @@ namespace BlockCraft.World
         public override void OnClose(Player p) { base.OnClose(p); _onClose?.Invoke(); }
         /// <summary>MC isUseableByPlayer: tile entity wciąż w świecie (wagonik nieusunięty) i gracz w zasięgu 8 bloków.
         /// Inne inwentarze (skrzynia Endu, kopia po stronie klienta) zawsze ważne.</summary>
-        public bool StillValid(Player p)
+        public bool StillValid(Player p) => Inv.Parts.All(part => StillValid(p, part));
+
+        private static bool StillValid(Player p, IInventory inv)
         {
-            if (Inv is TileEntity te)
+            if (inv is TileEntity te)
                 return p.World.GetTileEntity(te.X, te.Y, te.Z) == te && p.DistanceSq(te.X + 0.5, te.Y + 0.5, te.Z + 0.5) <= 64;
-            if (Inv is Entity e) return !e.Removed && !e.Dead && e.World == p.World && p.DistanceSq(e.X, e.Y, e.Z) <= 64;
+            if (inv is Entity e) return !e.Removed && !e.Dead && e.World == p.World && p.DistanceSq(e.X, e.Y, e.Z) <= 64;
             return true;
         }
     }
@@ -731,13 +732,14 @@ namespace BlockCraft.Gui
         public RsContainerScreen(Player p, Container c) : base(p, c) { }
         protected override void DrawBackground(int mx, int my)
         {
-            GuiDraw.Panel(G, Left, Top, C.Width, C.Height);
-            foreach (var s in C.Slots) GuiDraw.Slot(G, Left + s.X - 1, Top + s.Y - 1, 18);
+            var (layout, bg) = PackBackground();
+            if (bg != null) layout.DrawFrame(G.Sb, bg, C, Left, Top);
+            else DrawGeneratedFrame();
             var sb = G.Sb;
-            if (C is World.RsContainer rc && rc.Kind != World.RsContainer.Layout.Chest27)
-                sb.TextCentered(C.Title, Left + C.Width / 2f, Top + 6, 0xFF404040, false);
+            bool chest = C is World.RsContainer { Kind: World.RsContainer.Layout.Chest27 };
+            if (!chest) sb.TextCentered(C.Title, Left + C.Width / 2f, Top + 6, 0xFF404040, false);
             else sb.Text(C.Title, Left + 8, Top + 6, 0xFF404040, false);
-            sb.Text("Ekwipunek", Left + 8, Top + C.Height - 96 + 2, 0xFF404040, false);
+            DrawInventoryLabel(bg != null ? layout : null);
         }
     }
 }

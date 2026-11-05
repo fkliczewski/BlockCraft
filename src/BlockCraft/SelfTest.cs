@@ -93,6 +93,7 @@ public static partial class SelfTest
         try { TestResourcePacks(); } catch (Exception e) { Check(false, "Paczki zasobów", e.ToString()); }
         try { TestContentSources(); } catch (Exception e) { Check(false, "Źródła paczek", e.ToString()); }
         try { TestPackAssets(); } catch (Exception e) { Check(false, "Paczki: GUI i kolory", e.ToString()); }
+        try { TestLargeChest(); } catch (Exception e) { Check(false, "Duża skrzynia", e.ToString()); }
         try { TestIntegratedDimensions(); } catch (Exception e) { Check(false, "Integracja wymiarów", e.ToString()); }
         Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ({sw.ElapsedMilliseconds} ms) ===");
         foreach (var f in Failures) Console.WriteLine(" - " + f);

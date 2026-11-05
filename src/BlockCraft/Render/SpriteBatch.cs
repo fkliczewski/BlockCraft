@@ -43,7 +43,7 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
     }
 
     /// <summary>Piksele tekstury czcionki na jeden piksel GUI (czcionka HD z paczki: 2, 4...).</summary>
-    private int _fk = 1;
+    private int _fontPixelScale = 1;
 
     /// <summary>Po zmianie paczek zasobów: font/ascii.png z paczki albo czcionka gry.</summary>
     public void ReloadFont()
@@ -58,9 +58,8 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
     /// pozostałe (polskie litery) z czcionki gry, powiększone do rozdzielczości paczki.</summary>
     private void BuildFont()
     {
-        var ascii = Core.ResourcePacks.ReadImage("font/ascii.png");
-        if (ascii != null && (ascii.W != ascii.H || ascii.W < 128 || ascii.W % 128 != 0)) ascii = null;
-        int k = _fk = ascii == null ? 1 : ascii.W / 128;
+        var ascii = Core.ResourcePacks.ReadImage("font/ascii.png")?.RequireSize(i => i.W == i.H && i.W >= 128 && i.W % 128 == 0, "kwadrat 128x128 albo jego wielokrotność");
+        int k = _fontPixelScale = ascii == null ? 1 : ascii.W / 128;
         var chars = FontData.Glyphs.Keys.ToList();
         int cols = 32, rows = (chars.Count + cols - 1) / cols;
         int cw = FontData.CellW * k, ch = FontData.CellH * k;
@@ -249,7 +248,7 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
             if (!_glyphs.TryGetValue(c, out var g) && !_glyphs.TryGetValue(char.ToLowerInvariant(c), out g)) { g = _glyphs['?']; }
             if (c != ' ')
                 Quad(cx, y - FontData.Top * scale, FontData.CellW * scale, FontData.CellH * scale,
-                    g.x / tw, g.y / th, (g.x + FontData.CellW * _fk) / tw, (g.y + FontData.CellH * _fk) / th, col, col, 0);
+                    g.x / tw, g.y / th, (g.x + FontData.CellW * _fontPixelScale) / tw, (g.y + FontData.CellH * _fontPixelScale) / th, col, col, 0);
             cx += (CharW(c) + 1) * scale;
         }
     }

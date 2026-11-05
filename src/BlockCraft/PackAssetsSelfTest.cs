@@ -27,14 +27,15 @@ public static partial class SelfTest
         {
             var map = new uint[256 * 256];
             for (int i = 0; i < map.Length; i++) map[i] = 0xFF000000 | (uint)(i & 255) << 16 | (uint)(i >> 8);
-            Biome.GrassMap = map;
+            var grassPng = new RawImage { W = 256, H = 256, Px = map };
+            Check(Biome.LoadColorMaps(p => p == "colormap/grass.png" ? grassPng : null), "Nowa mapa kolorów = przebudowa chunków");
             var d = Biome.Get(Biome.Plains);
             int x = (int)((1 - d.Temp) * 255), y = (int)((1 - d.Rain * d.Temp) * 255);
             uint c = Biome.GrassColor(Biome.Plains);
             Check(c == (uint)((y << 16) | (x & 255)), "Trawa z colormap/grass.png wg temperatury i wilgotności", c.ToString("X6"));
             Check(Biome.GrassColor(Biome.Swampland) == 0x6A7039, "Bagno: stały kolor jak w 1.8");
         }
-        finally { Biome.GrassMap = null; }
+        finally { Biome.LoadColorMaps(_ => null); }
         Check(Biome.GrassColor(Biome.Plains) == plainsBefore, "Bez mapy kolorów: tabela gry");
 
         var img = new RawImage { W = 2, H = 2, Px = new uint[] { 1, 2, 3, 4 } };

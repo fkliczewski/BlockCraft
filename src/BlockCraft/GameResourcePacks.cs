@@ -88,12 +88,11 @@ public sealed partial class Game
         var changed = TextureGen.ApplyPacks(ResourcePacks.Readers);
         Renderer.ReloadTextures(changed.Concat(animated).Distinct());
         Icons.Dispose(); Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
-        Gui.Dispose(); Gui = new GuiTextures();
+        Gui.Dispose(); Gui = new GuiTextures(ResourcePacks.ReadImage);
         Sb.ReloadFont();
-        uint grass = Biome.GrassColor(Biome.Plains), foliage = Biome.FoliageColor(Biome.Plains);
+        // inne mapy kolorów trawy i liści: siatki chunków do przebudowy
         Renderer.ReloadPackAssets();
-        // inne kolory trawy i liści z map kolorów: siatki chunków do przebudowy
-        if (grass != Biome.GrassColor(Biome.Plains) || foliage != Biome.FoliageColor(Biome.Plains)) MarkAllDirty();
+        if (Biome.LoadColorMaps(ResourcePacks.ReadImage)) MarkAllDirty();
         ResourcePacks.CloseAll();
         Log.Info($"Paczki zasobów przeładowane: {changed.Count} zmienionych tekstur, {sw.ElapsedMilliseconds} ms");
     }

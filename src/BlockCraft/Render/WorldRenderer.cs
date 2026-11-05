@@ -192,7 +192,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     {
         _sunTex?.Dispose(); _moonTex?.Dispose();
         var packSun = ResourcePacks.ReadImage("environment/sun.png");
-        var packMoon = ResourcePacks.ReadImage("environment/moon_phases.png");
+        var packMoon = ResourcePacks.ReadImage("environment/moon_phases.png")?.RequireSize(i => i.W == i.H * 2, "szerokość = 2 x wysokość (4x2 fazy)");
         var sun = new uint[32 * 32];
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
             {
@@ -217,7 +217,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 }
             }
         // moon_phases.png z 1.8: 4x2 fazy księżyca
-        _moonPhases = packMoon != null && packMoon.W == packMoon.H * 2;
+        _moonPhases = packMoon != null;
         _moonTex = _moonPhases ? new Texture2D(packMoon.W, packMoon.H, packMoon.Px) : new Texture2D(32, 32, moon);
         _sunSh ??= new Shader(SunVert, SunFrag, "sun");
     }
@@ -250,7 +250,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         }
         for (int i = 0; i < grid.Length; i++) grid[i] = n1[i] + r.NextFloat() * 0.08f > 0.6f;
         // environment/clouds.png z paczki: piksel nieprzezroczysty = komórka chmury (jak RenderGlobal 1.8)
-        if (ResourcePacks.ReadImage("environment/clouds.png") is { } ci && ci.W == ci.H && ci.W is >= 16 and <= 512)
+        if (ResourcePacks.ReadImage("environment/clouds.png")?.RequireSize(i => i.W == i.H && i.W is >= 16 and <= 512, "kwadrat od 16 do 512 pikseli") is { } ci)
         {
             CloudCells = ci.W;
             grid = new bool[CloudCells * CloudCells];

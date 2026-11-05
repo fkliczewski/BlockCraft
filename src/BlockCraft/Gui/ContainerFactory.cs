@@ -14,7 +14,7 @@ public static class ContainerFactory
     {
         [GuiKind.Crafting] = (w, p, x, y, z) => new WorkbenchContainer(p.Inventory, x, y, z),
         [GuiKind.Furnace] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is FurnaceTileEntity f ? new FurnaceContainer(p.Inventory, f) : null,
-        [GuiKind.Chest] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is ChestTileEntity c ? new ChestContainer(p.Inventory, c, "Skrzynia") : null,
+        [GuiKind.Chest] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is ChestTileEntity c ? OpenChest(w, p, c, x, y, z) : null,
         [GuiKind.Brewing] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is BrewingStandTile b ? new BrewingContainer(p.Inventory, b) : null,
         [GuiKind.Hopper] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is World.HopperTileEntity h ? new World.RsContainer(p.Inventory, h, "Lej", World.RsContainer.Layout.Hopper) : null,
         [GuiKind.Dispenser] = (w, p, x, y, z) => w.GetTileEntity(x, y, z) is World.DispenserTileEntity d ? new World.RsContainer(p.Inventory, d, w.GetBlock(x,y,z) == World.B.Dropper ? "Podajnik" : "Dozownik", World.RsContainer.Layout.Grid3) : null,
@@ -23,6 +23,12 @@ public static class ContainerFactory
         [GuiKind.Anvil] = (w, p, x, y, z) => w.GetBlock(x, y, z) == World.B.Anvil ? new AnvilContainer(p, w, x, y, z) : null,
         [GuiKind.TrappedChest] = (w, p, x, y, z) => World.Block.Get(w.GetBlock(x,y,z)) is World.TrappedChestBlock t ? t.CreateContainer(w, p, x, y, z) : null,
     };
+
+    private static ChestContainer OpenChest(World.World w, Player p, ChestTileEntity chest, int x, int y, int z)
+    {
+        var inv = World.ChestPairing.Inventory(w, chest, x, y, z);
+        return new ChestContainer(p.Inventory, inv, inv is LargeChestInventory ? "Duża skrzynia" : "Skrzynia");
+    }
 
     /// <summary>Ekrany dla typów kontenerów; brak wpisu = zwykły ContainerScreen.</summary>
     public static readonly Dictionary<Type, Func<Player, Container, Screen>> Screens = new()
