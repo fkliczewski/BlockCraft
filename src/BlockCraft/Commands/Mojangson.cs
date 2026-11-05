@@ -15,15 +15,6 @@ public static class Mojangson
     public static Nbt Parse(string s)
     {
         s = s.Trim();
-        int nesting = 0; bool quoted = false, escaped = false;
-        foreach (char ch in s)
-        {
-            if (escaped) { escaped = false; continue; }
-            if (quoted && ch == '\\') { escaped = true; continue; }
-            if (ch == '"') { quoted = !quoted; continue; }
-            if (!quoted && ch is '{' or '[' && ++nesting > 256) throw new CommandException("Tag danych jest zbyt głęboko zagnieżdżony");
-            if (!quoted && ch is '}' or ']') nesting--;
-        }
         if (!s.StartsWith('{')) throw new CommandException("Nieprawidłowy tag danych: musi zaczynać się od '{'");
         int i = 0;
         var v = Value(s, ref i);
@@ -32,13 +23,20 @@ public static class Mojangson
         return (Nbt)v;
     }
 
+    private static T Finite<T>(T x, string text) where T : System.Numerics.IFloatingPointIeee754<T> =>
+        T.IsFinite(x) ? x : throw new CommandException("Nieprawidłowy tag danych: liczba poza zakresem " + text);
+
     private static void Skip(string s, ref int i) { while (i < s.Length && char.IsWhiteSpace(s[i])) i++; }
 
-    private static object Value(string s, ref int i)
+    /// <summary>Limit zagnieżdżenia sprawdzany w samym parserze (wstępne skanowanie dawało się obejść cudzysłowem w wartości).</summary>
+    private const int MaxDepth = 256;
+
+    private static object Value(string s, ref int i, int depth = 0)
     {
         Skip(s, ref i);
         if (i >= s.Length) throw new CommandException("Nieprawidłowy tag danych: nieoczekiwany koniec");
         char c = s[i];
+        if (c is '{' or '[' && depth >= MaxDepth) throw new CommandException("Tag danych jest zbyt głęboko zagnieżdżony");
         if (c == '{')
         {
             var n = new Nbt(); i++;
@@ -49,7 +47,7 @@ public static class Mojangson
                 Skip(s, ref i);
                 if (i >= s.Length || s[i] != ':') throw new CommandException("Nieprawidłowy tag danych: brak ':' po kluczu " + key);
                 i++;
-                n[key] = Value(s, ref i);
+                n[key] = Value(s, ref i, depth + 1);
                 Skip(s, ref i);
                 if (i < s.Length && s[i] == ',') { i++; Skip(s, ref i); }
                 else if (i < s.Length && s[i] != '}') throw new CommandException("Nieprawidłowy tag danych: oczekiwano ',' lub '}'");
@@ -69,7 +67,7 @@ public static class Mojangson
                 int save = i;
                 while (i < s.Length && char.IsDigit(s[i])) i++;
                 if (!(i < s.Length && s[i] == ':' && i > save)) i = save; else i++;
-                list.Add(Value(s, ref i));
+                list.Add(Value(s, ref i, depth + 1));
                 Skip(s, ref i);
                 if (i < s.Length && s[i] == ',') { i++; Skip(s, ref i); }
                 else if (i < s.Length && s[i] != ']') throw new CommandException("Nieprawidłowy tag danych: oczekiwano ',' lub ']'");
@@ -117,13 +115,15 @@ public static class Mojangson
             char last = char.ToLowerInvariant(v[^1]);
             string num = v[..^1];
             bool isNum(string x) => x.Length > 0 && double.TryParse(x, NumberStyles.Float, Inv, out _) && !x.Contains('e', StringComparison.OrdinalIgnoreCase);
-            if (last == 'b' && isNum(num) && !num.Contains('.')) return (int)sbyte.Parse(num, Inv);
-            if (last == 's' && isNum(num) && !num.Contains('.')) return (int)short.Parse(num, Inv);
-            if (last == 'l' && isNum(num) && !num.Contains('.')) return long.Parse(num, Inv);
-            if (last == 'f' && isNum(num)) return float.Parse(num, Inv);
-            if (last == 'd' && isNum(num)) return double.Parse(num, Inv);
+            // "NaNb"/"Infinityb" przechodzą isNum, a Parse rzucał FormatException - zostają napisem
+            if (last == 'b' && isNum(num) && !num.Contains('.') && sbyte.TryParse(num, NumberStyles.AllowLeadingSign, Inv, out sbyte bv)) return (int)bv;
+            if (last == 's' && isNum(num) && !num.Contains('.') && short.TryParse(num, NumberStyles.AllowLeadingSign, Inv, out short sv)) return (int)sv;
+            if (last == 'l' && isNum(num) && !num.Contains('.') && long.TryParse(num, NumberStyles.AllowLeadingSign, Inv, out long lv)) return lv;
+            // jak JsonToNBT z 1.8: wykładnik (1e40f) zostaje napisem; poza zakresem float/double Parse daje nieskończoność - to błąd danych
+            if (last == 'f' && isNum(num)) return Finite(float.Parse(num, Inv), v);
+            if (last == 'd' && isNum(num)) return Finite(double.Parse(num, Inv), v);
             if (int.TryParse(v, NumberStyles.AllowLeadingSign, Inv, out int iv)) return iv;
-            if (v.Contains('.') && double.TryParse(v, NumberStyles.Float, Inv, out double dv)) return dv;
+            if (v.Contains('.') && double.TryParse(v, NumberStyles.Float, Inv, out double dv)) return Finite(dv, v);
         }
         catch (OverflowException) { }
         if (v.Equals("true", StringComparison.OrdinalIgnoreCase)) return 1;

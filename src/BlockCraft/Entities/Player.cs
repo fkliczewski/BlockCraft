@@ -408,6 +408,8 @@ public partial class Player : LivingEntity
         DeathMessage = src.DeathMessage(Name);
         if (!World.IsRemote)
         {
+            // najpierw zamknięcie okna: siatka wytwarzania i kursor wracają do ekwipunku, zanim go wyrzucimy
+            CloseContainer();
             if (!World.Rules.KeepInventory)
             {
                 for (int i = 0; i < 40; i++)

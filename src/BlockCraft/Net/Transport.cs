@@ -45,9 +45,31 @@ public abstract class QueuedConnection : INetConnection
         _out.Writer.TryWrite(frame);
     }
 
-    public bool TryReceive(out byte[] frame) => _in.TryDequeue(out frame);
+    private int _inCount;
+    private long _inBytes;
+    /// <summary>Limit kolejki odbioru: druga strona zasypująca nas danymi (albo nikt nie czyta) zamyka połączenie.</summary>
+    public const int MaxInFrames = 20000;
+    public const long MaxInBytes = 256L << 20;
 
-    protected void Received(byte[] frame) { BytesReceived += frame.Length; _in.Enqueue(frame); }
+    public bool TryReceive(out byte[] frame)
+    {
+        if (!_in.TryDequeue(out frame)) return false;
+        Interlocked.Decrement(ref _inCount); Interlocked.Add(ref _inBytes, -frame.Length);
+        return true;
+    }
+
+    protected void Received(byte[] frame)
+    {
+        if (IsClosed) return;
+        BytesReceived += frame.Length;
+        if (Interlocked.Increment(ref _inCount) > MaxInFrames || Interlocked.Add(ref _inBytes, frame.Length) > MaxInBytes)
+        {
+            Interlocked.Decrement(ref _inCount);
+            MarkClosed("Przepełniona kolejka odbioru");
+            return;
+        }
+        _in.Enqueue(frame);
+    }
 
     /// <summary>Pętla wysyłki: czeka na otwarcie kanału i przepycha ramki w kolejności.</summary>
     protected async Task SendLoop(Func<CancellationToken, Task<Func<byte[], CancellationToken, ValueTask>>> open, CancellationToken ct)
@@ -146,7 +168,11 @@ public sealed class LinkConnection : QueuedConnection
     {
         try
         {
-            await foreach (var frame in reader.ReadAllAsync(ct)) Received(frame.ToArray());
+            await foreach (var frame in reader.ReadAllAsync(ct))
+            {
+                if (IsClosed) return; // po zamknięciu nikt już nie czyta kolejki
+                Received(frame.ToArray());
+            }
             MarkClosed("Druga strona zamknęła połączenie");
         }
         catch (OperationCanceledException) { MarkClosed("Połączenie zamknięte"); }
@@ -239,19 +265,23 @@ public sealed class LinkClientService : IAsyncDisposable
         s._link = string.IsNullOrWhiteSpace(code)
             ? await TailcatLink.JoinAsync(LinkHostService.App, null, new JoinRequest { DisplayName = nick }, options, ct)
             : await TailcatLink.JoinAsync(LinkHostService.App, code.Trim(), new JoinRequest { DisplayName = nick }, options, ct);
-        await s._link.WaitUntilConnectedAsync(ct);
-        LinkConnection conn = null;
-        var ready = new TaskCompletionSource();
-        s._link.OnChannel(LinkConnection.ToClient, async (reader, c) =>
+        try
         {
-            while (conn == null) await Task.Delay(5, c);
-            ready.TrySetResult();
-            await conn.ReadFrom(reader, c);
-        });
-        conn = LinkConnection.ForHost(s._link, "Host");
-        s.Connection = conn;
-        s._link.Disconnected += reason => conn.MarkClosed("Utracono połączenie z hostem (" + reason + ")");
-        return s;
+            await s._link.WaitUntilConnectedAsync(ct);
+            LinkConnection conn = null;
+            var ready = new TaskCompletionSource();
+            s._link.OnChannel(LinkConnection.ToClient, async (reader, c) =>
+            {
+                while (conn == null) await Task.Delay(5, c);
+                ready.TrySetResult();
+                await conn.ReadFrom(reader, c);
+            });
+            conn = LinkConnection.ForHost(s._link, "Host");
+            s.Connection = conn;
+            s._link.Disconnected += reason => conn.MarkClosed("Utracono połączenie z hostem (" + reason + ")");
+            return s;
+        }
+        catch { await s.DisposeAsync(); throw; } // błąd albo limit czasu: łącze nie może zostać otwarte w tle
     }
 
     public async ValueTask DisposeAsync()

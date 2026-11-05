@@ -51,17 +51,49 @@ public abstract partial class Mob
         int meta=World.GetMeta(_doorX,_doorY,_doorZ);
         if((meta&4)!=0) { World.SetMeta(_doorX,_doorY,_doorZ,meta&~4); World.PlaySound("random.door_close",_doorX+.5,_doorY+.5,_doorZ+.5,1f,World.Rand.NextFloat()*.1f+.9f); }
     }
+    // smycz z zapisu (MC Leash/Leash{X,Y,Z}): 0 brak, 1 węzeł na płocie, 2 gracz; wiązana w pierwszym ticku
+    private enum SavedLeash : byte { None, Fence, Player }
+    private const int MobDataMagicV18=0x4D4F3138, MobDataMagicWithLeash=0x4D4F3139;
+    private SavedLeash _leashKind;
+    private int _leashX, _leashY, _leashZ;
     private void SaveMobData(BinaryWriter b)
     {
-        b.Write(0x4D4F3138); b.Write(CustomName??""); b.Write(PersistenceRequired); b.Write(Saddled);
+        // MO19 = MO18 + smycz
+        b.Write(MobDataMagicWithLeash); b.Write(CustomName??""); b.Write(PersistenceRequired); b.Write(Saddled);
+        if(LeashHolder is LeashKnot k) { b.Write((byte)SavedLeash.Fence); b.Write(k.BX); b.Write(k.BY); b.Write(k.BZ); }
+        else if(LeashHolder!=null) b.Write((byte)SavedLeash.Player);
+        else { b.Write((byte)_leashKind); if(_leashKind==SavedLeash.Fence) { b.Write(_leashX); b.Write(_leashY); b.Write(_leashZ); } }
     }
     private void LoadMobData(BinaryReader b)
     {
         long pos=b.BaseStream.Position;
         if(b.BaseStream.Length-pos<4) return;
-        if(b.ReadInt32()!=0x4D4F3138) { b.BaseStream.Position=pos; return; }
+        int magic=b.ReadInt32();
+        if(magic!=MobDataMagicV18&&magic!=MobDataMagicWithLeash) { b.BaseStream.Position=pos; return; }
         CustomName=b.ReadString(); PersistenceRequired=b.ReadBoolean(); Saddled=b.ReadBoolean();
         if(CustomName.Length==0) CustomName=null;
+        if(magic==MobDataMagicWithLeash) {
+            _leashKind=(SavedLeash)b.ReadByte();
+            if(_leashKind==SavedLeash.Fence) { _leashX=b.ReadInt32(); _leashY=b.ReadInt32(); _leashZ=b.ReadInt32(); }
+        }
+    }
+    /// <summary>Węzeł zwolniony razem ze swoim chunkiem: smycz czeka na płot jak po wczytaniu z zapisu.</summary>
+    private void RememberFenceLeash(LeashKnot k) { _leashKind=SavedLeash.Fence; _leashX=k.BX; _leashY=k.BY; _leashZ=k.BZ; }
+    /// <summary>recreateLeash z MC: węzeł na płocie (tworzony, jeśli zniknął); gracza po wczytaniu nie ma, więc smycz wypada.</summary>
+    private void RestoreLeash()
+    {
+        if(_leashKind==SavedLeash.Fence) {
+            if(!World.IsLoadedAt(_leashX,_leashZ)) return; // poczekaj na chunk z płotem
+            // także węzły utworzone w tym ticku przez inne moby z tego płotu (jeszcze poza Grid)
+            var knot=World.GetEntitiesInBox(new AABB(_leashX,_leashY,_leashZ,_leashX+1,_leashY+1,_leashZ+1),null).Concat(World.PendingEntities)
+                .OfType<LeashKnot>().FirstOrDefault(k=>!k.Removed&&k.BX==_leashX&&k.BY==_leashY&&k.BZ==_leashZ);
+            if(knot==null&&LeashKnot.IsFence(World.GetBlock(_leashX,_leashY,_leashZ))) {
+                knot=LeashKnot.Spawn(World,_leashX,_leashY,_leashZ);
+            }
+            if(knot!=null) LeashHolder=knot; else Drop(I.Lead,1);
+        }
+        else if(_leashKind==SavedLeash.Player) Drop(I.Lead,1);
+        _leashKind=SavedLeash.None;
     }
     private bool TickMobControl()
     {
@@ -88,7 +120,8 @@ public abstract partial class Mob
         }
         if(LeashHolder!=null) {
             double d=Distance(LeashHolder);
-            if(LeashHolder.Removed||LeashHolder.Dead||d>10) { if(!World.IsRemote) Drop(I.Lead,1); LeashHolder=null; }
+            if(LeashHolder is LeashKnot k&&k.Removed&&!World.IsRemote&&!World.IsLoadedAt(k.BX,k.BZ)) { RememberFenceLeash(k); LeashHolder=null; }
+            else if(LeashHolder.Removed||LeashHolder.Dead||d>10) { if(!World.IsRemote) Drop(I.Lead,1); LeashHolder=null; }
             else if(d>6) { MotionX+=(LeashHolder.X-X)/d*.4*(d-6)/4; MotionY+=Math.Max(0,(LeashHolder.Y-Y)/d*.4); MotionZ+=(LeashHolder.Z-Z)/d*.4*(d-6)/4; }
             else if(d>2 && Age%10==0) Nav.MoveTo(LeashHolder.X,LeashHolder.Y,LeashHolder.Z,MoveSpeed*1.2);
         }
@@ -97,6 +130,7 @@ public abstract partial class Mob
     public override void Tick()
     {
         base.Tick();
+        if(_leashKind!=SavedLeash.None&&!World.IsRemote&&!Dead) RestoreLeash();
         if(Vehicle!=null&&!Vehicle.Removed) { SetPosition(Vehicle.X,RideY,Vehicle.Z); MotionX=MotionY=MotionZ=0; FallDistance=0; }
         if(Rider!=null) {
             if(Dead||Removed||Rider.Dead||Rider.Removed||Rider.Sneaking) Dismount();

@@ -12,6 +12,8 @@ public sealed class MapTextureCache : IDisposable
     public readonly TextureArray Array;
     private readonly Dictionary<int, (int slot, int version)> _byMap = new();
     private readonly LinkedList<int> _lru = new();
+    /// <summary>Mapy użyte w MapBatch od ostatniego Flush: ich warstw nie wolno nadpisać przed narysowaniem.</summary>
+    private readonly HashSet<int> _inBatch = new();
 
     public MapTextureCache()
     {
@@ -60,9 +62,14 @@ public sealed class MapTextureCache : IDisposable
         return p;
     }
 
+    /// <summary>true, gdy LayerFor(m) wyrzuciłby slot mapy czekającej jeszcze w MapBatch (trzeba najpierw Flush).</summary>
+    public bool WouldEvictBatched(MapData m) => !_byMap.ContainsKey(m.Id) && _byMap.Count >= Slots && _inBatch.Contains(_lru.Last.Value);
+    public void BatchFlushed() => _inBatch.Clear();
+
     /// <summary>Warstwa z aktualnymi pikselami mapy (wgrywa ponownie po zmianie wersji).</summary>
     public int LayerFor(MapData m)
     {
+        _inBatch.Add(m.Id);
         if (_byMap.TryGetValue(m.Id, out var e))
         {
             _lru.Remove(m.Id); _lru.AddFirst(m.Id);
@@ -94,6 +101,7 @@ public sealed partial class EntityRenderer
 
     public void FlushMaps()
     {
+        _mapTex?.BatchFlushed();
         if (MapBatch.Verts == 0) return;
         _mapTex ??= new MapTextureCache();
         Flush(MapBatch, _mapTex.Array);
@@ -111,6 +119,7 @@ public sealed partial class EntityRenderer
             b.V(toSpace(-7, 135, 0), 0, 1, 1); b.V(toSpace(135, 135, 0), 1, 1, 1); b.V(toSpace(135, -7, 0), 1, 0, 1); b.V(toSpace(-7, -7, 0), 0, 0, 1);
         }
         if (m == null) return;
+        if (_mapTex.WouldEvictBatched(m)) FlushMaps(); // >48 map w kadrze: najpierw narysuj te, których slot zaraz nadpiszemy
         b.Layer = _mapTex.LayerFor(m);
         b.V(toSpace(0, 128, -.01f), 0, 1, 1); b.V(toSpace(128, 128, -.01f), 1, 1, 1); b.V(toSpace(128, 0, -.01f), 1, 0, 1); b.V(toSpace(0, 0, -.01f), 0, 0, 1);
         b.Layer = MapTextureCache.Icons;

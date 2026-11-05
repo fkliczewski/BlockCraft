@@ -190,11 +190,11 @@ public class ContainerScreen : Screen
         if (btn == 2) { if (slot >= 0) C.Click(slot, 2, ClickType.Clone, P); return; }
         if (slot < 0) { if (outside) C.Click(-999, btn, ClickType.Pickup, P); return; }
         if (shift) { C.Click(slot, btn, ClickType.QuickMove, P); return; }
-        if (btn == 0 && slot == _lastClickSlot && Environment.TickCount64 - _lastClickTime < 250 && P.Cursor != null)
+        if (btn == 0 && slot == _lastClickSlot && G.InputTime - _lastClickTime < 250 && P.Cursor != null)
         {
             C.Click(slot, 0, ClickType.PickupAll, P); _lastClickSlot = -1; return;
         }
-        _lastClickSlot = slot; _lastClickTime = Environment.TickCount64;
+        _lastClickSlot = slot; _lastClickTime = G.InputTime;
         if (P.Cursor != null && !C.Slots[slot].IsOutput)
         {
             _dragging = true; _dragBtn = btn; _drag.Clear(); _drag.Add(slot);
@@ -236,6 +236,7 @@ public class ContainerScreen : Screen
         if (C is FurnaceContainer fc && P.World.GetTileEntity(fc.Furnace.X, fc.Furnace.Y, fc.Furnace.Z) != fc.Furnace) G.SetScreen(null);
         if (C is WorkbenchContainer wb && P.World.GetBlock(wb.Bx, wb.By, wb.Bz) != B.CraftingTable) G.SetScreen(null);
         if (C is ChestContainer ch && ch.Chest is TileEntity te && P.World.GetTileEntity(te.X, te.Y, te.Z) != te) G.SetScreen(null);
+        if (C is RsContainer rc && !rc.StillValid(P)) G.SetScreen(null);
     }
 
     public override void OnClose() { P.CloseContainer(); }

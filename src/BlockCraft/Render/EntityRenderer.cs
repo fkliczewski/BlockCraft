@@ -185,6 +185,7 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
         void Face(Vector3 a, Vector3 bb, Vector3 c, Vector3 dd, float fu, float fv, float fw, float fh)
         {
             var n = Vector3.Cross(bb - a, dd - a);
+            if (bx.Mirror) n = -n; // zamiana x0/x1 odwraca iloczyn (przód/tył/góra/dół) i przenosi boki na drugą stronę
             if (n.LengthSquared > 1e-12f) n.Normalize();
             float s = b.ShadeFor(n);
             float u0 = U(fu), v0 = Vv(fv), u1 = U(fu + fw), v1 = Vv(fv + fh);

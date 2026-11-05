@@ -104,6 +104,7 @@ namespace BlockCraft.World
         }
         public override ItemStack PickStack(int meta) => new(Items.I.SignItem);
         public override void OnAdded(World w, int x, int y, int z) { if (w.GetTileEntity(x, y, z) is not SignTile) w.SetTileEntity(x, y, z, new SignTile()); }
+        public override void OnRemoved(World w, int x, int y, int z, int oldMeta) => w.RemoveTileEntity(x, y, z);
         public override void GetCollisionBoxes(IBlockAccess w, int x, int y, int z, int meta, List<AABB> boxes) { }
         protected abstract bool Supported(World w, int x, int y, int z, int meta);
         public override void OnNeighborChanged(World w, int x, int y, int z, int nid)

@@ -13,10 +13,10 @@ public partial class Game
         Dimensions = new DimensionSet(overworld);
         Dimensions.EntityTransferred += (entity, old, next) =>
         {
-            if (entity is Player) next.ChunkManager ??= new ChunkManager(next) { Radius = Settings.RenderDistance };
+            // zasięg menedżera ustawia co tick UpdateDimensionChunks
+            if (entity is Player) { next.ChunkManager ??= new ChunkManager(next); }
             if (entity != Player) return;
             Player.OpenContainer = null;
-            next.ChunkManager ??= new ChunkManager(next) { Radius = Settings.RenderDistance };
             World = next; Ctrl = new PlayerController(this); Cmds = new Commands(next);
             // renderer odrzuca stare siatki, więc chunki świata, do którego wracamy, trzeba przebudować
             foreach (var c in next.Chunks.Values) c.MarkAllDirty();
@@ -32,13 +32,24 @@ public partial class Game
         if (Dimensions == null) { World.ChunkManager?.Update(ChunkCenters(), 5); return; }
         foreach (var w in Dimensions.Loaded.Values)
         {
-            var centers = w.Players.Where(p => !p.Removed)
+            var centers = w.Players.Where(p => !p.Removed || p == Player && w == World)
                 .Select(p => (Core.MathUtil.FloorToInt(p.X) >> 4, Core.MathUtil.FloorToInt(p.Z) >> 4)).ToArray();
-            if (centers.Length == 0) continue;
-            w.ChunkManager ??= new ChunkManager(w) { Radius = Settings.RenderDistance };
-            w.ChunkManager.Update(centers, 5);
+            if (centers.Length > 0)
+            {
+                w.ChunkManager ??= new ChunkManager(w);
+                w.ChunkManager.Radius = Settings.RenderDistance;
+                w.ChunkManager.Update(centers, 5);
+                continue;
+            }
+            if (w.ChunkManager == null || w.IsRemote || w == World) continue;
+            // Wymiar bez graczy: Overworld trzyma tylko chunki spawnu (MC 1.8: 128 bloków wokół spawnu), pozostałe zwalniają wszystko
+            if (w.Dimension != DimensionId.Overworld) { w.ChunkManager.UnloadAll(); continue; }
+            w.ChunkManager.Radius = Math.Min(SpawnChunkRadius, Settings.RenderDistance);
+            w.ChunkManager.Update(new[] { (w.SpawnX >> 4, w.SpawnZ >> 4) }, 5);
         }
     }
+    /// <summary>Zasięg chunków spawnu Overworldu bez graczy; UnloadFar trzyma Radius+3 = 8 chunków (128 bloków), nie więcej niż przy graczu.</summary>
+    private const int SpawnChunkRadius = 5;
 
     /// <summary>MC 1.8 Minecraft.getAmbientMusicType: muzyka Netheru, Endu (z bossem: EndBoss), w Overworldzie gra albo kreatywny.</summary>
     private void DimensionMusicTick()

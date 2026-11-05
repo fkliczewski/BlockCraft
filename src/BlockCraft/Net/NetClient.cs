@@ -51,8 +51,13 @@ public sealed partial class NetClient
     private byte _windowId; private Container _window;
     private bool _invScreenOpen;
     private int _dim, _gen;
-    private readonly ConcurrentQueue<(long key, int gen, Chunk c)> _decoded = new();
-    private readonly HashSet<long> _decoding = new();
+    private readonly ConcurrentQueue<(long key, int gen, long seq, Chunk c)> _decoded = new();
+    /// <summary>Numer ostatnio odebranego ChunkData; dekodowania kończą się w dowolnej kolejności, więc starsze od zainstalowanego są odrzucane.</summary>
+    private long _chunkSeq;
+    private readonly Dictionary<long, long> _installedSeq = new();
+    /// <summary>UnloadChunk odebrany w trakcie dekodowania; nowszy ChunkData go anuluje.</summary>
+    private readonly HashSet<long> _pendingUnload = new();
+    private readonly Dictionary<long, int> _decoding = new(); // chunk -> liczba dekodowań w toku
     private readonly Dictionary<long, List<Action>> _deferred = new();
     private readonly long[] _serverInv = new long[40];
     public List<(string name, int ping)> Players = new();
@@ -89,9 +94,12 @@ public sealed partial class NetClient
 
     // ================= odbiór =================
 
+    /// <summary>Limit pakietów rozpakowanych z ramek: powyżej nich ramki czekają w kolejce połączenia, której limit zamyka łącze.</summary>
+    private const int MaxPendingPackets = 50000;
+
     private void Pump()
     {
-        while (Conn.TryReceive(out var f))
+        while (_packets.Count < MaxPendingPackets && Conn.TryReceive(out var f))
         {
             int pos = 0;
             while (pos + 5 <= f.Length)
@@ -247,29 +255,42 @@ public sealed partial class NetClient
         int n = 0;
         while (n < 16 && _decoded.TryDequeue(out var d))
         {
-            _decoding.Remove(d.key);
-            if (d.gen != _gen || d.c == null) continue;
-            n++;
-            var w = W;
-            if (w.Chunks.TryRemove(d.key, out var old)) old.Unloaded = true;
-            w.Chunks[d.key] = d.c;
-            w.Light.MergeChunk(d.c);
-            d.c.MarkAllDirty();
+            if (d.gen != _gen) continue; // stary wymiar: _decoding już wyczyszczone, nie ruszać nowych wpisów
+            bool last = true;
+            if (_decoding.TryGetValue(d.key, out var cnt)) { if (cnt > 1) { _decoding[d.key] = cnt - 1; last = false; } else _decoding.Remove(d.key); }
+            if (d.c != null && d.seq > _installedSeq.GetValueOrDefault(d.key)) { InstallChunk(d.key, d.seq, d.c); n++; }
+            if (last) RunDeferred(d.key);
+        }
+    }
+
+    private void InstallChunk(long key, long seq, Chunk c)
+    {
+        _installedSeq[key] = seq;
+        var w = W;
+        if (w.Chunks.TryRemove(key, out var old)) old.Unloaded = true;
+        w.Chunks[key] = c;
+        w.Light.MergeChunk(c);
+        c.MarkAllDirty();
             for (int dx = -1; dx <= 1; dx++)
                 for (int dz = -1; dz <= 1; dz++)
                 {
-                    var nb = w.GetChunk(d.c.Cx + dx, d.c.Cz + dz);
+                    var nb = w.GetChunk(c.Cx + dx, c.Cz + dz);
                     if (nb != null) nb.DirtySections = (1 << Chunk.Sections) - 1;
                 }
-            ChunksReceived++;
-            if (_deferred.Remove(d.key, out var acts)) foreach (var a in acts) a();
-        }
+        ChunksReceived++;
+    }
+
+    /// <summary>Zmiany odłożone czekają na ostatnie dekodowanie chunka (wcześniejsze nadpisałoby je starszymi danymi).</summary>
+    private void RunDeferred(long key)
+    {
+        if (_pendingUnload.Remove(key)) { _deferred.Remove(key); UnloadChunk(key); return; }
+        if (_deferred.Remove(key, out var acts)) foreach (var a in acts) a();
     }
 
     private bool Defer(int x, int z, Action a)
     {
         long k = MathUtil.ChunkKey(x >> 4, z >> 4);
-        if (!_decoding.Contains(k)) return false;
+        if (!_decoding.ContainsKey(k)) return false;
         if (!_deferred.TryGetValue(k, out var l)) _deferred[k] = l = new List<Action>();
         l.Add(a);
         return true;
@@ -287,17 +308,18 @@ public sealed partial class NetClient
             case S2C.ChunkData:
                 {
                     int dim = r.ReadSByte(), cx = r.ReadInt32(), cz = r.ReadInt32();
-                    var data = r.ReadBytes(r.ReadInt32());
+                    var data = Core.BinaryLength.ReadBytes(r);
                     if (dim != _dim) break;
                     long key = MathUtil.ChunkKey(cx, cz);
-                    int gen = _gen;
-                    _decoding.Add(key);
+                    int gen = _gen; long seq = ++_chunkSeq;
+                    _decoding[key] = _decoding.GetValueOrDefault(key) + 1;
+                    _pendingUnload.Remove(key); // nowsze dane po UnloadChunk: chunk zostaje
                     Task.Run(() =>
                     {
                         Chunk c = null;
                         try { c = ChunkCodec.Decode(cx, cz, data); LightEngine.InitChunkLocal(c); }
                         catch (Exception ex) { Log.Error($"Sieć: chunk {cx},{cz}: {ex.Message}"); }
-                        _decoded.Enqueue((key, gen, c));
+                        _decoded.Enqueue((key, gen, seq, c));
                     });
                     break;
                 }
@@ -307,7 +329,7 @@ public sealed partial class NetClient
                     if (dim != _dim) break;
                     long key = MathUtil.ChunkKey(cx, cz);
                     _deferred.Remove(key);
-                    if (_decoding.Contains(key)) _deferred[key] = new List<Action> { () => UnloadChunk(key) };
+                    if (_decoding.ContainsKey(key)) _pendingUnload.Add(key);
                     else UnloadChunk(key);
                     break;
                 }
@@ -325,7 +347,7 @@ public sealed partial class NetClient
             case S2C.TileEntity:
                 {
                     int dim = r.ReadSByte(), x = r.ReadInt32(), y = r.ReadInt32(), z = r.ReadInt32(), t = r.ReadInt32();
-                    var data = r.ReadBytes(r.ReadInt32());
+                    var data = Core.BinaryLength.ReadBytes(r);
                     if (dim != _dim) break;
                     if (!Defer(x, z, () => ApplyTile(x, y, z, t, data))) ApplyTile(x, y, z, t, data);
                     break;
@@ -333,7 +355,7 @@ public sealed partial class NetClient
             case S2C.SpawnEntity:
                 {
                     int id = r.ReadInt32(); string key = r.ReadString(), name = r.ReadString(); int nd = r.ReadInt32();
-                    var data = r.ReadBytes(r.ReadInt32());
+                    var data = Core.BinaryLength.ReadBytes(r);
                     Spawn(id, key, name, nd, data);
                     break;
                 }
@@ -354,7 +376,7 @@ public sealed partial class NetClient
             case S2C.EntityData:
                 {
                     int id = r.ReadInt32(), nd = r.ReadInt32();
-                    var data = r.ReadBytes(r.ReadInt32());
+                    var data = Core.BinaryLength.ReadBytes(r);
                     if (w.EntityById.TryGetValue(id, out var e) && e != p) LoadKeepingPosition(e, data, nd);
                     break;
                 }
@@ -493,7 +515,7 @@ public sealed partial class NetClient
                 }
             case S2C.WorldState:
                 {
-                    string key = r.ReadString(); var d = r.ReadBytes(r.ReadInt32());
+                    string key = r.ReadString(); var d = Core.BinaryLength.ReadBytes(r);
                     if (NetHooks.WorldState.TryGetValue(key, out var h)) { try { h.Read(w, d); } catch (Exception ex) { Log.Error("Sieć: stan " + key + ": " + ex.Message); } }
                     break;
                 }
@@ -505,6 +527,7 @@ public sealed partial class NetClient
 
     private void UnloadChunk(long key)
     {
+        _installedSeq.Remove(key);
         if (!W.Chunks.TryRemove(key, out var c)) return;
         c.Unloaded = true;
         foreach (var e in W.Entities.ToArray())
@@ -634,7 +657,7 @@ public sealed partial class NetClient
     private void ChangeDimension(int dim, int entityId)
     {
         _dim = dim; _gen++;
-        _decoding.Clear(); _deferred.Clear();
+        _decoding.Clear(); _deferred.Clear(); _pendingUnload.Clear(); _installedSeq.Clear();
         ResetSync();
         W.RemoveEntity(P);
         P.Id = entityId;

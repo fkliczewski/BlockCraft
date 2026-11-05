@@ -48,10 +48,12 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     public readonly EntityRenderer Entities;
     private readonly Dictionary<long, ChunkRender> _renders = new();
     private readonly object _jobLock = new();
-    private readonly List<(int cx, int sy, int cz, int ver)> _jobs = new();
+    // cr + ep: wynik trafia tylko do tego samego ChunkRender i tej samej epoki świata (portal / szybki unload-reload)
+    private readonly List<(int cx, int sy, int cz, int ver, ChunkRender cr, int ep)> _jobs = new();
     private readonly HashSet<(int, int, int)> _jobSet = new();
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, SortedSolid solid, byte[] trans, int tb, ulong vis)> _done = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(int cx, int sy, int cz, int ver, ChunkRender cr, SortedSolid solid, byte[] trans, int tb, ulong vis)> _done = new();
     private readonly Thread[] _workers;
+    private volatile int _epoch;
     private volatile bool _running = true;
     private readonly ChunkMesher _mainMesher = new();
     private Vector3d _camPos; private volatile int _camCx, _camCz;
@@ -101,7 +103,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         if (World != w) Sound.StopWorldSounds();
         if (World != null) World.Listeners.Remove(this);
         World = w;
-        lock (_jobLock) { _jobs.Clear(); _jobSet.Clear(); }
+        lock (_jobLock) { _jobs.Clear(); _jobSet.Clear(); _epoch++; }
         while (_done.TryDequeue(out _)) { }
         foreach (var r in _renders.Values) foreach (var s in r.S) s.Trans?.Dispose();
         _renders.Clear();
@@ -266,7 +268,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         var mesher = new ChunkMesher();
         while (_running)
         {
-            (int cx, int sy, int cz, int ver) job = default; bool got = false;
+            (int cx, int sy, int cz, int ver, ChunkRender cr, int ep) job = default; bool got = false;
             lock (_jobLock)
             {
                 if (_jobs.Count > 0)
@@ -285,13 +287,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             }
             if (!got) { Thread.Sleep(3); continue; }
             var w = World;
-            if (w == null) continue;
+            if (w == null || job.ep != _epoch) continue;
             try
             {
                 mesher.Build(w, job.cx, job.sy, job.cz);
                 var s = mesher.Solid.Count > 0 ? FacingSort.Sort(mesher.Solid.Data, mesher.Solid.Count) : null;
                 var t = mesher.Translucent.Count > 0 ? mesher.Translucent.Data[..mesher.Translucent.Bytes] : null;
-                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, s, t, t?.Length ?? 0, mesher.Vis));
+                _done.Enqueue((job.cx, job.sy, job.cz, job.ver, job.cr, s, t, t?.Length ?? 0, mesher.Vis));
             }
             catch (Exception ex) { Log.Error("Mesher: " + ex.Message); }
         }
@@ -416,8 +418,8 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 else
                     lock (_jobLock)
                     {
-                        if (_jobSet.Add((c.Cx, sy, c.Cz))) _jobs.Add((c.Cx, sy, c.Cz, sm.Version));
-                        else { for (int i = 0; i < _jobs.Count; i++) if (_jobs[i].cx == c.Cx && _jobs[i].sy == sy && _jobs[i].cz == c.Cz) { _jobs[i] = (c.Cx, sy, c.Cz, sm.Version); break; } }
+                        if (_jobSet.Add((c.Cx, sy, c.Cz))) _jobs.Add((c.Cx, sy, c.Cz, sm.Version, cr, _epoch));
+                        else { for (int i = 0; i < _jobs.Count; i++) if (_jobs[i].cx == c.Cx && _jobs[i].sy == sy && _jobs[i].cz == c.Cz) { _jobs[i] = (c.Cx, sy, c.Cz, sm.Version, cr, _epoch); break; } }
                     }
             }
         }
@@ -434,7 +436,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         var sw = Stopwatch.StartNew();
         while (sw.Elapsed.TotalMilliseconds < 4 && _done.TryDequeue(out var d))
         {
-            if (!_renders.TryGetValue(MathUtil.ChunkKey(d.cx, d.cz), out var cr)) continue;
+            if (!_renders.TryGetValue(MathUtil.ChunkKey(d.cx, d.cz), out var cr) || cr != d.cr) continue;
             var sm = cr.S[d.sy];
             if (d.ver < sm.BuiltVersion) continue;
             Upload(cr, d.cx, d.sy, d.cz, sm, d.solid, d.trans, d.tb);
@@ -1018,7 +1020,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
     public void AddParticle(Vector3 pos, Vector3 vel, int layer, float size, int life, float gravity, Vector4 color, bool collide = true, bool emissive = false, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, bool grow = false)
     {
-        if (Particles.Count > 4000) return;
+        if (Particles.Count > MaxParticles) return;
         Particles.Add(new Particle { Pos = pos, Prev = pos, Vel = vel, Layer = layer, Size = size, Life = life, Gravity = gravity, Color = color, Collide = collide, Emissive = emissive, U0 = u0, V0 = v0, U1 = u1, V1 = v1, Grow = grow });
     }
 
@@ -1055,19 +1057,24 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     private static int ExplosionLayer(int i) { _explosionLayers ??= Enumerable.Range(0, 4).Select(n => TextureGen.Layer("particle_explosion_" + n)).ToArray(); return _explosionLayers[i]; }
     /// <summary>Jak RenderGlobal.spawnEntityFX w MC 1.8: zwykłe cząsteczki dalej niż 16 bloków od kamery nie powstają
     /// (wybuchy mają ignoreRange). Pełna pula cząsteczek też kończy wywołanie od razu.</summary>
+    private const int MaxParticles = 4000;
     private bool SkipParticle(ParticleKind kind, double x, double y, double z)
     {
-        if (Particles.Count >= 4000) return true;
+        if (Particles.Count >= MaxParticles) return true;
         if (kind == ParticleKind.Explosion) return false;
         if (kind == ParticleKind.BlockBreak) { double bx = x - _camPos.X, by = y - _camPos.Y, bz = z - _camPos.Z; return bx * bx + by * by + bz * bz > 4096.0; }
         double dx = x - _camPos.X, dy = y - _camPos.Y, dz = z - _camPos.Z;
         return dx * dx + dy * dy + dz * dz > 256.0;
     }
 
+    /// <summary>Liczba z pakietu hosta: int.MaxValue nie może zawiesić pętli tworzenia cząsteczek.</summary>
+    internal static int LimitParticleCount(int count) => Math.Clamp(count, 0, MaxParticles);
+
     public void SpawnParticles(ParticleKind kind, double x, double y, double z, int count, int data)
     {
         if (SkipParticle(kind, x, y, z)) return;
-        var p = new Vector3((float)x, (float)y, (float)z);
+        count = LimitParticleCount(count);
+        var p =new Vector3((float)x, (float)y, (float)z);
         var r = _pr;
         Vector3 Rnd(float s) => new((r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s, (r.NextFloat() - 0.5f) * s);
         switch (kind)
@@ -1150,6 +1157,6 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         _skyQuad.Dispose(); _sunMesh.Dispose(); _starMesh.Dispose(); _lineMesh.Dispose(); _cloudMesh?.Dispose();
         foreach (var reg in _regions.Values) reg.Dispose(); _regions.Clear();
         Entities.Dispose(); Terrain.Dispose(); _sunTex.Dispose(); _moonTex.Dispose();
-        _weatherTextures?.Dispose();
+        _weatherTextures?.Dispose(); _tnt?.Dispose();
     }
 }

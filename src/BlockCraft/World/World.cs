@@ -401,19 +401,21 @@ public sealed partial class World : IBlockAccess
 
     private void ProcessScheduledTicks()
     {
+        LoadSavedTicksOnce();
         _ticksNow.Clear(); _ticksNowSet.Clear();
         while (_ticksNow.Count < 2000 && _ticks.TryPeek(out var t, out var due) && due.due <= TotalTime)
         {
             _ticks.Dequeue();
             var key = (t.x, t.y, t.z, TickKey(t.id));
             _tickSet.Remove(key);
+            if (!IsLoadedAt(t.x, t.z)) { ParkTick(t, due.prio); continue; }
             _ticksNow.Add(t); _ticksNowSet.Add(key);
         }
         for (int i = 0; i < _ticksNow.Count; i++)
         {
             var t = _ticksNow[i];
             _ticksNowSet.Remove((t.x, t.y, t.z, TickKey(t.id)));
-            if (!IsLoadedAt(t.x, t.z)) continue;
+            if (!IsLoadedAt(t.x, t.z)) { ParkTick(t, 0); continue; }
             byte cur = GetBlock(t.x, t.y, t.z);
             if (cur == 0 || TickKey(cur) != TickKey(t.id)) continue;
             Block.ById[cur].OnScheduledTick(this, t.x, t.y, t.z, Rand);
@@ -421,11 +423,54 @@ public sealed partial class World : IBlockAccess
         _ticksNow.Clear(); _ticksNowSet.Clear();
     }
 
-    public List<(int x, int y, int z, byte id, long due)> PendingTicksSnapshot()
+    // Ticki dla niezaładowanych chunków: odkładane do ponownego załadowania (na dysk trafiają przez SaveScheduledTicks).
+    private readonly Dictionary<long, List<(int x, int y, int z, byte id, int prio)>> _parkedTicks = new();
+    private int _parkedCount;
+    private const int MaxParkedTicks = 100000;
+    private void ParkTick((int x, int y, int z, byte id) t, int prio)
     {
-        var l = new List<(int, int, int, byte, long)>();
-        foreach (var (e, p) in _ticks.UnorderedItems) l.Add((e.x, e.y, e.z, e.id, p.due - TotalTime));
+        if (_parkedCount >= MaxParkedTicks) return;
+        long k = MathUtil.ChunkKey(t.x >> 4, t.z >> 4);
+        if (!_parkedTicks.TryGetValue(k, out var l)) _parkedTicks[k] = l = new();
+        l.Add((t.x, t.y, t.z, t.id, prio)); _parkedCount++;
+    }
+    /// <summary>Przywrócenie odłożonych ticków po załadowaniu chunka (ChunkManager.Integrate).</summary>
+    public void RestoreParkedTicks(int cx, int cz)
+    {
+        if (!_parkedTicks.Remove(MathUtil.ChunkKey(cx, cz), out var l)) return;
+        _parkedCount -= l.Count;
+        foreach (var t in l) ScheduleTickPriority(t.x, t.y, t.z, t.id, 1, t.prio);
+    }
+
+    /// <summary>Zaplanowane ticki (także odłożone dla niezaładowanych chunków) z opóźnieniem względem teraz - do zapisu na dysk.</summary>
+    public List<ScheduledTickRecord> PendingTicksSnapshot()
+    {
+        var l = new List<ScheduledTickRecord>(_ticks.Count + _parkedCount);
+        foreach (var (e, p) in _ticks.UnorderedItems) l.Add(new(e.x, e.y, e.z, e.id, (int)Math.Clamp(p.due - TotalTime, 1, int.MaxValue), p.prio));
+        foreach (var parked in _parkedTicks.Values)
+            foreach (var t in parked) l.Add(new(t.x, t.y, t.z, t.id, 1, t.prio));
         return l;
+    }
+
+    private bool _savedTicksLoaded;
+    /// <summary>Ticki zapisane przy poprzednim wyjściu z gry; dla niezaładowanych chunków odkładane do ich wczytania.</summary>
+    private void LoadSavedTicksOnce()
+    {
+        if (_savedTicksLoaded || Storage == null) return;
+        _savedTicksLoaded = true;
+        foreach (var t in Storage.LoadScheduledTicks())
+        {
+            if (IsLoadedAt(t.X, t.Z)) ScheduleTickPriority(t.X, t.Y, t.Z, t.Id, t.Delay, t.Priority);
+            else ParkTick((t.X, t.Y, t.Z, t.Id), t.Priority);
+        }
+    }
+
+    /// <summary>Zapis zaplanowanych ticków (DimensionSet.SaveAll), by przetrwały wyjście z gry.</summary>
+    public void SaveScheduledTicks()
+    {
+        if (Storage == null || IsRemote) return;
+        LoadSavedTicksOnce(); // nie nadpisuj zapisanych ticków, zanim zostały wczytane
+        Storage.SaveScheduledTicks(PendingTicksSnapshot());
     }
 
     // ---------- czas ----------
@@ -468,6 +513,8 @@ public sealed partial class World : IBlockAccess
         _toAdd.Add(e);
     }
     public int NextEntityId() => _nextEntityId++;
+    /// <summary>Encje dodane w tym ticku, których GetEntitiesInBox jeszcze nie widzi (czekają na FlushAdds).</summary>
+    public IReadOnlyList<Entity> PendingEntities => _toAdd;
 
     internal void FlushAdds()
     {

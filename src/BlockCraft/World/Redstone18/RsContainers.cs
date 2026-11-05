@@ -701,6 +701,15 @@ namespace BlockCraft.World
         }
         protected override bool TransferFromPlayer(ItemStack s) => MergeStack(s, 0, Inv.Size, false);
         public override void OnClose(Player p) { base.OnClose(p); _onClose?.Invoke(); }
+        /// <summary>MC isUseableByPlayer: tile entity wciąż w świecie (wagonik nieusunięty) i gracz w zasięgu 8 bloków.
+        /// Inne inwentarze (skrzynia Endu, kopia po stronie klienta) zawsze ważne.</summary>
+        public bool StillValid(Player p)
+        {
+            if (Inv is TileEntity te)
+                return p.World.GetTileEntity(te.X, te.Y, te.Z) == te && p.DistanceSq(te.X + 0.5, te.Y + 0.5, te.Z + 0.5) <= 64;
+            if (Inv is Entity e) return !e.Removed && !e.Dead && e.World == p.World && p.DistanceSq(e.X, e.Y, e.Z) <= 64;
+            return true;
+        }
     }
 
     /// <summary>Otwieranie GUI kontenerów RS (bez własnego GuiKind w fundamencie).</summary>

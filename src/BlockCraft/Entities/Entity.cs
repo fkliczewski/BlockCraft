@@ -13,7 +13,7 @@ public sealed class DamageSource
     public bool IsExplosion;
     public bool IsFire;
     /// <summary>DamageSource.isProjectile z 1.8 (strzały, kule ognia, rzucane przedmioty).</summary>
-    public bool IsProjectile => Type is "arrow" or "fireball" or "thrown";
+    public bool IsProjectile => Type is "arrow" or "fireball" or "fireball_reflected" or "thrown";
     public DamageSource(string type, Entity src = null, Entity attacker = null) { Type = type; Source = src; Attacker = attacker ?? src; }
 
     public static readonly DamageSource Fall = new("fall") { BypassArmor = true };
@@ -46,6 +46,7 @@ public sealed class DamageSource
             "outOfWorld" => victim + " wypadł poza świat",
             "explosion" => a != null ? victim + " został wysadzony przez " + a : victim + " wyleciał w powietrze",
             "arrow" => victim + " został zastrzelony przez " + (a ?? "?"),
+            "fireball" or "fireball_reflected" => victim + " został trafiony kulą ognia przez " + (a ?? "?"),
             "mob" or "player" => victim + " został zabity przez " + (a ?? "?"),
             _ => victim + " zginął"
         };
@@ -483,18 +484,20 @@ public static class EntitySerializer
         return ms.ToArray();
     }
 
+    /// <summary>Najkrótszy rekord encji: pusty klucz (1 bajt) i długość danych (4 bajty).</summary>
+    private const int MinEntityRecordSize = 5;
+
     public static void LoadEntities(World.World w, byte[] data)
     {
         try
         {
             using var br = new BinaryReader(new MemoryStream(data));
-            int n = br.ReadInt32();
+            int n = Core.BinaryLength.Read(br, MinEntityRecordSize);
             var loaded = new Entity[n];
             for (int i = 0; i < n; i++)
             {
                 string key = br.ReadString();
-                int len = br.ReadInt32();
-                var bytes = br.ReadBytes(len);
+                var bytes = Core.BinaryLength.ReadBytes(br);
                 var e = Create(key, w);
                 if (e == null) continue;
                 try { e.Load(new BinaryReader(new MemoryStream(bytes))); loaded[i] = e; w.SpawnEntity(e); }

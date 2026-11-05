@@ -315,15 +315,20 @@ public sealed class EnderDragon : Mob
     }
     private void GeneratePortal(int x, int z) => GeneratePortal(World, x, 64, z);
 
+    /// <summary>Śmierć zaliczona do statystyk, osiągnięć i scoreboardu (dokładnie raz, niezależnie od animacji).</summary>
+    private bool _deathRecorded;
+
     public override void OnDeath(DamageSource src)
     {
-        if (Dead) return;
+        if (Dead || _deathRecorded) return; // już umiera (np. drugi /kill przed następnym tickiem animacji)
         // bez Dead: świat usuwa martwe encje od razu, a smok ma 200 ticków animacji śmierci
         Health = 0;
+        _deathRecorded = true;
+        RecordDeath(src);
     }
 
     public override void Save(BinaryWriter bw) { base.Save(bw); bw.Write(DeathTicks); bw.Write(NoAI); }
-    public override void Load(BinaryReader br) { base.Load(br); DeathTicks = br.ReadInt32(); NoAI = br.ReadBoolean(); if (DeathTicks > 0) Health = 0; }
+    public override void Load(BinaryReader br) { base.Load(br); DeathTicks = br.ReadInt32(); NoAI = br.ReadBoolean(); if (DeathTicks > 0) { Health = 0; _deathRecorded = true; } }
 }
 
 /// <summary>Część ciała smoka (EntityDragonPart): sama nie myśli, obrażenia przekazuje smokowi. Nie jest zapisywana.</summary>

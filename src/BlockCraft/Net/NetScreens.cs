@@ -178,7 +178,9 @@ public sealed class ConnectingScreen : Screen
     private void Cancel()
     {
         _cts.Cancel();
-        _client?.Disconnect("Anulowano");
+        if (_client != null) _client.Disconnect("Anulowano");
+        // łączenie jeszcze trwa: klient, który mimo anulowania powstanie, trzeba zamknąć
+        else _task?.ContinueWith(t => { if (t.Status == TaskStatus.RanToCompletion) t.Result.Disconnect("Anulowano"); }, TaskScheduler.Default);
         G.SetScreen(_parent);
     }
 

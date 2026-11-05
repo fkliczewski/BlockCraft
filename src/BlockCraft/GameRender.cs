@@ -17,6 +17,7 @@ public sealed partial class Game
     private void RenderFrame(float pt)
     {
         int fw = FramebufferSize.X, fh = FramebufferSize.Y;
+        if (fw <= 0 || fh <= 0) return; // zminimalizowane okno
         GL.Viewport(0, 0, fw, fh);
         GL.ClearColor(0, 0, 0, 1);
         GL.DepthMask(true);
@@ -35,7 +36,9 @@ public sealed partial class Game
                 GL.BindFramebuffer(FramebufferTarget.Framebuffer, _scaleFb.Fbo);
                 GL.Viewport(0, 0, sw, sh);
                 GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-                RenderGameWorld(pt, sw, sh);
+                // wyjątek w renderze świata nie może zostawić podpiętego bufora pośredniego (GUI rysowałoby się do niego)
+                try { RenderGameWorld(pt, sw, sh); }
+                catch { GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0); GL.Viewport(0, 0, fw, fh); throw; }
                 GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _scaleFb.Fbo);
                 GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
                 GL.BlitFramebuffer(0, 0, sw, sh, 0, 0, fw, fh, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Linear);

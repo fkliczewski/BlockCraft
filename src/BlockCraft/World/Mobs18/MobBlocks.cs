@@ -17,6 +17,7 @@ public sealed class MobSpawnerBlock : Block
 {
     public MobSpawnerBlock():base(B.MobSpawner,"mob_spawner","Spawner") { HasTileEntity=true; DropOverride=0; }
     public override void OnAdded(World w,int x,int y,int z) => w.SetTileEntity(x,y,z,new MobSpawnerTile());
+    public override void OnRemoved(World w,int x,int y,int z,int oldMeta) => w.RemoveTileEntity(x,y,z);
     public override void OnDestroyedByPlayer(World w,int x,int y,int z,int meta,Player p)
     { if(CanHarvest(p.Inventory.Selected)) w.SpawnXp(x+.5,y+.5,z+.5,15+w.Rand.Next(15)+w.Rand.Next(15)); }
 }
@@ -54,6 +55,7 @@ public sealed class MobSpawnerTile : TileEntity
     }
     public override void Tick(World w)
     {
+        if(w.GetBlock(X,Y,Z)!=B.MobSpawner) return; // blok zniszczony - nie spawnuj
         if(!w.Players.Any(p=>!p.Spectator && !p.Dead && p.DistanceSq(X+.5,Y+.5,Z+.5)<PlayerRange*PlayerRange)) return;
         PrevRotation=Rotation; Rotation=(Rotation+1000f/(Delay+200))%360;
         if(w.IsRemote) return;

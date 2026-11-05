@@ -39,7 +39,7 @@ public sealed partial class World
         for (int cx = (x-radius)>>4; cx <= (x+radius)>>4; cx++) for (int cz = (z-radius)>>4; cz <= (z+radius)>>4; cz++)
         {
             if (GetChunk(cx,cz) != null) continue;
-            var c = Storage?.LoadChunk(cx,cz) ?? GenerateChunk(cx,cz);
+            var c = ChunkManager?.TakeSavingChunk(cx,cz) ?? Storage?.LoadChunk(cx,cz) ?? GenerateChunk(cx,cz);
             LightEngine.InitChunkLocal(c,Provider.HasNoSky);
             Chunks[MathUtil.ChunkKey(cx,cz)] = c; added.Add(c);
         }
@@ -48,6 +48,7 @@ public sealed partial class World
             Light.MergeChunk(c); c.MarkAllDirty();
             if (c.PendingEntityData != null) { EntitySerializer.LoadEntities(this,c.PendingEntityData); c.PendingEntityData = null; }
             ApplyGeneratedEntities(c);
+            RestoreParkedTicks(c.Cx,c.Cz);
         }
     }
 }
@@ -137,6 +138,15 @@ public sealed class DimensionSet : IDisposable
         FlushTransfers();
         return true;
     }
-    public void SaveAll() { foreach (var w in _worlds.Values) w.ChunkManager?.SaveAll(); }
+    /// <summary>Zapis wymiarów: chunki i, osobno, zaplanowane ticki (także wymiaru bez ChunkManagera).</summary>
+    public void SaveAll()
+    {
+        foreach (var w in _worlds.Values)
+        {
+            w.ChunkManager?.SaveAll();
+            try { w.SaveScheduledTicks(); }
+            catch (Exception ex) { Log.Error("Zapis ticków " + w.Dimension + ": " + ex.Message); }
+        }
+    }
     public void Dispose() { foreach (var w in _worlds.Values) w.ChunkManager?.Dispose(); }
 }

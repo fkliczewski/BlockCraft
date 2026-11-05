@@ -1,3 +1,4 @@
+using BlockCraft.Core;
 using BlockCraft.Items;
 
 namespace BlockCraft.World;
@@ -24,7 +25,7 @@ public sealed class OwStructureWriter
     {
         var p = Point(x, y, z); int meta = state.Meta;
         // Schody fundamentu używają kolejności S,W,N,E, MC przechowuje E,W,S,N.
-        if (state.Id is B.OakStairs or B.CobbleStairs or B.SandstoneStairs or B.StoneBrickStairs)
+        if (Block.Get(state.Id) is StairsBlock)
             meta = (meta & ~3) | ((meta & 3) switch { 0 => 3, 1 => 1, 2 => 0, _ => 2 });
         Region.Set(p.x, p.y, p.z, state.Id, meta);
     }
@@ -74,10 +75,18 @@ public sealed class OwStructureWriter
                 5 => meta switch { 2 => 5, 3 => 4, 4 => 2, 5 => 3, _ => meta },
                 _ => meta
             };
+        if (block == B.StoneButton) return Direction switch
+        {
+            3 => meta switch { 3 => 4, 4 => 3, _ => meta },
+            4 => meta switch { 3 => 1, 4 => 2, 2 => 3, 1 => 4, _ => meta },
+            5 => meta switch { 3 => 2, 4 => 1, 2 => 3, 1 => 4, _ => meta },
+            _ => meta
+        };
         if (block is B.OakDoor or B.IronDoor) return Direction switch { 3 => meta switch { 0 => 2, 2 => 0, _ => meta }, 4 => (meta + 1) & 3, 5 => (meta + 3) & 3, _ => meta };
         return meta;
     }
-    public int LeverMeta(int facing) => Meta(B.Lever, facing) switch { 2 => 4, 3 => 3, 4 => 2, 5 => 1, _ => 0 };
+    // Dźwignia silnika: kierunek do nośnika (przeciwny do facing z MC), bit 3 = włączona.
+    public int LeverMeta(int facing) { int f = Meta(B.Lever, facing); return f is >= 2 and <= 5 ? Dir.Opp[f] : 0; }
     public void Chest(int x, int y, int z, OwLoot.Entry[] table, int rolls)
     { var p = Point(x, y, z); OwLoot.Chest(Region, Random, p.x, p.y, p.z, table, rolls); }
     public void Dispenser(int x, int y, int z, int facing)

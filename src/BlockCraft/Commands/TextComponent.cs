@@ -136,7 +136,7 @@ public static class TextComponent
                 int j = i + 1; while (j < fmt.Length && char.IsDigit(fmt[j])) j++;
                 if (j > i + 1 && j + 2 < fmt.Length + 1 && fmt.Length > j + 1 && fmt[j] == '$' && fmt[j + 1] == 's')
                 {
-                    int idx = int.Parse(fmt[(i + 1)..j]) - 1;
+                    int idx = int.TryParse(fmt[(i + 1)..j], NumberStyles.None, CultureInfo.InvariantCulture, out int n) ? n - 1 : -1;
                     sb.Append(idx >= 0 && idx < args.Length ? args[idx] : ""); i = j + 1; continue;
                 }
             }
@@ -151,11 +151,15 @@ public static class Json
 {
     public static void SkipWs(string s, ref int i) { while (i < s.Length && char.IsWhiteSpace(s[i])) i++; }
 
-    public static object Parse(string s, ref int i)
+    /// <summary>Maksymalne zagnieżdżenie {}/[] - głębsze kończy się błędem zamiast przepełnienia stosu.</summary>
+    public const int MaxDepth = 512;
+
+    public static object Parse(string s, ref int i, int depth = 0)
     {
         SkipWs(s, ref i);
         if (i >= s.Length) throw new FormatException("nieoczekiwany koniec");
         char c = s[i];
+        if (c is '{' or '[' && depth >= MaxDepth) throw new FormatException("zbyt głębokie zagnieżdżenie");
         if (c == '{')
         {
             var o = new Dictionary<string, object>(); i++;
@@ -166,7 +170,7 @@ public static class Json
                 SkipWs(s, ref i);
                 if (i >= s.Length || (s[i] != ':' && s[i] != '=')) throw new FormatException("brak ':' po kluczu " + key);
                 i++;
-                o[key] = Parse(s, ref i);
+                o[key] = Parse(s, ref i, depth + 1);
                 SkipWs(s, ref i);
                 if (i < s.Length && (s[i] == ',' || s[i] == ';')) { i++; SkipWs(s, ref i); }
                 else if (i < s.Length && s[i] != '}') throw new FormatException("oczekiwano ',' albo '}'");
@@ -181,7 +185,7 @@ public static class Json
             SkipWs(s, ref i);
             while (i < s.Length && s[i] != ']')
             {
-                l.Add(Parse(s, ref i));
+                l.Add(Parse(s, ref i, depth + 1));
                 SkipWs(s, ref i);
                 if (i < s.Length && (s[i] == ',' || s[i] == ';')) { i++; SkipWs(s, ref i); }
                 else if (i < s.Length && s[i] != ']') throw new FormatException("oczekiwano ',' albo ']'");
@@ -196,7 +200,7 @@ public static class Json
         if (bare == "true") return true;
         if (bare == "false") return false;
         if (bare == "null") return null;
-        if (double.TryParse(bare, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return d;
+        if (double.TryParse(bare, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return double.IsFinite(d) ? d : throw new FormatException("liczba poza zakresem " + bare);
         return bare;
     }
 
@@ -219,7 +223,9 @@ public static class Json
                 {
                     case 'n': sb.Append('\n'); break;
                     case 't': sb.Append('\t'); break;
-                    case 'u' when i + 4 < s.Length: sb.Append((char)Convert.ToInt32(s.Substring(i + 1, 4), 16)); i += 4; break;
+                    case 'u':
+                        if (i + 4 >= s.Length || !ushort.TryParse(s.AsSpan(i + 1, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ushort u)) throw new FormatException("nieprawidłowa sekwencja \\u");
+                        sb.Append((char)u); i += 4; break;
                     default: sb.Append(s[i]); break;
                 }
                 i++; continue;

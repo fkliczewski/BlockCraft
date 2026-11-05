@@ -124,7 +124,7 @@ public sealed partial class RemoteClient : IPlayerHandler
         if (i.HitKind == 1 && (i.LeftDown || i.LeftPressed || i.RightPressed || i.RightDown))
         {
             QueueBlockState(i.HitX, i.HitY, i.HitZ);
-            if (i.RightPressed || i.RightDown) QueueBlockState(i.HitX + Dir.X[i.HitFace], i.HitY + Dir.Y[i.HitFace], i.HitZ + Dir.Z[i.HitFace]);
+            if ((i.RightPressed || i.RightDown) && i.HitFace is >= 0 and < 6) QueueBlockState(i.HitX + Dir.X[i.HitFace], i.HitY + Dir.Y[i.HitFace], i.HitZ + Dir.Z[i.HitFace]);
         }
     }
 
@@ -579,7 +579,7 @@ public sealed partial class RemoteClient : IPlayerHandler
         if (current is BeaconContainer bc && !bc.StillValid(P)
             || current is HorseContainer hc && !hc.StillValid(P)
             || current is MerchantContainer mc && !mc.StillValid(P)
-            || current is RsContainer rc && rc.Inv is Entity e && (e.Removed || e.Dead || e.World != W || e.DistanceSq(P) > 64))
+            || current is RsContainer rc && !rc.StillValid(P))
             P.CloseContainer();
         if (P.OpenContainer != _window)
         {
