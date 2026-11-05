@@ -30,10 +30,10 @@ public sealed partial class Game : INetClientHost
         EnsureServer();
         if (HostLink != null) return;
         HostStarting = true;
-        HostStatus = "Łączenie z przekaźnikiem " + RelayOptions.Default.Host + "...";
+        HostStatus = "Łączenie z przekaźnikiem (" + Relay.Current.Describe() + ")...";
         try
         {
-            var link = await LinkHostService.StartAsync(LinkSetup.Options("host"));
+            var link = await LinkHostService.StartAsync(LinkSetup.Options("host", RelayGateway.For(Relay.Current)));
             HostStatus = "Tworzenie kodu zaproszenia...";
             await link.InviteAsync();
             if (World == null || Server == null) { await link.DisposeAsync(); return; }
@@ -45,7 +45,7 @@ public sealed partial class Game : INetClientHost
         catch (Exception ex)
         {
             Log.Error("Sieć: start hosta: " + ex);
-            HostStatus = "Nie udało się otworzyć świata w sieci: " + NetErrors.Describe(ex);
+            HostStatus = "Nie udało się otworzyć świata w sieci: " + NetErrors.Describe(ex, Relay.Current);
         }
         finally { HostStarting = false; }
     }
@@ -68,7 +68,7 @@ public sealed partial class Game : INetClientHost
     {
         if (HostLink == null) return;
         try { await HostLink.InviteAsync(); AddChat("§eNowy kod zaproszenia: §f" + HostLink.Code); }
-        catch (Exception ex) { HostStatus = "Nie udało się utworzyć kodu: " + NetErrors.Describe(ex); }
+        catch (Exception ex) { HostStatus = "Nie udało się utworzyć kodu: " + NetErrors.Describe(ex, Relay.Current); }
     }
 
     public void StopNetwork(string reason = "Host zamknął świat")
@@ -268,17 +268,19 @@ public sealed partial class Game : INetClientHost
 /// <summary>Opisy błędów sieci po polsku.</summary>
 public static class NetErrors
 {
-    public static string Describe(Exception ex)
+    public const string TimeoutHint = "host wyłączony, zły kod, brak internetu albo host używa innego przekaźnika - sprawdź \"Przekaźnik\"";
+    public const string OtherRelay = "host używa innego przekaźnika niż publiczne Tailscale - ustaw w \"Przekaźnik\" ten sam przekaźnik co host";
+    public static string Describe(Exception ex, RelayOptions relay)
     {
         var e = ex is AggregateException ae && ae.InnerException != null ? ae.InnerException : ex;
         string m = e.Message ?? "";
         string t = e.GetType().Name;
-        if (e is OperationCanceledException || e is TimeoutException || t.Contains("Timeout")) return "przekroczono czas oczekiwania (host wyłączony albo brak internetu)";
+        if (e is OperationCanceledException || e is TimeoutException || t.Contains("Timeout")) return "przekroczono czas oczekiwania (" + TimeoutHint + ")";
         if (t.Contains("Invitation") || m.Contains("invitation", StringComparison.OrdinalIgnoreCase) || m.Contains("code", StringComparison.OrdinalIgnoreCase))
             return "nieprawidłowy albo wygasły kod zaproszenia";
         if (m.Contains("refused", StringComparison.OrdinalIgnoreCase)) return "host odrzucił połączenie (kod wygasł albo brak miejsc)";
         if (e is System.Net.Sockets.SocketException || e is HttpRequestException || m.Contains("DNS", StringComparison.OrdinalIgnoreCase))
-            return "brak połączenia z przekaźnikiem " + RelayOptions.Default.Host + " (" + m + ")";
+            return "brak połączenia z przekaźnikiem (" + relay.Describe() + "): " + m;
         if (m.Contains("No stored", StringComparison.OrdinalIgnoreCase) || m.Contains("not paired", StringComparison.OrdinalIgnoreCase) || m.Contains("pair", StringComparison.OrdinalIgnoreCase))
             return "brak zapamiętanego hosta - dołącz kodem";
         return m.Length > 0 ? m : t;

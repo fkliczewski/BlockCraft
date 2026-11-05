@@ -27,6 +27,8 @@ public sealed class Settings
     public string GpuProfileFor { get; set; } = "";
     /// <summary>Głośności kategorii dźwięku (master, music, record, weather, block, hostile, neutral, player, ambient), 0..1.</summary>
     public Dictionary<string, float> SoundVolumes { get; set; } = new();
+    /// <summary>Własny przekaźnik sieci (np. gry.fimson.pl); puste = publiczne przekaźniki Tailscale.</summary>
+    public string Relay { get; set; } = "";
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

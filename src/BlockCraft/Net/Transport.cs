@@ -305,10 +305,10 @@ public static class LinkSetup
         return dir;
     }
 
-    public static LinkOptions Options(string role, INodeGatewayFactory gateway = null, ILinkStore store = null) => new()
+    public static LinkOptions Options(string role, INodeGatewayFactory gateway, ILinkStore store = null) => new()
     {
         MaxPeers = role == "host" ? LinkHostService.MaxPeers : 1,
-        Gateway = gateway ?? RelayGateway.For(RelayOptions.Default),
+        Gateway = gateway,
         Store = store ?? new FileLinkStore(StoreDir(role)),
         LoggerFactory = new LogBridge(),
     };
