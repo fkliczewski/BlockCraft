@@ -44,7 +44,7 @@ public static partial class SelfTest
         Console.WriteLine("=== BlockCraft self-test ===");
         if (args.Contains("--mob-survey")) { MobSpeedSurveyReport(args.SkipWhile(a => a != "--mob-survey").Skip(1).FirstOrDefault()); return 0; }
         if (args.Contains("--audio-only")) { TestAudioMix(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); return _fail == 0 ? 0 : 2; }
-        if (args.Contains("--packs-only")) { TestResourcePacks(); TestContentSources(); TestPackAssets(); TestPackSkins(); TestPackSounds(); TestPackLang(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); foreach (var f in Failures) Console.WriteLine(" - " + f); return _fail == 0 ? 0 : 2; }
+        if (args.Contains("--packs-only")) { TestResourcePacks(); TestPackHd(); TestContentSources(); TestPackAssets(); TestPackSkins(); TestPackSounds(); TestPackLang(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); foreach (var f in Failures) Console.WriteLine(" - " + f); return _fail == 0 ? 0 : 2; }
         if (args.Contains("--cmd-only"))
         {
             try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
@@ -94,6 +94,7 @@ public static partial class SelfTest
         try { TestContentSources(); } catch (Exception e) { Check(false, "Źródła paczek", e.ToString()); }
         try { TestPackAssets(); } catch (Exception e) { Check(false, "Paczki: GUI i kolory", e.ToString()); }
         try { TestPackSkins(); } catch (Exception e) { Check(false, "Paczki: encje", e.ToString()); }
+        try { TestPackHd(); } catch (Exception e) { Check(false, "Paczki: HD", e.ToString()); }
         try { TestPackSounds(); } catch (Exception e) { Check(false, "Paczki: dźwięki", e.ToString()); }
         try { TestPackLang(); } catch (Exception e) { Check(false, "Paczki: język", e.ToString()); }
         try { TestLargeChest(); } catch (Exception e) { Check(false, "Duża skrzynia", e.ToString()); }
