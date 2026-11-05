@@ -13,7 +13,9 @@ public sealed class ResourcePack : IDisposable
     public readonly string Id;
     public readonly string Path;
     public readonly bool Builtin;
-    public string Name => Builtin ? "Minecraft 1.8 (oryginalne)" : _zip ? System.IO.Path.GetFileNameWithoutExtension(Id) : Id;
+    public string Name => Builtin ? "Minecraft 1.8 (oryginalne)" : _zip ? System.IO.Path.GetFileNameWithoutExtension(Path) : System.IO.Path.GetFileName(Path);
+    /// <summary>Nazwa źródła (folder albo repozytorium z ustawień), null = resourcepacks/ albo wbudowana.</summary>
+    public readonly string Source;
     public string Description { get; private set; } = "";
     public int Format { get; private set; } = -1;
     public uint[] Icon { get; private set; }
@@ -29,9 +31,9 @@ public sealed class ResourcePack : IDisposable
     /// <summary>Zip z paczką w podfolderze (częsty błąd przy pakowaniu): prefiks ścieżek wewnątrz archiwum.</summary>
     private string _prefix = "";
 
-    public ResourcePack(string id, string path, bool builtin = false)
+    public ResourcePack(string id, string path, bool builtin = false, string source = null)
     {
-        Id = id; Path = path; Builtin = builtin;
+        Id = id; Path = path; Builtin = builtin; Source = source;
         _zip = File.Exists(path);
         try { ReadInfo(); }
         catch (Exception ex) { Error = "uszkodzona paczka (" + ex.Message + ")"; Close(); }
@@ -157,29 +159,44 @@ public static class ResourcePacks
     private static List<ResourcePack> _active = new();
     public static IReadOnlyList<ResourcePack> Active => _active;
 
-    /// <summary>Dostępne paczki: wbudowana (gdy klient 1.8 jest pobrany), pliki .zip i foldery z pack.mcmeta.</summary>
+    /// <summary>Dostępne paczki: wbudowana (gdy klient 1.8 jest pobrany), pliki .zip i foldery z pack.mcmeta
+    /// z resourcepacks/ oraz ze źródeł (<see cref="ContentSources"/>, identyfikator "źródło:nazwa").
+    /// Z podanym dir: tylko ten folder (testy).</summary>
     public static List<ResourcePack> Scan(string dir = null)
     {
-        dir ??= Dir;
         var list = new List<ResourcePack>();
+        if (dir != null) { ScanDir(list, dir, null); return list; }
         string jar = Path.Combine(ClientAssets.Root, "client.jar");
-        if (dir == Dir && File.Exists(jar)) list.Add(new ResourcePack(BuiltinId, jar, true));
-        try
+        if (File.Exists(jar)) list.Add(new ResourcePack(BuiltinId, jar, true));
+        ScanDir(list, Dir, null);
+        foreach (var s in ContentSources.All)
         {
-            foreach (var f in Directory.EnumerateFiles(dir, "*.zip").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-                AddUnique(list, Path.GetFileName(f), f);
-            foreach (var d in Directory.EnumerateDirectories(dir).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-                if (File.Exists(Path.Combine(d, "pack.mcmeta"))) AddUnique(list, Path.GetFileName(d), d);
+            if (!s.Available) continue;
+            // źródło, które samo jest paczką (pack.mcmeta w głównym folderze)
+            if (File.Exists(Path.Combine(s.Dir, "pack.mcmeta"))) AddUnique(list, s.Name + ":" + s.Name, s.Dir, s.Name);
+            else ScanDir(list, s.PacksDir, s.Name);
         }
-        catch (Exception ex) { Log.Error("Paczki zasobów: " + ex.Message); }
         return list;
     }
 
+    private static void ScanDir(List<ResourcePack> list, string dir, string source)
+    {
+        string prefix = source == null ? "" : source + ":";
+        try
+        {
+            foreach (var f in Directory.EnumerateFiles(dir, "*.zip").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                AddUnique(list, prefix + Path.GetFileName(f), f, source);
+            foreach (var d in Directory.EnumerateDirectories(dir).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                if (File.Exists(Path.Combine(d, "pack.mcmeta"))) AddUnique(list, prefix + Path.GetFileName(d), d, source);
+        }
+        catch (Exception ex) { Log.Error("Paczki zasobów (" + dir + "): " + ex.Message); }
+    }
+
     /// <summary>Dodaje paczkę, chyba że jej nazwa jest już zajęta (np. folder o nazwie wbudowanej paczki 1.8).</summary>
-    private static void AddUnique(List<ResourcePack> list, string id, string path)
+    private static void AddUnique(List<ResourcePack> list, string id, string path, string source)
     {
         if (list.Any(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase))) { Log.Info("Paczka zasobów pominięta: nazwa " + id + " jest już zajęta"); return; }
-        list.Add(new ResourcePack(id, path));
+        list.Add(new ResourcePack(id, path, false, source));
     }
 
     /// <summary>Ustawia aktywne paczki wg identyfikatorów (nieznane i uszkodzone pomija).</summary>

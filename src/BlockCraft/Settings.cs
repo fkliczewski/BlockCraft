@@ -31,6 +31,8 @@ public sealed class Settings
     public Dictionary<string, float> SoundVolumes { get; set; } = new();
     /// <summary>Aktywne paczki zasobów (nazwy w resourcepacks/), pierwsza ma pierwszeństwo.</summary>
     public List<string> ResourcePacks { get; set; } = new();
+    /// <summary>Dodatkowe źródła paczek: foldery i repozytoria git (URL, opcjonalnie "#gałąź").</summary>
+    public List<string> PackSources { get; set; } = new();
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

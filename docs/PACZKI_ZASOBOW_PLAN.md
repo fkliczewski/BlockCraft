@@ -29,7 +29,13 @@ Po każdym etapie: kompilacja, selftest, ręczne sprawdzenie w grze, **stop i od
 - Przeładowanie bez restartu: podmiana warstw atlasu, odbudowa ikon bloków i tła menu.
 - Selftest: parsowanie mcmeta, kolejność paczek, przypisania, klatki animacji, paczka uszkodzona/pusta.
 
-## Etap 1b — Źródła paczek: wiele folderów i repozytoria git  *(TODO, proponuję jako następny)*
+## Etap 1b — Źródła paczek: wiele folderów i repozytoria git  *(zrobiony)*
+
+Zrobione: `Core/ContentSources.cs`, ekran „Źródła...” (`Gui/PackSourcesScreen.cs`), `PackSources` w `options.json`,
+`--pack-source`, pobieranie repo w tle przy starcie (git: płytki klon, potem fetch + reset do stanu zdalnego;
+bez gita zip z GitHuba z ETag), obserwowanie folderów lokalnych i przeładowanie po zapisie, selftest
+(`ContentSourcesSelfTest.cs`, w tym prawdziwe repo git przez file://). Przykład w repo `blockcraft-plugins`:
+`resourcepacks/przyklad`. Zaufanie do źródeł z kodem (mody) — razem z modami.
 
 Cel: paczki zasobów (a później mody) nie tylko z `resourcepacks/`, ale z dowolnych miejsc,
 w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
@@ -97,7 +103,7 @@ w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
 | Etap | Stan |
 |---|---|
 | 1 | zrobiony — do odbioru |
-| 1b | TODO: źródła paczek (foldery, git) |
+| 1b | zrobiony |
 | 2–6 | do zrobienia |
 
 ### Etap 1 — co jest i jak sprawdzić

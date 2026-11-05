@@ -24,8 +24,9 @@ public sealed class ResourcePackScreen : Screen
     protected override void Init()
     {
         if (_signature == null) Rescan(_initial);
-        Add(new Button(W / 2 - 154, H - 48, 150, 20, "Otwórz folder paczek", OpenFolder));
-        Add(new Button(W / 2 + 4, H - 48, 150, 20, "Gotowe", Done));
+        Add(new Button(W / 2 - 154, H - 48, 100, 20, "Folder paczek", OpenFolder));
+        Add(new Button(W / 2 - 50, H - 48, 100, 20, () => "Źródła (" + ContentSources.All.Count + ")...", () => G.SetScreen(new PackSourcesScreen(this))));
+        Add(new Button(W / 2 + 54, H - 48, 100, 20, "Gotowe", Done));
     }
 
     private int ListW => Math.Min(200, W / 2 - 8);
@@ -41,7 +42,8 @@ public sealed class ResourcePackScreen : Screen
         {
             var d = new DirectoryInfo(ResourcePacks.Dir);
             return string.Join("|", d.EnumerateFileSystemInfos().Select(f => f.Name + "@" + f.LastWriteTimeUtc.Ticks).OrderBy(s => s, StringComparer.Ordinal))
-                + (File.Exists(Path.Combine(ClientAssets.Root, "client.jar")) ? "|jar" : "");
+                + (File.Exists(Path.Combine(ClientAssets.Root, "client.jar")) ? "|jar" : "")
+                + "|v" + ContentSources.Version + "|" + string.Join(",", ContentSources.All.Select(s => s.Name + s.Available));
         }
         catch { return ""; }
     }
@@ -138,7 +140,7 @@ public sealed class ResourcePackScreen : Screen
                 }
             }
             int tx = x + 38, tw = ListW - 42;
-            sb.Text(Fit(p.Name, tw), tx, y + 1, 0xFFFFFFFF);
+            sb.Text(Fit(p.Source != null ? p.Name + " §9[" + p.Source + "]" : p.Name, tw), tx, y + 1, 0xFFFFFFFF);
             string desc = p.Error != null ? "§c" + p.Error
                 : p.Format != ResourcePacks.Format18 ? "§6Inna wersja MC (format " + p.Format + ")§7 - część może nie działać"
                 : p.Description;

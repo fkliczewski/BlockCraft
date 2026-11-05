@@ -11,10 +11,50 @@ public sealed partial class Game
     private List<string> _packOverride;
     private bool _reloadPacks;
 
+    /// <summary>--pack-source ŚCIEŻKA|URL (można powtórzyć): źródła tylko na tę sesję.</summary>
+    private List<string> _sourceOverride;
+
     private void ParsePackArgs(string[] args)
     {
         for (int i = 0; i + 1 < args.Length; i++)
+        {
             if (args[i] == "--resourcepack") (_packOverride ??= new()).Add(args[i + 1]);
+            if (args[i] == "--pack-source") (_sourceOverride ??= new()).Add(args[i + 1]);
+        }
+        ContentSources.Configure(ActiveSourceSpecs);
+    }
+
+    /// <summary>Źródła paczek: z parametru uruchomienia albo z ustawień.</summary>
+    public List<string> ActiveSourceSpecs => _sourceOverride ?? Settings.PackSources ?? new();
+    public bool SourcesFromArgs => _sourceOverride != null;
+
+    /// <summary>Zmienia listę źródeł (zapis w ustawieniach, chyba że podano --pack-source) i pobiera repozytoria.</summary>
+    public void SetPackSources(List<string> specs)
+    {
+        if (_sourceOverride != null) _sourceOverride = specs;
+        else { Settings.PackSources = specs; Settings.Save(); }
+        ContentSources.Configure(specs);
+        ContentSources.MarkChanged();
+        SyncSourcesInBackground();
+    }
+
+    private Task _sourceSync;
+    /// <summary>Pobiera repozytoria w tle; gdy coś się zmieniło, paczki przeładują się same (ConsumeChange w klatce).</summary>
+    public void SyncSourcesInBackground()
+    {
+        if (_sourceSync is { IsCompleted: false } || !ContentSources.All.Any(s => s.Remote)) return;
+        _sourceSync = Task.Run(async () =>
+        {
+            try { await ContentSources.SyncAllAsync(); }
+            catch (Exception ex) { Log.Error("Źródła paczek: " + ex.Message); }
+        });
+    }
+    public bool SourcesSyncing => _sourceSync is { IsCompleted: false };
+
+    /// <summary>Co klatkę: zmiana w obserwowanym folderze albo pobrane repo -> przeładowanie aktywnych paczek.</summary>
+    private void CheckSourceChanges()
+    {
+        if (ContentSources.ConsumeChange() && ActivePackIds.Count > 0) _reloadPacks = true;
     }
 
     /// <summary>Paczki do użycia: z parametru uruchomienia albo z ustawień.</summary>

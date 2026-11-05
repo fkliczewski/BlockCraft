@@ -128,6 +128,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         StartMenuWorld();
         SetScreen(new TitleScreen());
         _lastTime = _clock.Elapsed.TotalSeconds;
+        SyncSourcesInBackground();
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
         else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
@@ -572,6 +573,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
 
         MouseLook();
+        CheckSourceChanges();
         if (_reloadPacks) { _reloadPacks = false; try { ReloadResourcePacksNow(); } catch (Exception ex) { Log.Error("Paczki zasobów: " + ex); } }
         bool gpuQ = _stressMeasure;
         if (gpuQ) StressGpuBegin();
