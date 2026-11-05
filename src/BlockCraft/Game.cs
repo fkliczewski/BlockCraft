@@ -111,6 +111,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Gui = new GuiTextures(ResourcePacks.ReadImage);
         Biome.LoadColorMaps(ResourcePacks.ReadImage);
         Renderer = new WorldRenderer();
+        if (ResourcePacks.Active.Count > 0) Renderer.Entities.ReloadSkins(ResourcePacks.ReadImage);
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         ResourcePacks.CloseAll();
         Sound.Init(Settings);

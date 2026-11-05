@@ -164,8 +164,7 @@ public static partial class SkinGen
     {
         SkinsSkulls();
         // obrazy: oryginalny arkusz z client.jar 1.8, gdy jest w cache; inaczej proceduralne płótna
-        var sheet = ClientAssets.TryReadTexture("painting/paintings_kristoffer_zetterstrand.png", out int sw, out int sh);
-        if (sheet != null && (sw != 256 || sh != 256)) sheet = null;
+        var sheet = SourceTexture(PaintingSheet, PaintingSheetSize, PaintingSheetSize);
         foreach (var art in PaintingArt.All)
         {
             var c = new Cv(art.Name.GetHashCode() & 0xFFFF);
@@ -198,8 +197,8 @@ public static partial class SkinGen
     private static Cv FromClientOr(string path, int w, int h, Action<Cv> fallback)
     {
         var c = new Cv(path.GetHashCode() & 0xFFFF);
-        var px = ClientAssets.TryReadTexture(path, out int iw, out int ih);
-        if (px != null && iw == w && ih == h) { for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) c.Set(x, y, px[y * w + x]); }
+        var px = SourceTexture(path, w, h);
+        if (px != null) { for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) c.Set(x, y, px[y * w + x]); }
         else fallback(c);
         return c;
     }

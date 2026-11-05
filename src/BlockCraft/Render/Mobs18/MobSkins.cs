@@ -5,7 +5,9 @@ namespace BlockCraft.Render;
 /// <summary>Skórki mobów modułu MO. Tablica skórek ma 128x128: skórki 64x64 są skalowane 2x (UV są względne), duże (koń, golem, wiedźma) mają własne 128x128.</summary>
 public static partial class SkinGen
 {
-    public const int TexSize = 128;
+    private const int BaseTexSize = 128;
+    /// <summary>Bok warstwy tablicy skórek: 128 bez paczek, więcej dla tekstur HD z paczek.</summary>
+    public static int TexSize { get; private set; } = BaseTexSize;
     private static readonly Dictionary<int, uint[]> BigSkins = new();
 
     /// <summary>Warstwy tablicy tekstur: duże skórki wprost, pozostałe powiększone 2x.</summary>
@@ -13,14 +15,20 @@ public static partial class SkinGen
     {
         Ensure();
         var list = new List<uint[]>(Skins.Count);
-        for (int i = 0; i < Skins.Count; i++)
-        {
-            if (BigSkins.TryGetValue(i, out var big)) { list.Add(big); continue; }
-            var s = Skins[i]; var p = new uint[TexSize * TexSize];
-            for (int y = 0; y < TexSize; y++) for (int x = 0; x < TexSize; x++) p[y * TexSize + x] = s[(y >> 1) * W + (x >> 1)];
-            list.Add(p);
-        }
+        for (int i = 0; i < Skins.Count; i++) list.Add(PackLayers.TryGetValue(i, out var pack) ? pack : GameLayer(i));
         return list;
+    }
+
+    /// <summary>Kopia skórki gry powiększona do <see cref="TexSize"/> (duże 128x128, pozostałe 64x64).</summary>
+    private static uint[] GameLayer(int i)
+    {
+        bool big = BigSkins.TryGetValue(i, out var src);
+        int n = big ? BaseTexSize : W, k = TexSize / n;
+        if (!big) src = Skins[i];
+        else if (k == 1) return (uint[])src.Clone();
+        var p = new uint[TexSize * TexSize];
+        for (int y = 0; y < TexSize; y++) for (int x = 0; x < TexSize; x++) p[y * TexSize + x] = src[(y / k) * n + x / k];
+        return p;
     }
 
     /// <summary>Płótno o dowolnym rozmiarze (64 albo 128) z tym samym układem ścian co Canvas.</summary>

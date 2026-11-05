@@ -93,6 +93,13 @@ przy okazji), strony Unicode czcionki (`font/glyph_*.png`).
 - Moby, gracz (domyślne skórki Steve/Alex), skrzynie, zbroje na postaci, obrazy, banery, czaszki, łódka, wózki.
 - Tekstury encji mają własne wymiary (64×32, 64×64…) — mapowanie na nasze modele, kontrola UV.
 
+**Etap 4 — zrobione:** skórki mobów z `entity/` (około 80 przypisań w `Render/PackSkins.cs`, UV modeli gry jak w 1.8,
+tekstury 64x32/64x64/128x128 i HD; poza obszarem tekstury zostaje skórka gry), czaszki z głów mobów, smok
+(`entity/enderdragon/dragon.png`), obrazy, warstwy zbroi i stojak z paczki, ściany skrzyni, skrzyni-pułapki i skrzyni Endu
+z `entity/chest/`. Podgląd `--packs-preview` ma rzędy mobów i postać w zbroi.
+Bez zmian: model dużej skrzyni w świecie (dalej dwie małe), łódka, wózki, strzały, spławik, promień latarni, kryształ i pancerz
+withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
+
 ## Etap 5 — Dźwięki, muzyka i język
 
 - `sounds.json` (zastępowanie i dopisywanie dźwięków), pliki `.ogg`, muzyka i płyty.
@@ -114,7 +121,8 @@ przy okazji), strony Unicode czcionki (`font/glyph_*.png`).
 | 1 | zrobiony — do odbioru |
 | 1b | zrobiony |
 | 3 | zrobiony |
-| 2, 4–6 | do zrobienia |
+| 4 | zrobiony — do odbioru |
+| 2, 5, 6 | do zrobienia |
 
 ### Etap 1 — co jest i jak sprawdzić
 

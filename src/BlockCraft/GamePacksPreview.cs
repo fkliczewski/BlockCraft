@@ -46,7 +46,14 @@ public sealed partial class Game
         foreach (bool withPack in new[] { false, true })
         {
             string tag = withPack ? "pack" : "base";
-            Step(5, () => { if (withPack) { _packOverride = packs; _reloadPacks = true; } });
+            Step(5, () =>
+            {
+                if (withPack) { _packOverride = packs; _reloadPacks = true; }
+                // z powrotem nad ścianę bloków (sceny mobów przenoszą gracza)
+                World.DayTime = 6000; HideGui = true;
+                _holdY = by + 9; Player.SetPositionAndPrev(bx + 0.5, by + 9, bz + 0.5);
+                Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 50;
+            });
             WaitForMeshes(200);
             Step(20, () => Snap("blocks_" + tag));
             Step(5, () => { Player.Pitch = Player.PrevPitch = 20; Player.Yaw = Player.PrevYaw = 0; });
@@ -89,6 +96,41 @@ public sealed partial class Game
             Step(5, () => World.DayTime = 18000 + 24000 * 2); // trzecia faza księżyca
             Step(20, () => Snap("moon_" + tag));
             Step(5, () => { World.DayTime = 6000; Player.Pitch = Player.PrevPitch = 50; Player.Yaw = Player.PrevYaw = 0; });
+            // moby (etap 4): po kilka w rzędzie przed graczem
+            // rząd: moby, odstęp między nimi, odległość od gracza i wysokość nad ziemią (cały rząd w kadrze)
+            var mobRows = new (string[] Mobs, double Spacing, double Dist, int Lift)[]
+            {
+                (new[] { "Zombie", "Skeleton", "Creeper", "Spider", "CaveSpider", "Enderman", "PigZombie", "Witch", "Villager", "Slime" }, 1.6, 6, 0),
+                (new[] { "Cow", "MushroomCow", "Pig", "Sheep", "Chicken", "Wolf", "Ozelot", "Rabbit", "Squid", "Bat" }, 1.6, 6, 0),
+                (new[] { "EntityHorse", "VillagerGolem", "SnowMan", "Blaze", "Guardian" }, 3, 9, 0),
+                (new[] { "LavaSlime", "Silverfish", "Endermite", "Ghast" }, 3, 9, 0),
+                (new[] { "WitherBoss", "EnderDragon" }, 16, 18, 4),
+            };
+            int bossRow = mobRows.Length - 1;
+            for (int row = 0; row < mobRows.Length; row++)
+            {
+                var (mobs, spacing, dist, lift) = mobRows[row]; int rowIndex = row; bool bosses = row == bossRow;
+                Step(5, () =>
+                {
+                    Cmds.Execute(Player, "/difficulty normal"); _chat.Clear();
+                    World.DayTime = rowIndex == 0 ? 13500 : 6000; // potwory nie płoną (bez czerwonego błysku obrażeń)
+                    var (sx, sy, sz) = Stage(bx + 60 + rowIndex * 50, bz, 0, bosses ? 5 : 18, 14, bosses ? 6 : 1.5);
+                    for (int i = 0; i < mobs.Length; i++)
+                        Summon(mobs[i], sx + 0.5 + (i - (mobs.Length - 1) / 2.0) * spacing, sy + lift, sz + 0.5 + dist);
+                    if (bosses) foreach (var e in World.Entities.OfType<Entities.EnderDragon>()) e.NoAI = true;
+                });
+                Step(12, () => { _chat.Clear(); Snap($"mobs_{rowIndex}_{tag}"); });
+            }
+            Step(5, () =>
+            {
+                foreach (var e in World.Entities.ToList()) if (e is not Entities.Player) e.Kill();
+                Cmds.Execute(Player, "/difficulty peaceful"); _chat.Clear();
+                Player.Inventory.Armor[0] = new ItemStack(I.DiamondHelmet); Player.Inventory.Armor[1] = new ItemStack(I.IronChest);
+                Player.Inventory.Armor[2] = new ItemStack(I.GoldLegs); Player.Inventory.Armor[3] = new ItemStack(I.LeatherBoots);
+                Player.Pitch = Player.PrevPitch = 10; CameraMode = 2; HideGui = true;
+            });
+            Step(10, () => Snap("armor_" + tag));
+            Step(5, () => { CameraMode = 0; for (int a = 0; a < 4; a++) Player.Inventory.Armor[a] = null; });
             Step(5, () => SetScreen(new OptionsScreen(new TitleScreen())));
             Step(8, () => Snap("options_" + tag));
             Step(5, () => { SetScreen(null); HideGui = true; });

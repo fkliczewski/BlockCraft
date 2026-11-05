@@ -641,12 +641,13 @@ namespace BlockCraft.World
     /// <summary>Skrzynia-pułapka (BlockChest typu TRAP): moc = liczba graczy z otwartą skrzynią, silna w dół.</summary>
     public sealed class TrappedChestBlock : ChestBlock
     {
-        private readonly int _front;
+        private readonly int _front, _side, _top;
         public TrappedChestBlock(byte id, string k, string n) : base(id, k, n)
         {
-            _front = TextureGen.Layer("trapped_chest_front"); IsPowerSource = true;
+            _front = TextureGen.Layer("trapped_chest_front"); _side = TextureGen.Layer("trapped_chest_side"); _top = TextureGen.Layer("trapped_chest_top");
+            IsPowerSource = true;
         }
-        public override int GetTexture(int face, int meta) => face == Dir.HorizToFace(meta & 3) && face > 1 ? _front : base.GetTexture(face, meta);
+        public override int GetTexture(int face, int meta) => face <= 1 ? _top : face == Dir.HorizToFace(meta & 3) ? _front : _side;
         public override bool OnActivated(World w, int x, int y, int z, Player p)
         {
             p.OpenBlockGui(GuiKind.TrappedChest, x, y, z);

@@ -74,6 +74,7 @@ public sealed partial class Game
     {
         ResourcePacks.SetActive(ActivePackIds);
         TextureGen.ApplyPacks(ResourcePacks.Readers);
+        if (ResourcePacks.Active.Count > 0) SkinGen.Rebuild(ResourcePacks.ReadImage);
         Sb.ReloadFont();
         // archiwa zamyka OnLoad po utworzeniu GUI i renderera (też czytają z paczek)
     }
@@ -87,6 +88,9 @@ public sealed partial class Game
         var animated = TextureGen.PackAnimations.Keys.Concat(TextureGen.Animations.Keys).Select(TextureGen.Layer).ToList();
         var changed = TextureGen.ApplyPacks(ResourcePacks.Readers);
         Renderer.ReloadTextures(changed.Concat(animated).Distinct());
+        Func<string, RawImage> packImages = ResourcePacks.Active.Count > 0 ? ResourcePacks.ReadImage : null;
+        SkinGen.Rebuild(packImages);
+        Renderer.Entities.ReloadSkins(packImages);
         Icons.Dispose(); Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         Gui.Dispose(); Gui = new GuiTextures(ResourcePacks.ReadImage);
         Sb.ReloadFont();

@@ -218,12 +218,72 @@ public static partial class TextureGen
             c[name] = s => s.Cell("particle/particles", 16, cell);
         for (int i = 0; i < 4; i++) { int cell = i * 5; c["particle_explosion_" + i] = s => s.Cell("entity/explosion", 4, cell); }
 
+        // skrzynie: ściany składane z tekstur modelu (entity/chest/*.png, 64x64 jak ModelChest 1.8)
+        c["chest_front"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Front);
+        c["chest_side"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Side);
+        c["chest_top"] = s => ChestFace(s.Raw("entity/chest/normal"), ChestPart.Top);
+        c["trapped_chest_front"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Front);
+        c["trapped_chest_side"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Side);
+        c["trapped_chest_top"] = s => ChestFace(s.Raw("entity/chest/trapped"), ChestPart.Top);
+        foreach (var part in new[] { ChestPart.Front, ChestPart.Side, ChestPart.Top, ChestPart.Lock })
+            c["ender_chest_" + part.ToString().ToLowerInvariant()] = s => EnderChestTile(s.Raw("entity/chest/ender"), part);
+
         // inny układ niż blok 16x16 albo inna paczka plików: kolejne etapy (encje, cząsteczki, GUI, modele)
-        foreach (var n in new[] { "chest_top", "chest_side", "chest_front", "trapped_chest_front", "ender_chest_front", "ender_chest_side", "ender_chest_top", "ender_chest_lock",
-                     "minecart_side", "minecart_inside", "end_sky", "end_portal", "world_border", "beacon_beam", "fishing_hook", "me_brewing", "me_cauldron",
+        foreach (var n in new[] { "minecart_side", "minecart_inside", "end_sky", "end_portal", "world_border", "beacon_beam", "fishing_hook", "me_brewing", "me_cauldron",
                      "weather_rain", "weather_snow", "weather_lightning", "item_banner", "missing" })
             r.Skip.Add(n);
         return r;
+    }
+
+    // ================= skrzynie =================
+
+    public enum ChestPart { Front, Side, Top, Lock }
+
+    /// <summary>Tekstura modelu skrzyni 1.8 (64x64 albo wielokrotność); null = zły rozmiar albo brak.</summary>
+    private static Func<int, int, uint> ChestSampler(RawImage src)
+    {
+        if (src?.RequireSize(i => i.W == i.H && i.W >= 64 && i.W % 64 == 0, "kwadrat 64x64 albo wielokrotność") == null) return null;
+        int k = src.W / 64;
+        return (u, v) => src.At(u * k, v * k);
+    }
+
+    /// <summary>Ściana zwykłej skrzyni (model gry: jeden prostopadłościan 14x14x14 z pełnym UV na ścianę):
+    /// 5 wierszy wieka i 9 wierszy podstawy jak w ModelChest, na przodzie zamek 2x4; 14x14 rozciągnięte do 16x16.</summary>
+    private static uint[] ChestFace(RawImage src, ChestPart part)
+    {
+        var S = ChestSampler(src); if (S == null) return null;
+        var face = new RawImage { W = 14, H = 14, Px = new uint[196] };
+        for (int y = 0; y < 14; y++)
+            for (int x = 0; x < 14; x++)
+            {
+                int u0 = part == ChestPart.Side ? 0 : 14;
+                face.Px[y * 14 + x] = part == ChestPart.Top ? S(14 + x, y)
+                    : y < 5 ? S(u0 + x, 14 + y)        // wieko: ściana 14x5 od (u0,14)
+                    : S(u0 + x, 33 + y - 4);           // podstawa: ściana 14x10 od (u0,33), wiersze 1-9 pod wiekiem
+            }
+        if (part == ChestPart.Front)
+            for (int y = 0; y < 4; y++) for (int x = 0; x < 2; x++) face.Px[(3 + y) * 14 + 6 + x] = S(1 + x, 1 + y); // zamek: przód 2x4 od (1,1)
+        return face.Resize(16, 16).Px;
+    }
+
+    /// <summary>Kafle skrzyni Endu w układzie modelu gry (UV wg pozycji, jak EnderChestTextures).</summary>
+    private static uint[] EnderChestTile(RawImage src, ChestPart part)
+    {
+        var S = ChestSampler(src); if (S == null) return null;
+        var p = New();
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+            {
+                int cx = Math.Clamp(x - 1, 0, 13);
+                p[y * 16 + x] = part switch
+                {
+                    ChestPart.Front => y <= 6 ? S(14 + cx, 14 + Math.Clamp(y - 2, 0, 4)) : S(14 + cx, 33 + Math.Clamp(y - 6, 0, 9)),
+                    ChestPart.Side => y <= 6 ? S(cx, 14 + Math.Clamp(y - 2, 0, 4)) : S(cx, 33 + Math.Clamp(y - 6, 0, 9)),
+                    ChestPart.Top => S(14 + Math.Clamp(x - 1, 0, 13), Math.Clamp(y - 1, 0, 13)),
+                    _ => S(1 + Math.Clamp(x * 2 / 16, 0, 1), 1 + Math.Clamp(y * 4 / 16, 0, 3)),
+                };
+            }
+        return p;
     }
 
     // ================= przekształcenia =================

@@ -66,9 +66,23 @@ public sealed partial class EntityRenderer
         P(10, 4, 0).Box(32, 0, -4, -4, -4, 6, 6, 6, inf)
     };
 
+    /// <summary>entity/enderdragon/dragon.png z paczki (256x256 albo wielokrotność, UV jak ModelDragon 1.8); null = tekstura gry.</summary>
+    private Core.RawImage _packDragon;
+
     private void EnsureBossTex()
     {
-        _bossTex ??= new TextureArray(DragonTexSize, new[] { DragonTexture.Make() }, false);
+        _bossTex ??= _packDragon != null
+            ? new TextureArray(_packDragon.W, new[] { _packDragon.Px }, false)
+            : new TextureArray(DragonTexSize, new[] { DragonTexture.Make() }, false);
+    }
+
+    /// <summary>Po zmianie paczek zasobów (SkinGen już przebudowany): tablica skórek i tekstura smoka od nowa.</summary>
+    public void ReloadSkins(Func<string, Core.RawImage> packRead)
+    {
+        SkinTex?.Dispose();
+        SkinTex = new TextureArray(SkinGen.TexSize, SkinGen.Layers(), false);
+        _packDragon = packRead?.Invoke("entity/enderdragon/dragon.png")?.RequireSize(i => i.W == i.H && i.W % DragonTexSize == 0, $"{DragonTexSize}x{DragonTexSize} albo wielokrotność");
+        _bossTex?.Dispose(); _bossTex = null;
     }
 
     private void FlushBoss() => Flush(_bossBatch, _bossTex);
