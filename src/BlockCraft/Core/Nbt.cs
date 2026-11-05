@@ -7,11 +7,30 @@ namespace BlockCraft.Core;
 /// </summary>
 public sealed class Nbt : Dictionary<string, object>
 {
-    public int GetInt(string k, int def = 0) => TryGetValue(k, out var v) ? Convert.ToInt32(v) : def;
-    public long GetLong(string k, long def = 0) => TryGetValue(k, out var v) ? Convert.ToInt64(v) : def;
-    public float GetFloat(string k, float def = 0) => TryGetValue(k, out var v) ? Convert.ToSingle(v) : def;
-    public double GetDouble(string k, double def = 0) => TryGetValue(k, out var v) ? Convert.ToDouble(v) : def;
-    public bool GetBool(string k, bool def = false) => TryGetValue(k, out var v) ? Convert.ToBoolean(v) : def;
+    public int GetInt(string k, int def = 0) => Get(k, def, Convert.ToInt32);
+    public long GetLong(string k, long def = 0) => Get(k, def, Convert.ToInt64);
+    public float GetFloat(string k, float def = 0) => Get(k, def, ToFiniteSingle);
+    public double GetDouble(string k, double def = 0) => Get(k, def, Convert.ToDouble);
+    public bool GetBool(string k, bool def = false) => Get(k, def, Convert.ToBoolean);
+
+    /// <summary>Double spoza zakresu float (np. Health:1.0e40) dałby nieskończoność - to błąd danych.</summary>
+    private static float ToFiniteSingle(object v) => Convert.ToSingle(v) is var f && float.IsFinite(f) ? f : throw new OverflowException("poza zakresem float: " + v);
+
+    /// <summary>Zgłoszone już błędne wartości: ten sam przedmiot jest czytany co tick, a do logu trafia raz.</summary>
+    private const int MaxReportedBadValues = 1024;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> ReportedBadValues = new();
+
+    /// <summary>Wartość poza zakresem lub złego typu (np. id:999999999999L z komendy) daje domyślną zamiast wyjątku w każdym ticku.</summary>
+    private T Get<T>(string k, T def, Func<object, T> convert)
+    {
+        if (!TryGetValue(k, out var v)) return def;
+        try { return convert(v); }
+        catch (Exception ex) when (ex is OverflowException or FormatException or InvalidCastException)
+        {
+            if (ReportedBadValues.Count < MaxReportedBadValues && ReportedBadValues.TryAdd(k + "=" + v, 0)) Log.Error("Nbt: błędna wartość '" + k + "': " + ex.Message);
+            return def;
+        }
+    }
     public string GetString(string k, string def = null) => TryGetValue(k, out var v) ? v as string ?? def : def;
     public Nbt GetCompound(string k) => TryGetValue(k, out var v) ? v as Nbt : null;
     public Nbt GetOrCreateCompound(string k) { var c = GetCompound(k); if (c == null) this[k] = c = new Nbt(); return c; }
@@ -55,13 +74,19 @@ public sealed class Nbt : Dictionary<string, object>
         bw.Write(Count);
         foreach (var kv in this) { bw.Write(kv.Key); WriteValue(bw, kv.Value); }
     }
-    public static Nbt Read(BinaryReader br)
+    public static Nbt Read(BinaryReader br) => Read(br, 0);
+
+    /// <summary>Limit zagnieżdżenia jak w MC (512): dane z sieci nie mogą przepełnić stosu.</summary>
+    private const int MaxDepth = 512;
+    private static Nbt Read(BinaryReader br, int depth)
     {
+        if (depth > MaxDepth) throw new InvalidDataException("Nbt: za głębokie zagnieżdżenie");
         var n = new Nbt();
-        int c = br.ReadInt32();
-        for (int i = 0; i < c; i++) { string k = br.ReadString(); n[k] = ReadValue(br); }
+        int c = BinaryLength.Read(br, 2);
+        for (int i = 0; i < c; i++) { string k = br.ReadString(); n[k] = ReadValue(br, depth); }
         return n;
     }
+
     private static void WriteValue(BinaryWriter bw, object v)
     {
         switch (v)
@@ -81,7 +106,7 @@ public sealed class Nbt : Dictionary<string, object>
             default: throw new InvalidOperationException("Nbt: nieobsługiwany typ " + v?.GetType().Name);
         }
     }
-    private static object ReadValue(BinaryReader br)
+    private static object ReadValue(BinaryReader br, int depth)
     {
         byte t = br.ReadByte();
         switch (t)
@@ -92,10 +117,10 @@ public sealed class Nbt : Dictionary<string, object>
             case 4: return br.ReadDouble();
             case 5: return br.ReadString();
             case 6: return br.ReadBoolean();
-            case 7: return br.ReadBytes(br.ReadInt32());
-            case 8: { var a = new int[br.ReadInt32()]; for (int i = 0; i < a.Length; i++) a[i] = br.ReadInt32(); return a; }
-            case 9: return Read(br);
-            case 10: { int n = br.ReadInt32(); var l = new List<object>(n); for (int i = 0; i < n; i++) l.Add(ReadValue(br)); return l; }
+            case 7: return BinaryLength.ReadBytes(br);
+            case 8: { int n = BinaryLength.Read(br, 4); if (n > int.MaxValue / 4) throw new InvalidDataException("Nbt: za długa tablica"); var raw = BinaryLength.ReadExactly(br, n * 4); var a = new int[n]; Buffer.BlockCopy(raw, 0, a, 0, raw.Length); return a; }
+            case 9: return Read(br, depth + 1);
+            case 10: { int n = BinaryLength.Read(br, 1); if (depth + 1 > MaxDepth) throw new InvalidDataException("Nbt: za głębokie zagnieżdżenie"); var l = new List<object>(Math.Min(n, 1024)); for (int i = 0; i < n; i++) l.Add(ReadValue(br, depth + 1)); return l; }
             default: throw new InvalidDataException("Nbt: nieznany typ " + t);
         }
     }

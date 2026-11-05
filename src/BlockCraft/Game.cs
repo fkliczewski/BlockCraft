@@ -28,8 +28,13 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private LevelData _level;
     private Screen _screen;
     public int GuiW, GuiH; public float GuiScale = 2;
-    public int MouseGuiX, MouseGuiY;
-    public bool IsShiftDown => KeyboardState.IsKeyDown(Keys.LeftShift) || KeyboardState.IsKeyDown(Keys.RightShift);
+    /// <summary>Pozycja myszy w GUI; podczas odtwarzania odłożonego zdarzenia - z chwili, gdy przyszło.</summary>
+    public int MouseGuiX => _input.Replaying?.MouseX ?? _mouseGuiX;
+    public int MouseGuiY => _input.Replaying?.MouseY ?? _mouseGuiY;
+    private int _mouseGuiX, _mouseGuiY;
+    public bool IsShiftDown => _input.Replaying?.Shift ?? (KeyboardState.IsKeyDown(Keys.LeftShift) || KeyboardState.IsKeyDown(Keys.RightShift));
+    /// <summary>Czas zdarzenia wejścia w ms (Environment.TickCount64); odłożone zdarzenie zachowuje czas, w którym przyszło (np. dwuklik).</summary>
+    public long InputTime => _input.Replaying?.Time ?? Environment.TickCount64;
     public bool ShowDebug, HideGui;
     public int CameraMode;
     private readonly List<(string text, long time)> _chat = new();
@@ -49,7 +54,16 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private float _fovMod = 1f, _prevFovMod = 1f;
     private World.World _menuWorld; private ChunkManager _menuCm; private float _menuYaw;
     public bool HasMenuWorld => _menuWorld != null && Renderer.RenderedSections > 20;
-    public int CurrentDifficulty { get => World != null ? (int)World.Difficulty : Settings.Difficulty; set { if (World != null) World.Difficulty = (Difficulty)value; Settings.Difficulty = value; } }
+    public int CurrentDifficulty
+    {
+        get => World != null ? (int)World.Difficulty : Settings.Difficulty;
+        set
+        {
+            // jak /difficulty: wszystkie wymiary; hardcore i gość (trudność ustala host) bez zmian w świecie
+            if (World != null && Client == null && !World.Hardcore) foreach (var w in Commands.Worlds(World)) w.Difficulty = (Difficulty)value;
+            Settings.Difficulty = value;
+        }
+    }
     private readonly bool _autotest;
     private readonly string[] _args;
 
@@ -57,6 +71,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         new NativeWindowSettings { ClientSize = new Vector2i(1280, 720), Title = "BlockCraft", APIVersion = new Version(3, 3), Profile = ContextProfile.Core, Flags = ContextFlags.ForwardCompatible, StartVisible = true })
     {
         _args = args;
+        _input = new DeferredInputQueue(IsInputBlocked);
         _autotest = args.Contains("--autotest") || args.Contains("--autotest-host") || args.Contains("--autotest-join");
         int profile = Array.IndexOf(args, "--net-profile");
         if (profile >= 0 && profile + 1 < args.Length)
@@ -129,7 +144,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer.CloudsEnabled = Settings.Clouds;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
-        if (World != null && Client == null) World.Difficulty = (Difficulty)Settings.Difficulty; // gość: trudność ustala host
+        // trudność świata zmienia tylko przycisk w opcjach (CurrentDifficulty) i /difficulty, nie każde zastosowanie ustawień
         if (fancyChanged || _lastSmooth != Settings.SmoothLighting) MarkAllDirty();
         _lastSmooth = Settings.SmoothLighting;
         UpdateGuiScale();
@@ -379,16 +394,31 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     {
         base.OnMouseMove(e);
         float sx = FramebufferSize.X / (float)Math.Max(1, ClientSize.X), sy = FramebufferSize.Y / (float)Math.Max(1, ClientSize.Y);
-        MouseGuiX = (int)(e.X * sx / GuiScale); MouseGuiY = (int)(e.Y * sy / GuiScale);
-        _screen?.MouseMove(MouseGuiX, MouseGuiY);
+        _mouseGuiX = (int)(e.X * sx / GuiScale); _mouseGuiY = (int)(e.Y * sy / GuiScale);
+        int mx = MouseGuiX, my = MouseGuiY;
+        RunOrDefer(() => _screen?.MouseMove(mx, my));
     }
+
+    // Wejście w połowie dzielonego ticku czeka na jego koniec: akcje GUI (odrodzenie, komendy z czatu, upuszczanie)
+    // dodają i usuwają encje, a to przesuwa indeksy pętli encji przerwanego ticku (encja byłaby pominięta).
+    private readonly DeferredInputQueue _input;
+    private void RunOrDefer(Action a) => _input.RunOrDefer(a, new InputContext(MouseGuiX, MouseGuiY, IsShiftDown, Environment.TickCount64));
+    /// <summary>Kliknięcie w świecie czeka na ControlTick; kolejne zdarzenia zostają w kolejce, żeby nie scalić dwóch kliknięć w jedno.</summary>
+    private bool HasUnhandledWorldClick => _screen == null && (_leftPressed || _rightPressed || _middlePressed);
+    private bool IsInputBlocked() => _midTick || HasUnhandledWorldClick;
+    private void FlushDeferredInput() => _input.Flush(ex => Log.Error("Wejście: " + ex));
 
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         base.OnMouseDown(e);
         int btn = e.Button == MouseButton.Left ? 0 : e.Button == MouseButton.Right ? 1 : e.Button == MouseButton.Middle ? 2 : -1;
         if (btn < 0) return;
-        if (_screen != null) { _screen.MouseDown(MouseGuiX, MouseGuiY, btn); return; }
+        int mx = MouseGuiX, my = MouseGuiY;
+        RunOrDefer(() => MouseDownNow(mx, my, btn));
+    }
+    private void MouseDownNow(int mx, int my, int btn)
+    {
+        if (_screen != null) { _screen.MouseDown(mx, my, btn); return; }
         if (btn == 0) { _leftDown = true; _leftPressed = true; }
         if (btn == 1) { _rightDown = true; _rightPressed = true; }
         if (btn == 2) _middlePressed = true;
@@ -398,17 +428,27 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     {
         base.OnMouseUp(e);
         int btn = e.Button == MouseButton.Left ? 0 : e.Button == MouseButton.Right ? 1 : 2;
+        int mx = MouseGuiX, my = MouseGuiY;
+        RunOrDefer(() => MouseUpNow(mx, my, btn));
+    }
+    private void MouseUpNow(int mx, int my, int btn)
+    {
         if (btn == 0) _leftDown = false;
         if (btn == 1) _rightDown = false;
-        _screen?.MouseUp(MouseGuiX, MouseGuiY, btn);
+        _screen?.MouseUp(mx, my, btn);
     }
 
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         base.OnMouseWheel(e);
-        if (_screen != null) { _screen.Scroll(MouseGuiX, MouseGuiY, e.OffsetY); return; }
+        int mx = MouseGuiX, my = MouseGuiY; float dy = e.OffsetY;
+        RunOrDefer(() => MouseWheelNow(mx, my, dy));
+    }
+    private void MouseWheelNow(int mx, int my, float offsetY)
+    {
+        if (_screen != null) { _screen.Scroll(mx, my, offsetY); return; }
         if (Player == null) return;
-        int d = e.OffsetY > 0 ? -1 : e.OffsetY < 0 ? 1 : 0;
+        int d = offsetY > 0 ? -1 : offsetY < 0 ? 1 : 0;
         if (Player.Spectator) { Player.FlySpeed = Math.Clamp(Player.FlySpeed - d * 0.005f, 0.01f, 0.2f); return; }
         Player.Inventory.SelectedSlot = (Player.Inventory.SelectedSlot + d + 9) % 9;
     }
@@ -416,15 +456,32 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnTextInput(TextInputEventArgs e)
     {
         base.OnTextInput(e);
+        int u = e.Unicode;
+        RunOrDefer(() => TextInputNow(u));
+    }
+    private void TextInputNow(int unicode)
+    {
         if (_ignoreNextChar) { _ignoreNextChar = false; return; }
-        foreach (char c in char.ConvertFromUtf32(e.Unicode)) _screen?.CharTyped(c);
+        foreach (char c in char.ConvertFromUtf32(unicode)) _screen?.CharTyped(c);
     }
     private bool _ignoreNextChar;
+
+    /// <summary>Klawisze edycji tekstu, których powtarzanie (przytrzymanie) trafia do ekranu; reszta reaguje tylko na wciśnięcie.</summary>
+    private static bool IsEditRepeatKey(Keys k) => k is Keys.Backspace or Keys.Delete or Keys.Left or Keys.Right or Keys.Up or Keys.Down
+        or Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown;
 
     protected override void OnKeyDown(KeyboardKeyEventArgs e)
     {
         base.OnKeyDown(e);
+        RunOrDefer(() => KeyDownNow(e));
+    }
+    private void KeyDownNow(KeyboardKeyEventArgs e)
+    {
         bool ctrl = e.Control;
+        // MC 1.8: w grze bez powtórzeń klawiszy; ekrany tekstowe (czat, tabliczka, kowadło) potrzebują ich do kasowania i strzałek
+        if (e.IsRepeat) { if (_screen != null && IsEditRepeatKey(e.Key)) _screen.KeyDown(e.Key, ctrl, e.Shift); return; }
+        // znak klawisza, który otworzył czat, przychodzi zaraz po nim; inne wciśnięcie znaczy, że go nie było (np. Ctrl+T)
+        _ignoreNextChar = false;
         if (e.Key == Keys.F11) { WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen; return; }
         if (e.Key == Keys.F2) { _screenshotRequested = true; return; }
         if (_screen != null) { _screen.KeyDown(e.Key, ctrl, e.Shift); return; }
@@ -439,8 +496,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
                 break;
-            case Keys.T: _ignoreNextChar = true; SetScreen(new ChatScreen("")); break;
-            case Keys.Slash: _ignoreNextChar = true; SetScreen(new ChatScreen("/")); break;
+            case Keys.T: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("")); break; // Ctrl/Alt+T nie daje znaku
+            case Keys.Slash: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("/")); break;
             case Keys.F1: HideGui = !HideGui; break;
             case Keys.F3: ShowDebug = !ShowDebug; break;
             case Keys.F5: CameraMode = (CameraMode + 1) % 3; break;
@@ -491,15 +548,24 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         long deadline = _autotest || _noSlice ? long.MaxValue : Stopwatch.GetTimestamp() + (long)(TickBudgetSeconds * Stopwatch.Frequency);
         int n = 0;
         if (_midTick) { n++; try { ContinueTick(deadline); } catch (Exception ex) { _midTick = false; Log.Error("Tick: " + ex); } }
+        FlushDeferredInput(); // między pełnymi tickami, przed następnym (ControlTick widzi kliknięcia)
         while (!_midTick && _acc >= 0.05 && n < 10 && (n == 0 || Stopwatch.GetTimestamp() < deadline))
         {
             _acc -= 0.05; n++;
             try { Tick(deadline); } catch (Exception ex) { _midTick = false; Log.Error("Tick: " + ex); }
+            FlushDeferredInput(); // np. zwolnienie przycisku po kliknięciu obsłużonym w tym ticku, przed nadrabianiem kolejnych
         }
         if (n >= 10 || _acc > 0.5) _acc = 0;
         // w połowie ticku: pt=0, czyli wszystko w pozycji z początku ticku (bez cofania po jego końcu)
         float pt = _midTick ? 0f : (float)(_acc / 0.05);
-        if (World != null && _screen != null && _screen.PausesGame && _sessionStarted) pt = 1f;
+        if (World != null && _screen != null && _screen.PausesGame && _sessionStarted && Server == null && Client == null) pt = 1f; // w sieci świat dalej tyka
+
+        // zminimalizowane okno: bufor 0x0 (rzutowanie z proporcją 0 rzuca wyjątek), więc bez rysowania i bez kręcenia pętli
+        if (FramebufferSize.X <= 0 || FramebufferSize.Y <= 0 || WindowState == WindowState.Minimized)
+        {
+            Thread.Sleep(10); _nextFrame = _clock.Elapsed.TotalSeconds;
+            return;
+        }
 
         MouseLook();
         bool gpuQ = _stressMeasure;

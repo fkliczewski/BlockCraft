@@ -87,8 +87,12 @@ public sealed class AnvilScreen : ContainerScreen
     public override void KeyDown(Keys k, bool ctrl, bool shift)
     {
         if (k == Keys.Escape) { G.SetScreen(null); return; }
-        if (_ac.Inv.Get(0) != null && _name.Key(G, k, ctrl, shift)) { Rename(); return; }
-        if (k == Keys.E) return; // E pisze w polu nazwy jak w 1.8, nie zamyka okna
+        if (_ac.Inv.Get(0) != null)
+        {
+            if (_name.Key(G, k, ctrl, shift)) { Rename(); return; }
+            // aktywne pole nazwy (GuiRepair.keyTyped): E, Q i 1-9 piszą w polu - nie zamykają okna, nie wyrzucają ani nie zamieniają slotów
+            if (!ctrl) return;
+        }
         base.KeyDown(k, ctrl, shift);
     }
 

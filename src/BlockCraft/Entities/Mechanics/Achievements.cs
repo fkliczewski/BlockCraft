@@ -75,7 +75,7 @@ public static class AchievementList
         if (src.Attacker is not Player p || victim.World.IsRemote) return;
         if (victim is Monster) p.AwardAchievement("killEnemy");
         if (victim.TypeKey == "wither") p.AwardAchievement("killWither");
-        if (victim.TypeKey == "ghast" && src.Type == "fireball") p.AwardAchievement("ghast");
+        if (victim.TypeKey == "ghast" && src.Type is "fireball" or "fireball_reflected") p.AwardAchievement("ghast");
         double dx = victim.X-p.X, dz = victim.Z-p.Z;
         if (victim.TypeKey == "skeleton" && src.Type == "arrow" && dx*dx+dz*dz >= 2500) p.AwardAchievement("snipeSkeleton");
     }

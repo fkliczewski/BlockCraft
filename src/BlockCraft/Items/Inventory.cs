@@ -118,6 +118,8 @@ public class Slot
     public virtual void OnTake(Player p, ItemStack taken) { }
     /// <summary>Slot.canTakeStack (np. wynik kowadła wymaga poziomów).</summary>
     public virtual bool CanTake(Player p) => true;
+    /// <summary>InventoryCraftResult/InventoryMerchant.decrStackSize: wynik (crafting, kowadło, handel) oddaje się zawsze w całości (piec nie).</summary>
+    public bool TakesWhole => IsOutput && this is not FurnaceOutputSlot;
     public ItemStack Take(int n)
     {
         var s = Stack; if (s == null) return null;
@@ -242,7 +244,7 @@ public abstract class Container
             if (slotIdx < 0) return;
             var slot = Slots[slotIdx];
             var s = slot.Stack; if (s == null || p.Cursor != null || !slot.CanTake(p)) return;
-            var taken = slot.Take(button == 1 ? s.Count : 1);
+            var taken = slot.Take(button == 1 || slot.TakesWhole ? s.Count : 1);
             p.DropStack(taken, false);
             slot.OnTake(p, taken);
             return;
@@ -259,6 +261,15 @@ public abstract class Container
                 return;
             }
             if (hot != null && !slot.CanPlace(hot)) return;
+            if (hot != null && hot.Count > slot.MaxStack(hot))
+            {
+                // slot z mniejszym limitem (np. zapłata bekonu): wkłada ile wolno, reszta zostaje w hotbarze
+                int n = slot.MaxStack(hot);
+                if (s != null || n <= 0) return;
+                slot.Stack = hot.CopyWith(n); hot.Count -= n; PInv.Dirty = true;
+                OnSlotChanged(slot);
+                return;
+            }
             PInv.Main[button] = s; slot.Stack = hot; PInv.Dirty = true;
             OnSlotChanged(slot);
             return;
@@ -316,7 +327,7 @@ public abstract class Container
             else if (cur == null)
             {
                 if (!slot.CanTake(p)) return;
-                int n = button == 0 ? s.Count : (s.Count + 1) / 2;
+                int n = button == 0 || slot.TakesWhole ? s.Count : (s.Count + 1) / 2;
                 var taken = slot.Take(n);
                 p.Cursor = taken;
                 slot.OnTake(p, taken);
@@ -389,9 +400,16 @@ public abstract class Container
             if (m != null && m.CanStackWith(s)) { int n = Math.Min(need, m.MaxStack - tmpCounts[i]); if (n > 0) { need -= n; if (!simulate) m.Count += n; } }
             if (need <= 0) break;
         }
+        // puste sloty po MaxStack (np. 8 skopiowanych książek przy limicie 1 zajmuje 8 slotów)
         if (need > 0)
             foreach (var i in order)
-                if (PInv.Main[i] == null) { if (!simulate) PInv.Main[i] = s.CopyWith(need); need = 0; break; }
+            {
+                if (PInv.Main[i] != null) continue;
+                int n = Math.Min(need, s.MaxStack);
+                if (!simulate) PInv.Main[i] = s.CopyWith(n);
+                need -= n;
+                if (need <= 0) break;
+            }
         PInv.Dirty = true;
         return need <= 0;
     }

@@ -24,6 +24,8 @@ public sealed class Chunk
     public int DirtySections; // maska bitowa sekcji do przebudowy mesha
     public long LastSeen;
     public byte[] PendingEntityData; // wczytane z dysku, encje tworzone przy integracji
+    /// <summary>Zapisy tego chunka czekające w kolejce zapisu (ChunkManager); 0 - chunk może zniknąć z listy zapisywanych.</summary>
+    public int QueuedSaves;
     public List<OwEntityPlan> GeneratedEntityPlans; // nowe struktury, wykonywane raz na wątku świata
     public bool FromDisk;
 
@@ -131,4 +133,13 @@ public abstract class TileEntity
     };
 
     public static TileEntity Create(int type) => Types.TryGetValue(type, out var f) ? f() : null;
+
+    /// <summary>Tile entity z jego rekordu (zapis lub sieć): nieznany typ albo uszkodzony rekord gubi tylko siebie (null z logiem), nie cały chunk.</summary>
+    public static TileEntity LoadRecord(int type, BinaryReader record)
+    {
+        var te = Create(type);
+        if (te == null) { Log.Error("Nieznany typ tile entity: " + type); return null; }
+        try { te.Load(record); return te; }
+        catch (Exception ex) { Log.Error("Tile entity " + type + ": " + ex.Message); return null; }
+    }
 }

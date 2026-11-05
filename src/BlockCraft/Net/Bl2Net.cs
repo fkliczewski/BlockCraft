@@ -21,7 +21,7 @@ public static class Bl2Net
 
     public static void ReadStatistics(Player p, BinaryReader r)
     {
-        var data = r.ReadBytes(r.ReadInt32());
+        var data = Core.BinaryLength.ReadBytes(r);
         if (p != null) Bl2Stats.Deserialize(data, p.Statistics);
         Gui.StatsScreen.Received++;
     }

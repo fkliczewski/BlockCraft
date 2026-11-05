@@ -239,6 +239,7 @@ namespace BlockCraft.World
         }
         public override ItemStack PickStack(int meta) => new(I.Banner, 1, 15);
         public override void OnAdded(World w, int x, int y, int z) { if (w.GetTileEntity(x, y, z) is not BannerTile) w.SetTileEntity(x, y, z, new BannerTile()); }
+        public override void OnRemoved(World w, int x, int y, int z, int oldMeta) => w.RemoveTileEntity(x, y, z);
         public override void GetCollisionBoxes(IBlockAccess w, int x, int y, int z, int meta, List<AABB> boxes) { }
         public override void GetDrops(World w, int x, int y, int z, int meta, Rng r, ItemStack tool, List<ItemStack> drops)
             => drops.Add(w.GetTileEntity(x, y, z) is BannerTile te ? te.ToItem() : new ItemStack(I.Banner, 1, 15));

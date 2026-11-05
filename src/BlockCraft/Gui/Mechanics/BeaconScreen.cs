@@ -46,7 +46,12 @@ public sealed class BeaconScreen : ContainerScreen
                 if(Enabled(b.e,b.secondary))
                 {
                     if(b.secondary)_secondary=b.e;
-                    else{bool upgraded=_primary==_secondary;_primary=b.e;if(upgraded)_secondary=b.e;}
+                    else
+                    {
+                        // wzmocnienie (II) idzie za mocą podstawową; świeża latarnia ma obie None, więc bez tego warunku secondary=primary
+                        bool upgraded=_primary!=Effect.None&&_primary==_secondary;_primary=b.e;
+                        if(upgraded)_secondary=b.e;else if(_secondary!=Effect.Regeneration)_secondary=Effect.None;
+                    }
                 }
                 return;
             }
@@ -54,7 +59,9 @@ public sealed class BeaconScreen : ContainerScreen
             {
                 if(CanConfirm)
                 {
-                    if(P.World.IsRemote)G.Client?.SetBeacon(_primary,_secondary);else _bc.Confirm(P,_primary,_secondary);
+                    // moc dodatkowa tylko przy piramidzie 4 poziomów (inaczej Confirm odrzuca całość)
+                    var sec=_bc.Beacon.Levels>=4?_secondary:Effect.None;
+                    if(P.World.IsRemote)G.Client?.SetBeacon(_primary,sec);else _bc.Confirm(P,_primary,sec);
                     G.SetScreen(null);
                 }
                 return;

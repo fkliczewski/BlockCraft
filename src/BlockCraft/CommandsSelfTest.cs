@@ -30,6 +30,14 @@ public static partial class SelfTest
         Check(nbt.GetString("Name") == "A B" && nbt["Health"] is float && nbt["Long"] is long && nbt.GetList("CanDestroy").Count == 1, "CMD Mojangson typy i listy");
         Check(Fails(() => Mojangson.Parse("{a:[1,2}")) && Fails(() => Mojangson.Parse("{}x")), "CMD błędny Mojangson");
         Check(Fails(() => Mojangson.Parse(string.Concat(Enumerable.Repeat("{a:", 300)) + "0" + new string('}', 300))), "CMD limit głębokości NBT");
+        Check(Fails(() => Mojangson.Parse(string.Concat(Enumerable.Repeat("{a:\"x\",b:", 300)) + "0" + new string('}', 300))), "CMD limit głębokości NBT z cudzysłowem");
+        var odd = Mojangson.Parse("{a:NaNb,b:99999b}");
+        Check(odd["a"] is string && odd["b"] is string, "CMD NaNb i 99999b jako napis");
+        Check(Mojangson.Parse("{Health:1e40f}")["Health"] is string && Fails(() => Mojangson.Parse("{Health:1" + new string('0', 40) + "f}")), "CMD float z wykładnikiem jako napis, poza zakresem jako błąd");
+        bool JsonFails(string json) { try { int i = 0; Json.Parse(json, ref i); return false; } catch (FormatException) { return true; } }
+        Check(JsonFails(new string('[', 600) + new string(']', 600)) && JsonFails("\"\\uZZZZ\"") && JsonFails("\"\\u12\""), "CMD JSON głębokość i \\u");
+        bool NbtFails(int len) { using var ms = new System.IO.MemoryStream(); using (var bw = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8, true)) bw.Write(len); ms.Position = 0; try { Nbt.Read(new System.IO.BinaryReader(ms)); return false; } catch (System.IO.InvalidDataException) { return true; } catch (System.IO.EndOfStreamException) { return true; } }
+        Check(NbtFails(-1) && NbtFails(int.MaxValue), "CMD NBT z długością -1 i 2^31");
         Check(Mojangson.Matches(Mojangson.Parse("{Nested:{ok:1b}}"), nbt) && !Mojangson.Matches(Mojangson.Parse("{Nested:{ok:2b}}"), nbt), "CMD częściowe porównanie NBT");
         Check(TextComponent.Render("{\"text\":\"Witaj \",\"extra\":[{\"selector\":\"@a\"}]}", s, p).Contains("Ala") && TextComponent.Render("{\"score\":{\"name\":\"Ala\",\"objective\":\"brak\"}}", s, p) == "", "CMD JSON tekst i selektor");
         var pig = new Pig(w); pig.SetPositionAndPrev(3.5, 4, 3.5); w.AddEntityNow(pig);

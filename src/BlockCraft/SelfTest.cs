@@ -64,6 +64,7 @@ public static partial class SelfTest
         try { TestMobs18(); } catch (Exception e) { Check(false, "Mobs18", e.ToString()); }
         try { TestFood(); } catch (Exception e) { Check(false, "Food", e.ToString()); }
         try { TestSaveLoad(); } catch (Exception e) { Check(false, "SaveLoad", e.ToString()); }
+        try { TestDataRobustness(); } catch (Exception e) { Check(false, "Uszkodzone dane", e.ToString()); }
         try { TestMechanicsEffects(); } catch (Exception e) { Check(false, "Efekty", e.ToString()); }
         try { TestEnchanting(); } catch (Exception e) { Check(false, "Zaklinanie", e.ToString()); }
         try { TestEnchantEffects(); } catch (Exception e) { Check(false, "Działanie zaklęć", e.ToString()); }

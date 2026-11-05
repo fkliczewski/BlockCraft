@@ -200,10 +200,8 @@ public static class ChunkCodec
 
     public static TileEntity LoadTile(int type, int x, int y, int z, byte[] data)
     {
-        var te = TileEntity.Create(type);
-        if (te == null) return null;
-        te.Load(new BinaryReader(new MemoryStream(data)));
-        te.X = x; te.Y = y; te.Z = z;
+        var te = TileEntity.LoadRecord(type, new BinaryReader(new MemoryStream(data)));
+        if (te != null) { te.X = x; te.Y = y; te.Z = z; }
         return te;
     }
 
@@ -231,6 +229,9 @@ public static class ChunkCodec
         return ms.ToArray();
     }
 
+    /// <summary>Najkrótszy rekord tile entity: typ, x, y, z i długość danych (po 4 bajty).</summary>
+    public const int TileEntityRecordMinSize = 20;
+
     /// <summary>Odtwarza chunk (bez światła; światło liczy LightEngine.InitChunkLocal).</summary>
     public static Chunk Decode(int cx, int cz, byte[] data)
     {
@@ -240,17 +241,14 @@ public static class ChunkCodec
         ReadFully(br, c.Blocks, sections * 4096); c.InvalidateColumns();
         ReadFully(br, c.Meta, sections * 4096);
         ReadFully(br, c.Biomes, 256);
-        int n = br.ReadInt32();
+        int n = Core.BinaryLength.Read(br, TileEntityRecordMinSize);
         for (int i = 0; i < n; i++)
         {
             int type = br.ReadInt32(), x = br.ReadInt32(), y = br.ReadInt32(), z = br.ReadInt32();
-            var d = br.ReadBytes(br.ReadInt32());
-            try
-            {
-                var te = LoadTile(type, x, y, z, d);
-                if (te != null) c.TileEntities[Chunk.Index(x & 15, y, z & 15)] = te;
-            }
-            catch (Exception ex) { BlockCraft.Core.Log.Error("Sieć: tile entity " + type + ": " + ex.Message); }
+            var te = Core.BinaryLength.ReadRecord(br, record => TileEntity.LoadRecord(type, record));
+            if (te == null) continue;
+            te.X = x; te.Y = y; te.Z = z;
+            c.TileEntities[Chunk.Index(x & 15, y, z & 15)] = te;
         }
         c.RecountSections();
         c.RecalcHeightMap();

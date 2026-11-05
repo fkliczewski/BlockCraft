@@ -66,6 +66,12 @@ public sealed class LevelData
     public int Version { get; set; } = 1;
 }
 
+/// <summary>Zaplanowany tick bloku w zapisie: opóźnienie w tickach liczone od chwili zapisu.</summary>
+public readonly record struct ScheduledTickRecord(int X, int Y, int Z, byte Id, int Delay, int Priority)
+{
+    public const int Size = 4 * 3 + 1 + 4 + 4;
+}
+
 public sealed class WorldStorage
 {
     public readonly string Dir;
@@ -139,6 +145,34 @@ public sealed class WorldStorage
         return res.OrderByDescending(x => x.Item2.LastPlayed).ToList();
     }
 
+    private string ScheduledTicksPath => Path.Combine(Dir, "ticks.dat");
+
+    public void SaveScheduledTicks(IReadOnlyCollection<ScheduledTickRecord> ticks)
+    {
+        var tmp = ScheduledTicksPath + ".tmp";
+        using (var bw = new BinaryWriter(File.Create(tmp)))
+        {
+            bw.Write(ticks.Count);
+            foreach (var t in ticks) { bw.Write(t.X); bw.Write(t.Y); bw.Write(t.Z); bw.Write(t.Id); bw.Write(t.Delay); bw.Write(t.Priority); }
+        }
+        File.Move(tmp, ScheduledTicksPath, true);
+    }
+
+    /// <summary>Ticki z ticks.dat; brak pliku (stare światy) lub uszkodzony plik daje pustą listę.</summary>
+    public List<ScheduledTickRecord> LoadScheduledTicks()
+    {
+        var res = new List<ScheduledTickRecord>();
+        if (!File.Exists(ScheduledTicksPath)) return res;
+        try
+        {
+            using var br = new BinaryReader(File.OpenRead(ScheduledTicksPath));
+            int n = Core.BinaryLength.Read(br, ScheduledTickRecord.Size);
+            for (int i = 0; i < n; i++) res.Add(new(br.ReadInt32(), br.ReadInt32(), br.ReadInt32(), br.ReadByte(), br.ReadInt32(), br.ReadInt32()));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException) { Log.Error("ticks.dat: " + ex.Message); res.Clear(); }
+        return res;
+    }
+
     private string ChunkPath(int cx, int cz) => Path.Combine(Dir, "chunks", $"c.{cx}.{cz}.dat");
 
     public void SaveChunk(Chunk c, byte[] entityData)
@@ -167,7 +201,7 @@ public sealed class WorldStorage
         var tmp = path + ".tmp";
         File.WriteAllBytes(tmp, ms.ToArray());
         File.Move(tmp, path, true);
-        c.Modified = false;
+        // Modified czyści wywołujący (wątek główny) - wątek zapisu nie może kasować zmian zrobionych w międzyczasie
     }
 
     public Chunk LoadChunk(int cx, int cz)
@@ -185,31 +219,51 @@ public sealed class WorldStorage
             (ver >= 3 ? Chunk.Volume : Chunk.Volume / 2).ReadFully(br, c.Meta);
             256.ReadFully(br, c.Biomes);
             c.Populated = br.ReadBoolean();
-            int nte = br.ReadInt32();
-            for (int i = 0; i < nte; i++)
+            try { ReadChunkExtras(br, ver, c); }
+            catch (Exception ex) when (ex is EndOfStreamException or InvalidDataException)
             {
-                int type = br.ReadInt32(); int x = br.ReadInt32(), y = br.ReadInt32(), z = br.ReadInt32();
-                TileEntity te;
-                if (ver >= 3)
-                {
-                    var tbytes = br.ReadBytes(br.ReadInt32());
-                    te = TileEntity.Create(type);
-                    if (te == null) { Log.Error("Nieznany typ tile entity: " + type); continue; }
-                    try { te.Load(new BinaryReader(new MemoryStream(tbytes))); }
-                    catch (Exception ex) { Log.Error("Tile entity " + type + ": " + ex.Message); continue; }
-                }
-                else { te = TileEntity.Create(type); te.Load(br); }
-                te.X = x; te.Y = y; te.Z = z;
-                c.TileEntities[Chunk.Index(x & 15, y, z & 15)] = te;
+                // uszkodzony ogon pliku: bloki zostają, tracimy tylko niewczytane tile entity/encje
+                Log.Error($"Load chunk {cx},{cz}: uszkodzone tile entity lub encje: {ex.Message}");
             }
-            int elen = br.ReadInt32();
-            if (elen > 0) c.PendingEntityData = br.ReadBytes(elen);
             c.RecountSections();
             c.RecalcHeightMap();
             c.FromDisk = true;
             return c;
         }
         catch (Exception ex) { Log.Error($"Load chunk {cx},{cz}: {ex.Message}"); return null; }
+    }
+
+    /// <summary>Najkrótszy rekord tile entity w pliku chunka: typ, x, y, z (po 4 bajty); od wersji 3 dochodzi długość danych.</summary>
+    private const int TileEntityRecordMinSize = 16;
+
+    /// <summary>Tile entity i dane encji zapisane po blokach chunka.</summary>
+    private static void ReadChunkExtras(BinaryReader br, int ver, Chunk c)
+    {
+        int nte = Core.BinaryLength.Read(br, TileEntityRecordMinSize);
+        for (int i = 0; i < nte; i++)
+        {
+            int type = br.ReadInt32(); int x = br.ReadInt32(), y = br.ReadInt32(), z = br.ReadInt32();
+            TileEntity te;
+            if (ver >= 3)
+            {
+                te = Core.BinaryLength.ReadRecord(br, rb => TileEntity.LoadRecord(type, rb));
+                if (te == null) continue;
+            }
+            else te = ReadLegacyTileEntity(br, type);
+            te.X = x; te.Y = y; te.Z = z;
+            c.TileEntities[Chunk.Index(x & 15, y, z & 15)] = te;
+        }
+        int elen = Core.BinaryLength.Read(br);
+        if (elen > 0) c.PendingEntityData = Core.BinaryLength.ReadExactly(br, elen);
+    }
+
+    /// <summary>Tile entity sprzed wersji 3 (bez długości rekordu): błąd przerywa odczyt ogona chunka, ale bloki zostają.</summary>
+    private static TileEntity ReadLegacyTileEntity(BinaryReader br, int type)
+    {
+        var te = TileEntity.Create(type) ?? throw new InvalidDataException("nieznany typ tile entity " + type);
+        try { te.Load(br); }
+        catch (Exception ex) when (ex is not (EndOfStreamException or InvalidDataException)) { throw new InvalidDataException("tile entity " + type + ": " + ex.Message, ex); }
+        return te;
     }
 }
 
@@ -236,7 +290,7 @@ public static class StreamExt
         bool tag = (id & 0x4000) != 0; id &= 0x3FFF;
         int count = br.ReadByte(); int dmg = br.ReadInt16();
         var t = tag ? Nbt.Read(br) : null;
-        if (Item.ById[id] == null) return null;
+        if (id >= Item.ById.Length || Item.ById[id] == null) return null; // nieznane/uszkodzone id
         return new ItemStack(id, count, dmg) { Tag = t };
     }
 }

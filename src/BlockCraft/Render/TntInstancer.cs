@@ -93,5 +93,5 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard;
         _count = 0;
     }
 
-    public void Dispose() { GL.DeleteBuffer(_vbo); GL.DeleteBuffer(_ibo); GL.DeleteVertexArray(_vao); }
+    public void Dispose() { GL.DeleteBuffer(_vbo); GL.DeleteBuffer(_ibo); GL.DeleteVertexArray(_vao); _sh.Dispose(); }
 }

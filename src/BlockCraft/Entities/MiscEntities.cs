@@ -39,7 +39,7 @@ public sealed class ItemEntity : Entity
         MotionX *= f; MotionY *= 0.98; MotionZ *= f;
         if (OnGround) MotionY *= -0.5;
         Lifetime++;
-        if (Lifetime >= 6000) Kill();
+        if (Lifetime >= 6000) { Kill(); return; }
         // łączenie stosów
         if (Age % 20 == 0 && !World.IsRemote && Stack.Count < Stack.MaxStack)
             foreach (var e in World.GetEntitiesInBox(BoundingBox.Grow(0.5, 0, 0.5), this))
@@ -369,7 +369,7 @@ public sealed class ThrownEntity : Entity
         if (Kind == 0)
         {
             World.SpawnParticles(ParticleKind.Portal, X, Y, Z, 32);
-            if (Thrower is Player p && !p.Dead)
+            if (Thrower is Player p && !p.Dead && p.World == World)
             {
                 // MC 1.8: 5% szans na endermita w miejscu gracza (moduł NE rejestruje "endermite")
                 if (World.Rand.NextFloat() < 0.05f && World.Rules.DoMobSpawning && EntitySerializer.Create("endermite", World) is { } mite) { mite.SetPositionAndPrev(p.X, p.Y, p.Z); mite.Yaw = p.Yaw; World.SpawnEntity(mite); }

@@ -383,9 +383,7 @@ public abstract partial class LivingEntity : Entity
     {
         if (Dead) return;
         Dead = true;
-        AchievementList.Killed(this, src);
-        Bl2Stats.Killed(this, src);
-        DeathHook?.Invoke(this, src);
+        RecordDeath(src);
         Health = 0;
         UnpredictedSound = true;
         try { World.PlaySound(DeathSound, X, Y + Height / 2, Z, 1f, 1f); }
@@ -396,6 +394,14 @@ public abstract partial class LivingEntity : Entity
             if (World.Rules.DoMobLoot) DropLoot(byPlayer, FireTicks > 0);
             if (byPlayer && XpValue > 0) World.SpawnXp(X, Y + 0.5, Z, XpValue);
         }
+    }
+
+    /// <summary>Osiągnięcia, statystyki i scoreboard po śmierci (też dla smoka z własną animacją śmierci).</summary>
+    protected void RecordDeath(DamageSource src)
+    {
+        AchievementList.Killed(this, src);
+        Bl2Stats.Killed(this, src);
+        DeathHook?.Invoke(this, src);
     }
 
     protected virtual void DropLoot(bool byPlayer, bool burning) { }

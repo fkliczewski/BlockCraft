@@ -1,3 +1,4 @@
+using BlockCraft.Core;
 using BlockCraft.Items;
 
 namespace BlockCraft.World.Structures18;
@@ -155,8 +156,12 @@ public sealed class StructureWorld
             id = (meta & 7) switch { 1 => B.SandstoneSlab, 3 => B.CobbleSlab, 4 => B.BrickSlab, 5 => B.StoneBrickSlab, _ => id };
             meta = (meta & 8) >> 3;
         }
-        if (id is B.OakStairs or B.CobbleStairs or B.SandstoneStairs or B.StoneBrickStairs)
+        if (BlockCraft.World.Block.Get(id) is StairsBlock)
             meta = (meta & ~3) | ((meta & 3) switch { 0 => 3, 1 => 1, 2 => 0, _ => 2 });
+        // MC: drabina/przycisk wskazują facing (od ściany), silnik: kierunek do bloku-nośnika.
+        if (id == B.Ladder && meta is >= 2 and <= 5) meta ^= 1;
+        if (id is B.StoneButton or B.WoodButton)
+            meta = (meta & 8) | ((meta & 7) switch { 0 => Dir.Up, 1 => Dir.West, 2 => Dir.East, 3 => Dir.North, 4 => Dir.South, _ => Dir.Down });
         if (id is B.Chest or B.Furnace) meta = meta switch { 3 => 0, 4 => 1, 5 => 3, _ => 2 };
         if (id == B.Torch && meta == 5) meta = 0;
         Region.Set(p.X, p.Y, p.Z, id, meta);
@@ -164,7 +169,7 @@ public sealed class StructureWorld
     public BlockPos getTopSolidOrLiquidBlock(BlockPos p)
     {
         int y = 255;
-        while (y > 0) { int id = Region.Get(p.X, y, p.Z); var b = BlockCraft.World.Block.Get(id); if (id is B.Water or B.Lava || b.Solid && b is not LeavesBlock) break; y--; }
+        while (y > 0) { int id = Region.Get(p.X, y, p.Z); var b = BlockCraft.World.Block.Get(id); if (b.Solid && b is not LeavesBlock) break; y--; }
         return new(p.X, y + 1, p.Z);
     }
     public BlockPos getTopSolidOrLiquidBlock(int x, int z) => new(x, Region.TopSolid(x, z), z);

@@ -51,11 +51,13 @@ public sealed partial class NetServer
     {
         _tick++;
         foreach (var w in NetHooks.WorldsOf(Main)) if (!_taps.ContainsKey(w)) { var t = new WorldTap(this, w); _taps[w] = t; w.Listeners.Add(t); }
+        // rozłączeni przed logowaniami: gracz wracający od razu dostaje swój nick i zapisany przed chwilą stan
+        foreach (var c in Clients.ToArray()) if (c.Conn.IsClosed) Disconnected(c, c.Conn.CloseReason);
         for (int i = _pending.Count - 1; i >= 0; i--)
         {
             var c = _pending[i];
             if (c.Conn.IsClosed) { _pending.RemoveAt(i); continue; }
-            while (c.Conn.TryReceive(out var f) && !c.LoggedIn) HandleFrame(c, f);
+            while (!c.LoggedIn && c.Conn.TryReceive(out var f)) HandleFrame(c, f);
             if (c.LoggedIn) { _pending.RemoveAt(i); Clients.Add(c); }
             else if (c.Age++ > 20 * 30) { c.Kick("Brak logowania"); _pending.RemoveAt(i); }
         }
@@ -65,7 +67,8 @@ public sealed partial class NetServer
             int n = 0;
             while (n++ < 200 && c.Conn.TryReceive(out var f)) HandleFrame(c, f);
             if (c.Conn.IsClosed) continue;
-            c.ProcessInputs();
+            try { c.ProcessInputs(); }
+            catch (Exception ex) { Log.Error("Sieć: wejście od " + c.Name + ": " + ex); c.Kick("Błąd protokołu"); continue; }
             if (_tick - c.LastPacketTick > 20 * 45) c.Kick("Przekroczono czas oczekiwania");
         }
     }
@@ -147,7 +150,8 @@ public sealed partial class NetServer
         if (!c.LoggedIn && type != C2S.Login) return;
         switch (type)
         {
-            case C2S.Login: Login(c, r.ReadInt32(), r.ReadString(), r.ReadByte()); break;
+            case C2S.Login: if (c.LoggedIn) break; // drugie logowanie stworzyłoby drugiego gracza (stary zostałby w świecie)
+                Login(c,r.ReadInt32(), r.ReadString(), r.ReadByte()); break;
             case C2S.Input: c.QueueInput(NetInput.Read(r)); break;
             case C2S.Chat: Chat(c, r.ReadString()); break;
             case C2S.Click: c.Click(r.ReadByte(), r.ReadInt16(), r.ReadByte(), (ClickType)r.ReadByte()); break;

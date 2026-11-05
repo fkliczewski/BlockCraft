@@ -117,7 +117,7 @@ public static class OwDecorator
                     if (g.Get(vx, y, vz) == B.Air)
                     {
                         for (int d = 0; d < 4; d++)
-                            if (g.Solid(vx + Dir.HorizX[d], y, vz + Dir.HorizZ[d])) { g.Set(vx, y, vz, B.Vine, d switch { 0 => 4, 1 => 8, 2 => 1, _ => 2 }); break; }
+                            if (g.Solid(vx + Dir.HorizX[d], y, vz + Dir.HorizZ[d])) { g.Set(vx, y, vz, B.Vine, 1 << d); break; }
                     }
                     else { vx += r.NextInt(4) - r.NextInt(4); vz += r.NextInt(4) - r.NextInt(4); }
                 }

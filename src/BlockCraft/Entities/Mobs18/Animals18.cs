@@ -589,10 +589,17 @@ public sealed class LeashKnot : Entity
             return existing.Interact(p);
         }
         if(w.IsRemote) return true;
-        var knot=existing??new LeashKnot(w);
-        if(existing==null) { knot.SetPositionAndPrev(x+.5,y+.375-.25,z+.5); w.SpawnEntity(knot); w.PlaySound("dig.wood",x+.5,y+.5,z+.5); }
+        var knot=existing;
+        if(knot==null) { knot=Spawn(w,x,y,z); w.PlaySound("dig.wood",x+.5,y+.5,z+.5); }
         foreach(var m in mobs) m.LeashHolder=knot;
         return true;
+    }
+    /// <summary>Nowy węzeł zawieszony na płocie w (x,y,z).</summary>
+    public static LeashKnot Spawn(World.World w,int x,int y,int z)
+    {
+        var knot=new LeashKnot(w);
+        knot.SetPositionAndPrev(x+.5,y+.375-.25,z+.5); w.SpawnEntity(knot);
+        return knot;
     }
     public override bool Interact(Player p)
     {
@@ -604,6 +611,13 @@ public sealed class LeashKnot : Entity
             if(mine.Count>0) return true;
         }
         Break(p.Creative);
+        return true;
+    }
+    /// <summary>EntityHanging.attackEntityFrom: uderzenie zrywa węzeł, przywiązane moby gubią smycze (jak w MC także w kreatywnym).</summary>
+    public override bool Attack(DamageSource source,float amount)
+    {
+        if(World.IsRemote||Removed) return false;
+        Break(false);
         return true;
     }
     public void Break(bool creative)

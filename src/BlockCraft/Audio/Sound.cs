@@ -12,6 +12,8 @@ public static class Sound
     static readonly Mixer Mix = new();
     static SoundBank _bank = new();
     static Settings _settings;
+    /// <summary>Kopia głośności kategorii dla wątku audio (copy-on-write): Dictionary w Settings pisze wątek GUI.</summary>
+    static volatile Dictionary<string, float> _vols = new();
     static volatile bool _started;
     static readonly object BankLock = new();
 
@@ -28,6 +30,7 @@ public static class Sound
     public static void Init(Settings settings)
     {
         _settings = settings;
+        _vols = settings?.SoundVolumes != null ? new Dictionary<string, float>(settings.SoundVolumes) : new();
         Mix.CategoryVolume = CategoryVolume;
         _started = Mix.Start();
         AssetStore.Finished = ReloadBank;
@@ -47,13 +50,14 @@ public static class Sound
     /// <summary>Głośność kategorii 0..1 (master, music, record, weather, block, hostile, neutral, player, ambient).</summary>
     public static float CategoryVolume(string cat)
     {
-        if (_settings?.SoundVolumes != null && _settings.SoundVolumes.TryGetValue(cat, out var v)) return v;
-        return 1f;
+        return _vols.TryGetValue(cat, out var v) ? v : 1f;
     }
     public static void SetCategoryVolume(string cat, float v)
     {
-        if (_settings == null) return;
-        _settings.SoundVolumes[cat] = Math.Clamp(v, 0f, 1f);
+        if (_settings?.SoundVolumes == null) return;
+        v = Math.Clamp(v, 0f, 1f);
+        _settings.SoundVolumes[cat] = v;
+        _vols = new Dictionary<string, float>(_vols) { [cat] = v };
     }
 
     /// <summary>Pozycja i kierunek słuchacza (yaw w stopniach, konwencja MC: 0 = +Z).</summary>
@@ -78,14 +82,14 @@ public static class Sound
         catch (Exception ex) { Log.Error("Sound.PlayUi " + ev + ": " + ex.Message); }
     }
 
-    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0, bool enqueue = true)
+    static Voice Start(bool resolved, string ev, double x, double y, double z, float vol, float pitch, bool positional, bool forceStream = false, float attOverride = 0, bool enqueue = true, bool farOk = false)
     {
         SoundBank bank; lock (BankLock) bank = _bank;
         bank.Events.TryGetValue(ev, out var def);
         var v = new Voice { Positional = positional, X = x, Y = y, Z = z, EventKey = ev, EventPitch = pitch };
         float att = 16f * Math.Max(1f, vol);
         v.AttDist = attOverride > 0 ? attOverride : att;
-        if (positional)
+        if (positional && !farOk) // farOk: długi dźwięk (płyta) gra od razu z głośnością 0, słychać go po podejściu
         {
             double dx = x - Mix.LX, dy = y - Mix.LY, dz = z - Mix.LZ;
             if (dx * dx + dy * dy + dz * dz >= v.AttDist * v.AttDist) return null;
@@ -147,7 +151,7 @@ public static class Sound
         {
             string ev = name.StartsWith("records.") ? name : "records." + name;
             float vol = 4f, pitch = 1f;
-            var v = Start(true, ev, x + 0.5, y + 0.5, z + 0.5, vol, pitch, true, true);
+            var v = Start(true, ev, x + 0.5, y + 0.5, z + 0.5, vol, pitch, true, true, farOk: true);
             if (v != null) { v.Tag = Key(x, y, z); v.Category = "record"; }
         }
         catch (Exception ex) { Log.Error("Sound.PlayRecord: " + ex.Message); }

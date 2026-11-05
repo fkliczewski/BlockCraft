@@ -36,7 +36,7 @@ public static class EntityNbt
     public static ItemStack ItemFromNbt(Nbt n)
     {
         if (n == null) return null;
-        Item it = n.TryGetValue("id", out var id) ? id is string str ? Item.Get(str) : Item.ById.ElementAtOrDefault(Convert.ToInt32(id)) : null;
+        Item it = n.TryGetValue("id", out var id) ? id is string str ? Item.Get(str) : Item.ById.ElementAtOrDefault(n.GetInt("id", -1)) : null;
         if (it == null) return null;
         var s = new ItemStack(it.Id, Math.Max(1, n.GetInt("Count", 1)), n.GetInt("Damage"));
         if (n.GetCompound("tag") is { } t) s.Tag = t.Copy();

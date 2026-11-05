@@ -166,6 +166,12 @@ public sealed class LightEngine
                 {
                     SetL(c, nx, ny, nz, sky, 0);
                     PushR(nx, ny, nz, nl);
+                    // sąsiad sam świeci - przywróć jego emisję i rozprowadź ponownie
+                    if (!sky)
+                    {
+                        int e = Emit[c.Blocks[Chunk.Index(nx & 15, ny, nz & 15)]];
+                        if (e > 0) { SetL(c, nx, ny, nz, false, e); Push(nx, ny, nz, e); }
+                    }
                 }
                 else Push(nx, ny, nz, nl);
             }

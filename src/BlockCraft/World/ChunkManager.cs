@@ -21,6 +21,8 @@ public sealed class ChunkManager : IDisposable
     public int LoadedCount => _w.Chunks.Count;
     public int PendingCount { get { lock (_lock) return _requests.Count + _pending.Count; } }
     private readonly ConcurrentDictionary<long, Chunk> _savingChunks = new();
+    /// <summary>Wpis do _savingChunks razem z licznikiem QueuedSaves (QueueSave i CompleteSave).</summary>
+    private readonly object _savingLock = new();
     private readonly BlockingCollection<(Chunk, byte[])> _saveQueue = new();
     private readonly Thread _saver;
 
@@ -73,8 +75,7 @@ public sealed class ChunkManager : IDisposable
             try
             {
                 int cx = (int)(key >> 32), cz = (int)key;
-                Chunk c = null;
-                if (_savingChunks.TryGetValue(key, out var sc)) { c = sc; c.Unloaded = false; }
+                Chunk c = TakeSavingChunk(cx, cz);
                 if (c == null && _w.Storage != null) c = _w.Storage.LoadChunk(cx, cz);
                 if (c == null) c = _w.GenerateChunk(cx, cz);
                 LightEngine.InitChunkLocal(c, _w.Provider.HasNoSky);
@@ -90,13 +91,52 @@ public sealed class ChunkManager : IDisposable
         {
             foreach (var (c, ents) in _saveQueue.GetConsumingEnumerable())
             {
-                try { _w.Storage?.SaveChunk(c, ents); }
-                catch (Exception ex) { Log.Error("Save chunk error: " + ex.Message); }
-                _savingChunks.TryRemove(MathUtil.ChunkKey(c.Cx, c.Cz), out _);
+                if (TrySaveChunk(c, ents)) CompleteSave(c);
+                else _failedSaves.Enqueue((c, ents));
             }
         }
         catch (Exception) { }
     }
+
+    /// <summary>Chunk zwolniony, którego zapis trwa lub się nie udał: wczytanie bierze go z pamięci, nie starą wersję z dysku.</summary>
+    public Chunk TakeSavingChunk(int cx, int cz)
+    {
+        if (!_savingChunks.TryGetValue(MathUtil.ChunkKey(cx, cz), out var c)) return null;
+        c.Unloaded = false; c.Modified = true; // kolejne zwolnienie musi zapisać chunk ponownie
+        return c;
+    }
+
+    /// <summary>Nieudane zapisy zwolnionych chunków: zostają w _savingChunks (wczytanie bierze je z pamięci) i są ponawiane.</summary>
+    private readonly ConcurrentQueue<(Chunk c, byte[] ents)> _failedSaves = new();
+
+    private bool TrySaveChunk(Chunk c, byte[] ents)
+    {
+        try { _w.Storage?.SaveChunk(c, ents); return true; }
+        catch (Exception ex) { Log.Error("Save chunk error: " + ex.Message); return false; }
+    }
+
+    /// <summary>Ponowienie nieudanych zapisów (chunk nadal zwolniony); wczytany ponownie chunk zapisze się sam.</summary>
+    private void RetryFailedSaves()
+    {
+        int n = _failedSaves.Count;
+        for (int i = 0; i < n && _failedSaves.TryDequeue(out var f); i++)
+        {
+            if (!f.c.Unloaded) { f.c.Modified = true; CompleteSave(f.c); continue; }
+            if (IsSupersededSave(f.c, f.ents)) { CompleteSave(f.c); continue; } // chunk zakolejkowany ponownie: nowszy zapis ma aktualne encje
+            _saveQueue.Add(f);
+        }
+    }
+
+    /// <summary>Zakończony (lub porzucony) zapis: chunk znika z _savingChunks dopiero, gdy nie czeka już nowszy zapis.</summary>
+    private void CompleteSave(Chunk c)
+    {
+        // pod tą samą blokadą co QueueSave: inaczej nowy zapis mógłby wpisać chunk między zmniejszeniem licznika a usunięciem
+        lock (_savingLock)
+            if (Interlocked.Decrement(ref c.QueuedSaves) == 0) _savingChunks.TryRemove(MathUtil.ChunkKey(c.Cx, c.Cz), out _);
+    }
+
+    /// <summary>Od nieudanego zapisu chunk wczytano i zwolniono znowu (QueueSave podmienił PendingEntityData).</summary>
+    private static bool IsSupersededSave(Chunk c, byte[] ents) => !ReferenceEquals(c.PendingEntityData, ents);
 
     private int _lastCenterHash = int.MinValue;
 
@@ -131,6 +171,19 @@ public sealed class ChunkManager : IDisposable
         Integrate(budgetMs);
     }
 
+    /// <summary>Wymiar bez graczy: anuluje zamówienia i zwalnia (z zapisem) wszystkie chunki.</summary>
+    public void UnloadAll()
+    {
+        lock (_lock)
+        {
+            _centers = Array.Empty<(int cx, int cz)>();
+            foreach (var old in _requests) _pending.Remove(old);
+            _requests.Clear();
+        }
+        _lastCenterHash = int.MinValue;
+        if (!_w.Chunks.IsEmpty) UnloadFar();
+    }
+
     private bool InRange(long k, int r)
     {
         int cx = (int)(k >> 32), cz = (int)k;
@@ -145,8 +198,8 @@ public sealed class ChunkManager : IDisposable
         {
             long k = MathUtil.ChunkKey(c.Cx, c.Cz);
             lock (_lock) _pending.Remove(k);
-            if (!InRange(k, Radius + 3)) { if (c.Modified) QueueSave(c, null); continue; }
-            if (_w.Chunks.ContainsKey(k)) continue;
+            if (!InRange(k, Radius + 3)) { if (c.Modified) { c.Unloaded = true; QueueSave(c, c.PendingEntityData); } continue; } // nie gub niewczytanych encji
+            if (_w.Chunks.ContainsKey(k)) continue; // wczytany w międzyczasie synchronicznie (EnsureDimensionArea)
             _w.Chunks[k] = c;
             _w.Light.MergeChunk(c);
             c.MarkAllDirty();
@@ -159,6 +212,7 @@ public sealed class ChunkManager : IDisposable
             foreach (var te in c.TileEntities.Values) { te.X += 0; }
             if (c.PendingEntityData != null) { EntitySerializer.LoadEntities(_w, c.PendingEntityData); c.PendingEntityData = null; }
             _w.ApplyGeneratedEntities(c);
+            _w.RestoreParkedTicks(c.Cx, c.Cz);
             if (!c.Populated) { c.Populated = true; _w.Spawner.PopulateChunk(c); }
             // zaplanuj ticki płynów na krawędziach (np. wczytane źródła)
         }
@@ -191,8 +245,13 @@ public sealed class ChunkManager : IDisposable
     private void QueueSave(Chunk c, byte[] ents)
     {
         if (_w.Storage == null) return;
-        _savingChunks[MathUtil.ChunkKey(c.Cx, c.Cz)] = c;
+        lock (_savingLock)
+        {
+            _savingChunks[MathUtil.ChunkKey(c.Cx, c.Cz)] = c;
+            Interlocked.Increment(ref c.QueuedSaves);
+        }
         c.PendingEntityData = ents;
+        c.Modified = false; // czyszczone tu (wątek główny), nie w wątku zapisu - późniejsze zmiany ponownie ustawią flagę
         _saveQueue.Add((c, ents));
     }
 
@@ -200,6 +259,8 @@ public sealed class ChunkManager : IDisposable
     public void SaveAll()
     {
         if (_w.Storage == null) return;
+        RetryFailedSaves();
+        WaitForQueuedSaves();
         var byChunk = new Dictionary<long, List<Entity>>();
         foreach (var e in _w.Entities)
         {
@@ -213,12 +274,18 @@ public sealed class ChunkManager : IDisposable
             var c = kv.Value;
             byChunk.TryGetValue(kv.Key, out var ents);
             if (!c.Modified && ents == null) continue;
+            if (Volatile.Read(ref c.QueuedSaves) > 0) continue; // starszy zapis z kolejki nadpisałby nowszy stan
+            c.Modified = false;
             try { _w.Storage.SaveChunk(c, ents != null ? EntitySerializer.SaveEntities(ents) : null); }
-            catch (Exception ex) { Log.Error("SaveAll: " + ex.Message); }
+            catch (Exception ex) { Log.Error("SaveAll: " + ex.Message); c.Modified = true; }
         }
-        // poczekaj na kolejkę
+    }
+
+    /// <summary>Czeka (max 5 s), aż wątek zapisu skończy chunki z kolejki, zanim zapisze je SaveAll.</summary>
+    private void WaitForQueuedSaves()
+    {
         var sw = Stopwatch.StartNew();
-        while (_saveQueue.Count > 0 && sw.ElapsedMilliseconds < 5000) Thread.Sleep(10);
+        while (sw.ElapsedMilliseconds < 5000 && (_saveQueue.Count > 0 || _w.Chunks.Values.Any(c => Volatile.Read(ref c.QueuedSaves) > 0))) Thread.Sleep(10);
     }
 
     /// <summary>Synchroniczne załadowanie (np. przy starcie dla obszaru spawnu).</summary>

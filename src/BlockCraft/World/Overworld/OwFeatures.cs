@@ -112,9 +112,17 @@ public static class OwFeatures
             {
                 if (soil && g.Get(xx, yy + 1, zz) == B.Air) { g.Set(xx, yy, zz, id, meta); g.Set(xx, yy + 1, zz, id, 8); placed = true; }
             }
-            else if (soil && g.Height(xx, zz) <= yy) { g.Set(xx, yy, zz, id, meta); placed = true; }
+            else if (soil && Lit(g, xx, yy, zz)) { g.Set(xx, yy, zz, id, meta); placed = true; }
         }
         return placed;
+    }
+
+    // Jak canBlockStay krzaka 1.8 (światło >= 8): nad blokiem łącznie < 8 nieprzezroczystości (liście = 1).
+    private static bool Lit(OwGenRegion g, int x, int y, int z)
+    {
+        int o = 0;
+        for (int yy = 255; yy > y && o < 8; yy--) o += Block.Get(g.Get(x, yy, z)).LightOpacity;
+        return o < 8;
     }
 
     public static void Sediment(OwGenRegion g, JRandom r, int x, int y, int z, int id, int size)
