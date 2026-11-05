@@ -71,6 +71,12 @@ w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
 - Poprawki miejsc zakładających 16×16 (wyciągane przedmioty 3D, cząsteczki z bloków, ikony).
 - Mipmapy i opcja „Poziom mipmap” jak w 1.8.
 
+**Etap 2 — zrobione:** drugi przebieg nakładania w rozdzielczości paczki (`TextureGen.BuildAtlas`), atlas terenu
+w rozmiarze największej tekstury bloków/przedmiotów (potęga dwójki, najwyżej „Tekstury paczek: do N x” w ustawieniach
+graficznych, domyślnie 64, profil słabego GPU 32, programowy 16), tekstury bez wersji HD i klatki wygenerowane
+(woda, lawa) powiększane bez wygładzania, przekształcenia (trawa, szyny, skrzynie, cząsteczki) w HD, mipmapy do 1x1.
+Gra dalej ma atlas 16x16 w pamięci (ikony 3D, kolizje kształtów); na GPU idzie atlas HD.
+
 ## Etap 3 — GUI, czcionka, cząsteczki, niebo, kolory biomów
 
 - `gui/widgets.png`, `gui/icons.png`, okna kontenerów (`gui/container/*.png`), `gui/options_background.png`,
@@ -132,8 +138,9 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 | 1b | zrobiony |
 | 3 | zrobiony |
 | 4 | zrobiony |
-| 5 | zrobiony — do odbioru |
-| 2, 6 | do zrobienia |
+| 5 | zrobiony |
+| 2 | zrobiony — do odbioru |
+| 6 | do zrobienia |
 
 ### Etap 1 — co jest i jak sprawdzić
 
