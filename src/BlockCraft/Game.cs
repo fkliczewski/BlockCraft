@@ -111,6 +111,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Gui = new GuiTextures();
         Renderer = new WorldRenderer();
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
+        ResourcePacks.CloseAll();
         Sound.Init(Settings);
         Renderer.SoundHook = (n, x, y, z, v, p) =>
         {

@@ -60,6 +60,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private readonly Mesh _skyQuad, _sunMesh, _starMesh, _lineMesh;
     private Mesh _cloudMesh;
     private Texture2D _sunTex, _moonTex;
+    private bool _moonPhases;
     public readonly List<Particle> Particles = new();
     public Action<string, double, double, double, float, float> SoundHook;
     /// <summary>Modele bloków z tile entity rysowane co klatkę (np. tabliczki w 16 obrotach), w przebiegu encji.</summary>
@@ -93,8 +94,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         _lineMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); }, false);
         _tnt = new TntInstancer(Entities);
         BuildStars();
-        BuildCelestialTextures();
-        BuildClouds();
+        ReloadPackAssets();
         int n = Math.Clamp(Environment.ProcessorCount / 2, 1, 3);
         _workers = new Thread[n];
         for (int i = 0; i < n; i++) { _workers[i] = new Thread(WorkerLoop) { IsBackground = true, Name = "Mesher" + i, Priority = ThreadPriority.BelowNormal }; _workers[i].Start(); }
@@ -190,6 +190,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
     private void BuildCelestialTextures()
     {
+        _sunTex?.Dispose(); _moonTex?.Dispose();
+        var packSun = ResourcePacks.ReadImage("environment/sun.png");
+        var packMoon = ResourcePacks.ReadImage("environment/moon_phases.png");
         var sun = new uint[32 * 32];
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
             {
@@ -201,7 +204,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 else if (d < 26) c = TextureGen.Rgba(200, 160, 60, 90);
                 sun[y * 32 + x] = c;
             }
-        _sunTex = new Texture2D(32, 32, sun);
+        _sunTex = packSun != null ? new Texture2D(packSun.W, packSun.H, packSun.Px) : new Texture2D(32, 32, sun);
         var moon = new uint[32 * 32]; var r = new Rng(3);
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
             {
@@ -213,15 +216,21 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                     moon[y * 32 + x] = TextureGen.Rgba(g, g, g + 10);
                 }
             }
-        _moonTex = new Texture2D(32, 32, moon);
-        _sunSh = new Shader(SunVert, SunFrag, "sun");
+        // moon_phases.png z 1.8: 4x2 fazy księżyca
+        _moonPhases = packMoon != null && packMoon.W == packMoon.H * 2;
+        _moonTex = _moonPhases ? new Texture2D(packMoon.W, packMoon.H, packMoon.Px) : new Texture2D(32, 32, moon);
+        _sunSh ??= new Shader(SunVert, SunFrag, "sun");
     }
 
     private const float CloudY = 108.33f;
-    private const int CloudCells = 128, CloudCell = 12;
+    private const int CloudCell = 12;
+    /// <summary>Rozmiar wzoru chmur w komórkach (128 wygenerowany, 256 z environment/clouds.png).</summary>
+    private int CloudCells = 128;
     private void BuildClouds()
     {
         // wzór chmur 128x128 komórek, kafelkowalny
+        _cloudMesh?.Dispose(); _cloudMesh = null;
+        CloudCells = 128;
         var r = new Rng(1234);
         var grid = new bool[CloudCells * CloudCells];
         var n1 = new float[CloudCells * CloudCells];
@@ -240,6 +249,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 }
         }
         for (int i = 0; i < grid.Length; i++) grid[i] = n1[i] + r.NextFloat() * 0.08f > 0.6f;
+        // environment/clouds.png z paczki: piksel nieprzezroczysty = komórka chmury (jak RenderGlobal 1.8)
+        if (ResourcePacks.ReadImage("environment/clouds.png") is { } ci && ci.W == ci.H && ci.W is >= 16 and <= 512)
+        {
+            CloudCells = ci.W;
+            grid = new bool[CloudCells * CloudCells];
+            for (int i = 0; i < grid.Length; i++) grid[i] = ci.Px[i] >> 24 >= 128;
+        }
         bool G(int x, int y) => grid[((y % CloudCells + CloudCells) % CloudCells) * CloudCells + ((x % CloudCells + CloudCells) % CloudCells)];
         var v = new List<float>();
         void Q(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float s) { foreach (var p in new[] { a, b, c, d }) { v.Add(p.X); v.Add(p.Y); v.Add(p.Z); v.Add(s); } }
@@ -723,7 +739,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             _sunSh.Use();
             var skyVp = view.ClearTranslation() * proj;
             DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
-            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
+            int phase = w.MoonPhase;
+            if (_moonPhases) DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)), phase % 4 / 4f, phase / 4 / 2f, (phase % 4 + 1) / 4f, (phase / 4 + 1) / 2f);
+            else DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             }
         }
@@ -924,13 +942,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         b.Quad(new(x1, y1, z1), new(x1, y0, z1), new(x1, y0, z0), new(x1, y1, z0), 0, 0, 1, 1, 1);
     }
 
-    private void DrawCelestial(Texture2D tex, Vector3 c, float size, Matrix4 vp, Vector4 col)
+    private void DrawCelestial(Texture2D tex, Vector3 c, float size, Matrix4 vp, Vector4 col, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1)
     {
         var n = Vector3.Normalize(c);
         var t1 = Vector3.Normalize(Vector3.Cross(n, Vector3.UnitZ)); var t2 = Vector3.Cross(n, t1);
         t1 *= size / 2; t2 *= size / 2;
         var pts = new[] { c - t1 - t2, c - t1 + t2, c + t1 + t2, c + t1 - t2 };
-        float[] uv = { 0, 0, 0, 1, 1, 1, 1, 0 };
+        float[] uv = { u0, v0, u0, v1, u1, v1, u1, v0 };
         var v = new float[20];
         for (int i = 0; i < 4; i++) { v[i * 5] = pts[i].X; v[i * 5 + 1] = pts[i].Y; v[i * 5 + 2] = pts[i].Z; v[i * 5 + 3] = uv[i * 2]; v[i * 5 + 4] = uv[i * 2 + 1]; }
         _sunMesh.Upload(v, 20);

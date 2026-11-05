@@ -15,13 +15,32 @@ public sealed partial class WorldRenderer
     public bool WeatherNativeTextures => _weatherNative;
     public int WeatherTextureSize => _weatherTextures?.Size ?? 0;
 
+    /// <summary>environment/rain.png i snow.png z aktywnych paczek (obie albo żadna).</summary>
+    private ImageResult[] _packWeather;
+
+    /// <summary>Po zmianie paczek zasobów: niebo, chmury, pogoda i mapy kolorów biomów.</summary>
+    public void ReloadPackAssets()
+    {
+        BuildCelestialTextures();
+        BuildClouds();
+        _weatherTextures?.Dispose(); _weatherTextures = null; _weatherNative = _weatherNativeFailed = false;
+        var rain = ResourcePacks.Read("assets/minecraft/textures/environment/rain.png");
+        var snow = ResourcePacks.Read("assets/minecraft/textures/environment/snow.png");
+        try { _packWeather = rain != null && snow != null ? new[] { ImageResult.FromMemory(rain, ColorComponents.RedGreenBlueAlpha), ImageResult.FromMemory(snow, ColorComponents.RedGreenBlueAlpha) } : null; }
+        catch (Exception ex) { _packWeather = null; Log.Error("Paczka zasobów: pogoda: " + ex.Message); }
+        Biome.GrassMap = ColorMap("colormap/grass.png");
+        Biome.FoliageMap = ColorMap("colormap/foliage.png");
+    }
+
+    private static uint[] ColorMap(string path) => ResourcePacks.ReadImage(path) is { } m && m.W >= 2 && m.H >= 2 ? m.Resize(256, 256).Px : null;
+
     private void EnsureWeatherTextures()
     {
-        if (ClientAssets.Ready && !_weatherNative && !_weatherNativeFailed)
+        if ((_packWeather != null || ClientAssets.Ready) && !_weatherNative && !_weatherNativeFailed)
         {
             try
             {
-                var images = new[] { "rain", "snow" }.Select(n =>
+                var images = _packWeather ?? new[] { "rain", "snow" }.Select(n =>
                 {
                     using var stream = File.OpenRead(ClientAssets.WeatherPath(n));
                     return ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);

@@ -1,6 +1,7 @@
 using BlockCraft.Core;
 using BlockCraft.Gui;
 using BlockCraft.Render;
+using BlockCraft.World;
 
 namespace BlockCraft;
 
@@ -73,7 +74,8 @@ public sealed partial class Game
     {
         ResourcePacks.SetActive(ActivePackIds);
         TextureGen.ApplyPacks(ResourcePacks.Readers);
-        ResourcePacks.CloseAll();
+        Sb.ReloadFont();
+        // archiwa zamyka OnLoad po utworzeniu GUI i renderera (też czytają z paczek)
     }
 
     /// <summary>W trakcie gry (na początku klatki): atlas terenu, ikony bloków i tło menu.</summary>
@@ -84,10 +86,15 @@ public sealed partial class Game
         // warstwy animowane (przez poprzednie paczki albo przez grę) mogły zostać na innej klatce niż w atlasie
         var animated = TextureGen.PackAnimations.Keys.Concat(TextureGen.Animations.Keys).Select(TextureGen.Layer).ToList();
         var changed = TextureGen.ApplyPacks(ResourcePacks.Readers);
-        ResourcePacks.CloseAll();
         Renderer.ReloadTextures(changed.Concat(animated).Distinct());
         Icons.Dispose(); Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         Gui.Dispose(); Gui = new GuiTextures();
+        Sb.ReloadFont();
+        uint grass = Biome.GrassColor(Biome.Plains), foliage = Biome.FoliageColor(Biome.Plains);
+        Renderer.ReloadPackAssets();
+        // inne kolory trawy i liści z map kolorów: siatki chunków do przebudowy
+        if (grass != Biome.GrassColor(Biome.Plains) || foliage != Biome.FoliageColor(Biome.Plains)) MarkAllDirty();
+        ResourcePacks.CloseAll();
         Log.Info($"Paczki zasobów przeładowane: {changed.Count} zmienionych tekstur, {sw.ElapsedMilliseconds} ms");
     }
 }

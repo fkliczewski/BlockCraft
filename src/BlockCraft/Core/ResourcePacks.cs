@@ -226,4 +226,65 @@ public static class ResourcePacks
     public static IReadOnlyList<Func<string, byte[]>> Readers => _active.Select(p => (Func<string, byte[]>)p.Read).ToList();
 
     public static void CloseAll() { foreach (var p in _active) p.Close(); }
+
+    /// <summary>Obraz z pierwszej aktywnej paczki ("gui/widgets.png" względem assets/minecraft/textures/), null = brak.</summary>
+    public static RawImage ReadImage(string texturePath)
+    {
+        var data = Read("assets/minecraft/textures/" + texturePath);
+        return data == null ? null : RawImage.Decode(data, texturePath);
+    }
+}
+
+/// <summary>Obraz RGBA (piksel = uint jak w TextureGen: R w najmłodszym bajcie).</summary>
+public sealed class RawImage
+{
+    public int W, H;
+    public uint[] Px;
+
+    public static RawImage Decode(byte[] png, string name = "")
+    {
+        try
+        {
+            var img = StbImageSharp.ImageResult.FromMemory(png, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+            var px = new uint[img.Width * img.Height];
+            Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
+            return new RawImage { W = img.Width, H = img.Height, Px = px };
+        }
+        catch (Exception ex) { Log.Error("Paczka zasobów: " + name + ": " + ex.Message); return null; }
+    }
+
+    public uint At(int x, int y) => x >= 0 && y >= 0 && x < W && y < H ? Px[y * W + x] : 0;
+
+    /// <summary>Wycinek (x,y,w,h) w pikselach tego obrazu.</summary>
+    public RawImage Crop(int x, int y, int w, int h)
+    {
+        var r = new RawImage { W = w, H = h, Px = new uint[w * h] };
+        for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) r.Px[j * w + i] = At(x + i, y + j);
+        return r;
+    }
+
+    /// <summary>Powiększenie bez wygładzania o całkowity współczynnik.</summary>
+    public RawImage Upscale(int k)
+    {
+        if (k <= 1) return this;
+        var r = new RawImage { W = W * k, H = H * k, Px = new uint[W * k * H * k] };
+        for (int y = 0; y < r.H; y++) for (int x = 0; x < r.W; x++) r.Px[y * r.W + x] = Px[(y / k) * W + x / k];
+        return r;
+    }
+
+    /// <summary>Skalowanie do dowolnego rozmiaru metodą najbliższego piksela.</summary>
+    public RawImage Resize(int w, int h)
+    {
+        if (w == W && h == H) return this;
+        var r = new RawImage { W = w, H = h, Px = new uint[w * h] };
+        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) r.Px[y * w + x] = Px[(y * H / h) * W + x * W / w];
+        return r;
+    }
+
+    /// <summary>Kopiuje prostokąt z src w to samo miejsce (oba obrazy w tej samej skali).</summary>
+    public void Paste(RawImage src, int x, int y, int w, int h)
+    {
+        for (int j = 0; j < h; j++) for (int i = 0; i < w; i++)
+            if (x + i < W && y + j < H) Px[(y + j) * W + x + i] = src.At(x + i, y + j);
+    }
 }

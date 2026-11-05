@@ -1,5 +1,6 @@
 using BlockCraft.Entities;
 using BlockCraft.Items;
+using BlockCraft.Render;
 using BlockCraft.World;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
@@ -71,33 +72,74 @@ public class ContainerScreen : Screen
     public override bool PausesGame => false;
     protected override void Init() { Left = (W - C.Width) / 2; Top = (H - C.Height) / 2; }
 
+    /// <summary>Tło okna z paczki zasobów dla kontenerów o układzie jak w 1.8 (null = rysowane przez grę).</summary>
+    private Texture2D PackBackground() => C switch
+    {
+        PlayerContainer => G.Gui.Container("inventory"),
+        WorkbenchContainer => G.Gui.Container("crafting_table"),
+        FurnaceContainer => G.Gui.Container("furnace"),
+        ChestContainer => G.Gui.Container("generic_54"),
+        _ => null,
+    };
+
     protected virtual void DrawBackground(int mx, int my)
     {
-        GuiDraw.Panel(G, Left, Top, C.Width, C.Height);
-        foreach (var s in C.Slots) GuiDraw.Slot(G, Left + s.X - 1, Top + s.Y - 1, s.IsOutput && C is not FurnaceContainer ? 18 : 18);
+        var bg = PackBackground();
         var sb = G.Sb;
+        if (bg != null)
+        {
+            if (C is ChestContainer)
+            {
+                int top = (C.Height - 114) + 17; // generic_54: rzędy skrzyni, potem ekwipunek gracza od y=126
+                sb.DrawPx(bg, Left, Top, 0, 0, C.Width, top);
+                sb.DrawPx(bg, Left, Top + top, 0, 126, C.Width, 96);
+            }
+            else sb.DrawPx(bg, Left, Top, 0, 0, C.Width, C.Height);
+        }
+        else
+        {
+            GuiDraw.Panel(G, Left, Top, C.Width, C.Height);
+            foreach (var s in C.Slots) GuiDraw.Slot(G, Left + s.X - 1, Top + s.Y - 1, 18);
+        }
         if (C is PlayerContainer)
         {
-            sb.Fill(Left + 26, Top + 8, 52, 70, 0xFF000000);
+            if (bg == null)
+            {
+                sb.Fill(Left + 26, Top + 8, 52, 70, 0xFF000000);
+                DrawArrow(Left + 133, Top + 28, 1f);
+            }
             sb.Text("Wytwarzanie", Left + 86, Top + 6, 0xFF404040, false);
-            DrawArrow(Left + 133, Top + 28, 1f);
             for (int a = 0; a < 4; a++) if (C.Slots[5 + a].Stack == null) DrawArmorGhost(Left + 8, Top + 8 + a * 18, a);
             G.DrawPlayerPreview(Left + 51, Top + 75, 30, Left + 51 - G.MouseGuiX, Top + 25 - G.MouseGuiY);
         }
         else if (C is WorkbenchContainer)
         {
             sb.Text("Wytwarzanie", Left + 28, Top + 6, 0xFF404040, false);
-            DrawArrow(Left + 90, Top + 35, 1f);
-            GuiDraw.Slot(G, Left + 119, Top + 30, 26);
+            if (bg == null)
+            {
+                DrawArrow(Left + 90, Top + 35, 1f);
+                GuiDraw.Slot(G, Left + 119, Top + 30, 26);
+            }
         }
         else if (C is FurnaceContainer fc)
         {
             sb.TextCentered("Piec", Left + C.Width / 2f, Top + 6, 0xFF404040, false);
             var f = fc.Furnace;
-            float burn = f.CurrentItemBurnTime > 0 ? (float)f.BurnTime / f.CurrentItemBurnTime : 0;
-            DrawFlame(Left + 57, Top + 37, f.BurnTime > 0 ? burn : 0);
-            DrawArrow(Left + 79, Top + 34, f.CookTime / (float)FurnaceTileEntity.CookTotal, true);
-            GuiDraw.Slot(G, Left + 111, Top + 30, 26);
+            float burn = f.BurnTime > 0 && f.CurrentItemBurnTime > 0 ? (float)f.BurnTime / f.CurrentItemBurnTime : 0;
+            float cook = f.CookTime / (float)FurnaceTileEntity.CookTotal;
+            if (bg != null)
+            {
+                // GuiFurnace: płomień 14x13 z (176,0) od dołu, strzałka 24x17 z (176,14)
+                if (f.BurnTime > 0) { int k = (int)(burn * 13); sb.DrawPx(bg, Left + 56, Top + 36 + 12 - k, 176, 12 - k, 14, k + 1); }
+                int l = (int)(cook * 24);
+                if (l > 0) sb.DrawPx(bg, Left + 79, Top + 34, 176, 14, l + 1, 16);
+            }
+            else
+            {
+                DrawFlame(Left + 57, Top + 37, burn);
+                DrawArrow(Left + 79, Top + 34, cook, true);
+                GuiDraw.Slot(G, Left + 111, Top + 30, 26);
+            }
         }
         else if (C is ChestContainer cc) sb.Text(cc.Title, Left + 8, Top + 6, 0xFF404040, false);
         if (C is not ChestContainer && C is not PlayerContainer) sb.Text("Ekwipunek", Left + 8, Top + C.Height - 96 + 2, 0xFF404040, false);

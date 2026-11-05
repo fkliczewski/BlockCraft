@@ -42,27 +42,68 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
         BuildFont();
     }
 
+    /// <summary>Piksele tekstury czcionki na jeden piksel GUI (czcionka HD z paczki: 2, 4...).</summary>
+    private int _fk = 1;
+
+    /// <summary>Po zmianie paczek zasobów: font/ascii.png z paczki albo czcionka gry.</summary>
+    public void ReloadFont()
+    {
+        Flush();
+        FontTex?.Dispose();
+        _glyphs.Clear();
+        BuildFont();
+    }
+
+    /// <summary>Atlas czcionki: znaki ASCII z font/ascii.png paczki (siatka 16x16, szerokość jak w FontRenderer 1.8),
+    /// pozostałe (polskie litery) z czcionki gry, powiększone do rozdzielczości paczki.</summary>
     private void BuildFont()
     {
+        var ascii = Core.ResourcePacks.ReadImage("font/ascii.png");
+        if (ascii != null && (ascii.W != ascii.H || ascii.W < 128 || ascii.W % 128 != 0)) ascii = null;
+        int k = _fk = ascii == null ? 1 : ascii.W / 128;
         var chars = FontData.Glyphs.Keys.ToList();
         int cols = 32, rows = (chars.Count + cols - 1) / cols;
-        int w = cols * FontData.CellW, h = rows * FontData.CellH;
+        int cw = FontData.CellW * k, ch = FontData.CellH * k;
+        int w = cols * cw, h = rows * ch;
         var px = new uint[w * h];
         for (int i = 0; i < chars.Count; i++)
         {
-            var (g, start) = FontData.Glyphs[chars[i]];
-            int cx = (i % cols) * FontData.CellW, cy = (i / cols) * FontData.CellH;
+            char c0 = chars[i];
+            var (g, start) = FontData.Glyphs[c0];
+            int cx = (i % cols) * cw, cy = (i / cols) * ch;
             int gw = g.Max(r => r.Length);
+            if (ascii != null && c0 > ' ' && c0 < 127 && PackGlyph(ascii, c0, k, px, w, cx, cy + FontData.Top * k) is int pw)
+            {
+                _glyphs[c0] = (cx, cy, pw, 0);
+                continue;
+            }
             for (int r = 0; r < g.Length; r++)
                 for (int c = 0; c < g[r].Length; c++)
                     if (g[r][c] == '#')
                     {
-                        int yy = cy + FontData.Top + start + r;
-                        if (yy >= cy && yy < cy + FontData.CellH) px[yy * w + cx + c] = 0xFFFFFFFF;
+                        int yy = FontData.Top + start + r;
+                        if (yy < 0 || yy >= FontData.CellH) continue;
+                        for (int sy = 0; sy < k; sy++) for (int sx = 0; sx < k; sx++) px[(cy + yy * k + sy) * w + cx + c * k + sx] = 0xFFFFFFFF;
                     }
-            _glyphs[chars[i]] = (cx, cy, gw, start);
+            _glyphs[c0] = (cx, cy, gw, start);
         }
         FontTex = new Texture2D(w, h, px);
+    }
+
+    /// <summary>Kopiuje znak z ascii.png; zwraca szerokość w pikselach GUI (null = pusta komórka).</summary>
+    private static int? PackGlyph(Core.RawImage ascii, char c, int k, uint[] dst, int dstW, int dx, int dy)
+    {
+        int cell = 8 * k, sx0 = c % 16 * cell, sy0 = c / 16 * cell, last = -1;
+        for (int y = 0; y < cell; y++)
+            for (int x = 0; x < cell; x++)
+            {
+                uint p = ascii.At(sx0 + x, sy0 + y);
+                if (p >> 24 < 128) continue;
+                last = Math.Max(last, x);
+                dst[(dy + y) * dstW + dx + x] = 0xFF000000 | p;
+            }
+        if (last < 0) return null;
+        return (int)(0.5 + (last + 1) * 8.0 / cell);
     }
 
     public void Begin(int width, int height, float scale)
@@ -128,7 +169,7 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
     }
     /// <summary>Rysuj fragment tekstury w pikselach (jak MC drawTexturedModalRect).</summary>
     public void DrawPx(Texture2D t, float x, float y, int sx, int sy, int sw, int sh, uint color = 0xFFFFFFFF, float scale = 1)
-        => Draw(t, x, y, sw * scale, sh * scale, (float)sx / t.Width, (float)sy / t.Height, (float)(sx + sw) / t.Width, (float)(sy + sh) / t.Height, color);
+        => Draw(t, x, y, sw * scale, sh * scale, (float)sx / t.LogicalWidth, (float)sy / t.LogicalHeight, (float)(sx + sw) / t.LogicalWidth, (float)(sy + sh) / t.LogicalHeight, color);
 
     public void DrawLayer(TextureArray arr, int layer, float x, float y, float w, float h, uint color = 0xFFFFFFFF, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1)
     {
@@ -208,7 +249,7 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
             if (!_glyphs.TryGetValue(c, out var g) && !_glyphs.TryGetValue(char.ToLowerInvariant(c), out g)) { g = _glyphs['?']; }
             if (c != ' ')
                 Quad(cx, y - FontData.Top * scale, FontData.CellW * scale, FontData.CellH * scale,
-                    g.x / tw, g.y / th, (g.x + FontData.CellW) / tw, (g.y + FontData.CellH) / th, col, col, 0);
+                    g.x / tw, g.y / th, (g.x + FontData.CellW * _fk) / tw, (g.y + FontData.CellH * _fk) / th, col, col, 0);
             cx += (CharW(c) + 1) * scale;
         }
     }

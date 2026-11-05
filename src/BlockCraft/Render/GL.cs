@@ -49,9 +49,11 @@ public sealed class Shader : IDisposable
 public sealed class Texture2D : IDisposable
 {
     public readonly int Handle, Width, Height;
+    /// <summary>Rozmiar w jednostkach GUI (DrawPx): tekstury HD z paczek mają więcej pikseli niż oryginał 1.8.</summary>
+    public int LogicalWidth, LogicalHeight;
     public Texture2D(int w, int h, uint[] pixels, bool linear = false)
     {
-        Width = w; Height = h;
+        Width = w; Height = h; LogicalWidth = w; LogicalHeight = h;
         Handle = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, Handle);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8, w, h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);

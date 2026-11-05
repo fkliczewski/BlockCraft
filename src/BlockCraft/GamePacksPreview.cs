@@ -1,5 +1,7 @@
 using BlockCraft.Core;
+using BlockCraft.Entities;
 using BlockCraft.Gui;
+using BlockCraft.Items;
 using BlockCraft.World;
 
 namespace BlockCraft;
@@ -56,6 +58,39 @@ public sealed partial class Game
                 Step(8, () => { _chat.Clear(); SetScreen(new CreativeScreen(Player, t)); });
                 Step(8, () => Snap($"creative_{t:D2}_{tag}"));
             }
+            Step(5, () => { SetScreen(null); _chat.Clear(); Cmds.Execute(Player, "/gamemode survival"); Player.Health = 13; Player.FoodLevel = 11; });
+            Step(10, () => { _chat.Clear(); Snap("hud_" + tag); });
+            Step(5, () => SetScreen(new ContainerScreen(Player, Player.InventoryContainer)));
+            Step(8, () => Snap("inventory_" + tag));
+            Step(5, () =>
+            {
+                SetScreen(null);
+                var wb = new WorkbenchContainer(Player.Inventory, bx, by, bz - 3);
+                Player.OpenContainer = wb; SetScreen(new ContainerScreen(Player, wb));
+            });
+            Step(8, () => Snap("crafting_" + tag));
+            Step(5, () =>
+            {
+                SetScreen(null);
+                World.SetBlock(bx + 2, by, bz - 3, B.Furnace, 0);
+                OpenBlockGui(GuiKind.Furnace, bx + 2, by, bz - 3);
+                if (Player.OpenContainer is FurnaceContainer fc) { fc.Furnace.BurnTime = 800; fc.Furnace.CurrentItemBurnTime = 1600; fc.Furnace.CookTime = 120; }
+            });
+            Step(8, () => Snap("furnace_" + tag));
+            Step(5, () =>
+            {
+                SetScreen(null);
+                World.SetBlock(bx - 2, by, bz - 3, B.Chest, 0);
+                OpenBlockGui(GuiKind.Chest, bx - 2, by, bz - 3);
+            });
+            Step(8, () => Snap("chest_" + tag));
+            Step(5, () => { SetScreen(null); HideGui = true; Cmds.Execute(Player, "/weather clear 99999"); _chat.Clear(); World.DayTime = 6000; Player.Pitch = Player.PrevPitch = -89; });
+            Step(20, () => Snap("sun_" + tag));
+            Step(5, () => World.DayTime = 18000 + 24000 * 2); // trzecia faza księżyca
+            Step(20, () => Snap("moon_" + tag));
+            Step(5, () => { World.DayTime = 6000; Player.Pitch = Player.PrevPitch = 50; Player.Yaw = Player.PrevYaw = 0; });
+            Step(5, () => SetScreen(new OptionsScreen(new TitleScreen())));
+            Step(8, () => Snap("options_" + tag));
             Step(5, () => { SetScreen(null); HideGui = true; });
         }
         Step(5, () => { Log.Info("PACKS PREVIEW DONE"); Close(); });

@@ -17,13 +17,47 @@ public sealed class GuiTextures : IDisposable
 
     public GuiTextures()
     {
-        Widgets = new Texture2D(256, 256, MakeWidgets());
-        Icons = new Texture2D(256, 256, MakeIcons());
+        // obszary jak w gui/widgets.png i gui/icons.png z 1.8; poza nimi zostają nasze dodatki (np. zakładki kreatywne)
+        Widgets = Compose(MakeWidgets(), "gui/widgets.png", new[] { (0, 0, 182, 22), (0, 22, 24, 24), (0, 46, 200, 60) });
+        Icons = Compose(MakeIcons(), "gui/icons.png", new[] { (0, 0, 256, 80) });
         Logo = MakeLogo();
-        var d = TextureGen.Get("dirt");
-        var dirt = new uint[256];
-        for (int i = 0; i < 256; i++) dirt[i] = d[i];
-        Dirt = new Texture2D(16, 16, dirt);
+        foreach (var name in new[] { "inventory", "crafting_table", "furnace", "generic_54" }) Container(name);
+        var bg = ResourcePacks.ReadImage("gui/options_background.png");
+        if (bg != null) Dirt = new Texture2D(bg.W, bg.H, bg.Px) { LogicalWidth = 16, LogicalHeight = 16 };
+        else
+        {
+            var d = TextureGen.Get("dirt");
+            var dirt = new uint[256];
+            for (int i = 0; i < 256; i++) dirt[i] = d[i];
+            Dirt = new Texture2D(16, 16, dirt);
+        }
+    }
+
+    /// <summary>Tekstura 256x256 wygenerowana w grze z wklejonymi obszarami z paczki (paczka HD: całość w jej rozdzielczości).</summary>
+    private static Texture2D Compose(uint[] generated, string packPath, (int x, int y, int w, int h)[] regions)
+    {
+        var img = ResourcePacks.ReadImage(packPath);
+        if (img == null || img.W < 64) return new Texture2D(256, 256, generated);
+        int k = Math.Max(1, (int)Math.Round(img.W / 256.0));
+        var src = img.Resize(256 * k, 256 * k);
+        var dst = new RawImage { W = 256, H = 256, Px = generated }.Upscale(k);
+        foreach (var (x, y, w, h) in regions) dst.Paste(src, x * k, y * k, w * k, h * k);
+        return new Texture2D(dst.W, dst.H, dst.Px) { LogicalWidth = 256, LogicalHeight = 256 };
+    }
+
+    private readonly Dictionary<string, Texture2D> _containers = new();
+    /// <summary>Tło okna z paczki (gui/container/NAZWA.png, współrzędne jak w 1.8, 256x256) albo null = rysowane przez grę.</summary>
+    public Texture2D Container(string name)
+    {
+        if (_containers.TryGetValue(name, out var t)) return t;
+        var img = ResourcePacks.ReadImage("gui/container/" + name + ".png");
+        if (img != null && img.W >= 64)
+        {
+            int k = Math.Max(1, (int)Math.Round(img.W / 256.0));
+            img = img.Resize(256 * k, 256 * k);
+            t = new Texture2D(img.W, img.H, img.Px) { LogicalWidth = 256, LogicalHeight = 256 };
+        }
+        return _containers[name] = t;
     }
 
     private static void Fill(uint[] p, int x, int y, int w, int h, uint c) { for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) if (x + i < 256 && y + j < 256) p[(y + j) * 256 + x + i] = c; }
@@ -240,5 +274,9 @@ public sealed class GuiTextures : IDisposable
         return new Texture2D(w, h, outP);
     }
 
-    public void Dispose() { Widgets.Dispose(); Icons.Dispose(); Logo.Dispose(); Dirt.Dispose(); }
+    public void Dispose()
+    {
+        Widgets.Dispose(); Icons.Dispose(); Logo.Dispose(); Dirt.Dispose();
+        foreach (var t in _containers.Values) t?.Dispose();
+    }
 }

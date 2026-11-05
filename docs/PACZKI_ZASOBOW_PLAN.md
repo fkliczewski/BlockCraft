@@ -79,6 +79,15 @@ w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
 - `particle/particles.png`, `environment/` (słońce, księżyc, chmury), `misc/` (winieta, nakładki).
 - `colormap/grass.png`, `colormap/foliage.png` — kolory trawy i liści zależne od biomu.
 
+**Etap 3 — zrobione:** `gui/widgets.png` i `gui/icons.png` (obszary 1.8 wklejane na teksturę gry, HD w rozdzielczości paczki),
+`gui/options_background.png`, okna ekwipunku, stołu, pieca (z płomieniem i strzałką postępu) i skrzyni z `gui/container/`,
+czcionka `font/ascii.png` (szerokości jak w 1.8, HD; polskie litery z czcionki gry), cząsteczki z `particle/particles.png`
+i wybuch z `entity/explosion.png`, słońce, fazy księżyca, chmury, deszcz i śnieg z `environment/`, mapy kolorów trawy
+i liści z `colormap/` (przebudowa chunków po zmianie).
+Świadomie bez zmian: logo (gra nazywa się BlockCraft, `gui/title/minecraft.png` ma napis Minecraft), zakładki i tło trybu
+kreatywnego, okna statywu, stołu do zaklęć, kowadła, latarni, konia, wieśniaka, lejka i dozownika (własne układy — do zrobienia
+przy okazji), strony Unicode czcionki (`font/glyph_*.png`).
+
 ## Etap 4 — Encje
 
 - Moby, gracz (domyślne skórki Steve/Alex), skrzynie, zbroje na postaci, obrazy, banery, czaszki, łódka, wózki.
@@ -104,7 +113,8 @@ w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
 |---|---|
 | 1 | zrobiony — do odbioru |
 | 1b | zrobiony |
-| 2–6 | do zrobienia |
+| 3 | zrobiony |
+| 2, 4–6 | do zrobienia |
 
 ### Etap 1 — co jest i jak sprawdzić
 
@@ -122,3 +132,31 @@ w tym z repozytorium git, np. https://github.com/b-y-t-e/blockcraft-plugins
 - statyw alchemiczny i kocioł (inny model niż w 1.8) → etap 6;
 - rama portalu Endu: ten sam obraz na wszystkich ścianach (bok) → etap 6;
 - `interpolate` w animacjach .mcmeta (klatki przełączane bez płynnego przejścia).
+
+---
+
+# Inne zadania (spoza paczek zasobów)
+
+## A. Wyszukiwanie przedmiotów po nazwie
+
+Stan: w trybie kreatywnym jest zakładka „Szukaj” (ikona książki, prawa górna), filtruje po nazwie i kluczu.
+Do zrobienia:
+- pisanie w dowolnej zakładce od razu przełącza na „Szukaj” i wpisuje znak (jak w MC 1.8);
+- wyszukiwanie bez polskich znaków i wielkości liter („zelazny” znajduje „Żelazny kilof”), po kilku słowach w dowolnej kolejności;
+- szukanie także po angielskim kluczu (`iron_pickaxe`), po zaklęciach i opisie z podpowiedzi;
+- pole wyszukiwania widoczne od razu (np. podpowiedź „Szukaj...” przy zakładkach), czyszczenie prawym przyciskiem jak w MC;
+- wyszukiwarka w ekwipunku przetrwania: podświetlanie pasujących przedmiotów w otwartych skrzyniach i ekwipunku (opcjonalnie).
+
+## B. Kontrolery (pady) i klawiatura ekranowa
+
+- Obsługa padów przez GLFW (OpenTK `JoystickState` / mapowania gamepad SDL z GLFW): Xbox, PlayStation, ogólne.
+- Sterowanie w grze: lewa gałka ruch, prawa kamera (czułość, martwa strefa, odwrócenie osi), spusty kopanie/stawianie,
+  przyciski: skok, skradanie, ekwipunek, upuszczanie, zmiana slotu (bumpery), pauza, sprint (wciśnięcie gałki).
+- Nawigacja po menu i ekranach: kursor sterowany gałką z przyciąganiem do przycisków i slotów, A = klik, B = wstecz,
+  X/Y = akcje slotów (połowa stosu, szybkie przeniesienie), przewijanie list.
+- Klawiatura ekranowa przy polach tekstowych (czat, komendy, nazwa świata, nick, kod zaproszenia, wyszukiwanie, tabliczki,
+  źródła paczek): siatka liter z polskimi znakami, Shift/Caps, Backspace, Enter, spacja, wklejanie ze schowka;
+  wybór gałką/krzyżakiem, otwiera się sama, gdy pole dostaje fokus z pada.
+- Ekran ustawień „Kontroler...”: przypisania przycisków, czułość, wibracje (jeśli dostępne), podgląd stanu pada.
+- Podpowiedzi przycisków na ekranie (ikony A/B/X/Y) zamiast klawiszy, gdy ostatnio używano pada.
+- Wiele padów w sieci lokalnej nie jest w planie (jeden gracz na instancję gry).

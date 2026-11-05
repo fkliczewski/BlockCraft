@@ -210,6 +210,14 @@ public static partial class TextureGen
         // zakręty szyn: jedna tekstura w 1.8 obracana wg meta (6..9)
         for (int m = 6; m < 10; m++) { int rot = m - 6; tr["rail_turn_" + m] = ("blocks/rail_normal_turned", (_, t) => Rotate(t, rot)); }
 
+        // cząsteczki: komórki 8x8 z particle/particles.png (indeksy jak setParticleTextureIndex w 1.8)
+        for (int i = 0; i < 8; i++) { int cell = 7 - i; c["particle_smoke_" + i] = s => s.Cell("particle/particles", 16, cell); } // 0 = największy dym
+        for (int i = 0; i < 8; i++) { int cell = 160 + i; c["particle_firework_" + i] = s => s.Cell("particle/particles", 16, cell); }
+        foreach (var (name, cell) in new[] { ("particle_bubble", 32), ("particle_flame", 48), ("particle_crit", 65), ("particle_heart", 80),
+                     ("particle_angry", 81), ("particle_splash", 19), ("particle_portal", 3), ("particle_white", 0) })
+            c[name] = s => s.Cell("particle/particles", 16, cell);
+        for (int i = 0; i < 4; i++) { int cell = i * 5; c["particle_explosion_" + i] = s => s.Cell("entity/explosion", 4, cell); }
+
         // inny układ niż blok 16x16 albo inna paczka plików: kolejne etapy (encje, cząsteczki, GUI, modele)
         foreach (var n in new[] { "chest_top", "chest_side", "chest_front", "trapped_chest_front", "ender_chest_front", "ender_chest_side", "ender_chest_top", "ender_chest_lock",
                      "minecart_side", "minecart_inside", "end_sky", "end_portal", "world_border", "beacon_beam", "fishing_hook", "me_brewing", "me_cauldron",
@@ -295,6 +303,25 @@ public static partial class TextureGen
                 if (png != null) return DecodePackImage(png, read(TexturesRoot + path + ".png.mcmeta"), path);
             }
             return null;
+        }
+        private readonly Dictionary<string, RawImage> _raw = new();
+        /// <summary>Cały obraz bez dzielenia na klatki (np. arkusz cząsteczek), z pierwszej paczki, która go ma.</summary>
+        public RawImage Raw(string path)
+        {
+            if (_packs == null) return null;
+            if (_raw.TryGetValue(path, out var r)) return r;
+            foreach (var read in _packs)
+                if (read(TexturesRoot + path + ".png") is { } png) { r = RawImage.Decode(png, path); break; }
+            return _raw[path] = r;
+        }
+        /// <summary>Komórka index z arkusza grid x grid (np. particle/particles: 16x16 komórek), przeskalowana do 16x16.</summary>
+        public uint[] Cell(string path, int grid, int index)
+        {
+            var img = Raw(path);
+            if (img == null || img.W != img.H || img.W % grid != 0) return null;
+            int cs = img.W / grid;
+            var cell = img.Crop(index % grid * cs, index / grid * cs, cs, cs);
+            return ScaleTo16(cell.Px, cs);
         }
         public uint[] Still(string path) => Img(path)?.Still is { } s ? (uint[])s.Clone() : null;
         public uint[] Frame(string path, int i)
