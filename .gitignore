@@ -6,13 +6,16 @@ BlockCraft_Gra/
 .claude/
 *.log
 
-# mTiles workspace state
-.claude/skills/mtiles-database/
-
 node_modules/
 
 # Modus Operandi (stan lokalny)
 .modus/
 
 # mTiles workspace state
-.agents/skills/mtiles-database/
+.claude/skills/mtiles-subtasks/
+
+# mTiles workspace state
+.mtiles/
+
+# mTiles workspace state
+.agents/skills/mtiles-subtasks/
