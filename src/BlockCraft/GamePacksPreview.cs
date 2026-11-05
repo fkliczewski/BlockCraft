@@ -135,6 +135,13 @@ public sealed partial class Game
             Step(8, () => Snap("options_" + tag));
             Step(5, () => { SetScreen(null); HideGui = true; });
         }
+        Step(5, () =>
+        {
+            foreach (var s in new[] { new ItemStack(I.IronPickaxe), new ItemStack(B.Wool, 1, 14), new ItemStack(I.SpawnEgg, 1, 50), new ItemStack(I.Potion, 1, 16385), new ItemStack(B.Stone, 1, 2) })
+                Log.Info("NAZWA [" + Lang.Code + "] " + s.Item.Key + ":" + s.Damage + " = " + s.Name);
+        });
+        Step(5, () => SetScreen(new LanguageScreen(new TitleScreen())));
+        Step(10, () => Snap("language"));
         Step(5, () => { Log.Info("PACKS PREVIEW DONE"); Close(); });
     }
 }

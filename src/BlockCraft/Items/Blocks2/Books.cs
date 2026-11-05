@@ -109,7 +109,7 @@ namespace BlockCraft.Items
             writable.UseInAir = (p, s) => Books.Open(p, s, true);
             // ItemEditableBook 1.8: stos 16 (kopiowanie daje do 8 sztuk naraz)
             var written = Simple(I.WrittenBook, "written_book", "Napisana książka", Blocks.TabMisc, 16);
-            written.InCreative = false; written.Glint = true; written.NameFn = Books.Name; written.LoreFn = Books.Lore;
+            written.InCreative = false; written.Glint = true; written.NameFn = Books.Name; written.TranslatedNameFn = LangKeys.WrittenBookName; written.LoreFn = Books.Lore;
             written.UseInAir = (p, s) => Books.Open(p, s, false);
             if (Item.ById[B.Barrier] is { } barrier) { barrier.Sprite = TextureGen.Layer("item_barrier"); barrier.InCreative = false; }
         }

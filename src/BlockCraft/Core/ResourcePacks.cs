@@ -28,6 +28,7 @@ public sealed class ResourcePack : IDisposable
     private readonly object _lock = new();
     private ZipArchive _arc;
     private Dictionary<string, ZipArchiveEntry> _entries;
+    private Dictionary<string, string> _fileNames;
     /// <summary>Zip z paczką w podfolderze (częsty błąd przy pakowaniu): prefiks ścieżek wewnątrz archiwum.</summary>
     private string _prefix = "";
 
@@ -103,6 +104,7 @@ public sealed class ResourcePack : IDisposable
         _arc = ZipFile.OpenRead(Path);
         _entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
         foreach (var e in _arc.Entries) if (!string.IsNullOrEmpty(e.Name)) _entries[e.FullName.Replace('\\', '/')] = e;
+        _fileNames = _entries.ToDictionary(entry => entry.Key, entry => entry.Value.FullName, StringComparer.Ordinal);
         _prefix = "";
         if (!Builtin && !_entries.ContainsKey("pack.mcmeta"))
         {
@@ -141,7 +143,78 @@ public sealed class ResourcePack : IDisposable
         lock (_lock) { _arc?.Dispose(); _arc = null; _entries = null; }
     }
 
+    /// <summary>Odczyt pojedynczego zasobu bez pozostawiania otwartego archiwum.</summary>
+    public byte[] ReadAndClose(string rel)
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (!_zip) return Read(rel);
+                if (Error != null) return null;
+                if (_fileNames == null) OpenZip();
+                if (!_fileNames.TryGetValue(_prefix + rel, out string entryName)) return null;
+                using var archive = ZipFile.OpenRead(Path);
+                var entry = archive.GetEntry(entryName);
+                if (entry == null) return null;
+                using var stream = entry.Open();
+                using var content = new MemoryStream();
+                stream.CopyTo(content);
+                return content.ToArray();
+            }
+            catch (Exception ex) { Log.Error("Paczka " + Id + ": " + rel + ": " + ex.Message); return null; }
+            finally { Close(); }
+        }
+    }
+
     public void Dispose() => Close();
+
+    /// <summary>Sprawdzanie obecności bez odczytu danych i bez utrzymywania otwartego ZIP.</summary>
+    public Func<string, bool> CreateFileLookup()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (Error != null) return _ => false;
+                if (!_zip)
+                    return rel => !rel.Contains("..") && File.Exists(System.IO.Path.Combine(Path, rel.Replace('/', System.IO.Path.DirectorySeparatorChar)));
+                OpenZip();
+                string prefix = _prefix;
+                var files = _entries.Keys.ToHashSet(StringComparer.Ordinal);
+                return rel => files.Contains(prefix + rel);
+            }
+            catch (Exception ex) { Log.Error("Paczka " + Id + ": indeks plików: " + ex.Message); return _ => false; }
+            finally { Close(); }
+        }
+    }
+
+    /// <summary>Domeny zasobów w folderze assets, także w ZIP z prefiksem paczki.</summary>
+    public IReadOnlyList<string> ResourceDomains()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (Error != null) return Array.Empty<string>();
+                if (!_zip)
+                {
+                    string assets = System.IO.Path.Combine(Path, "assets");
+                    return Directory.Exists(assets)
+                        ? Directory.GetDirectories(assets).Select(System.IO.Path.GetFileName).ToArray()
+                        : Array.Empty<string>();
+                }
+                OpenZip();
+                string root = _prefix + "assets/";
+                return _entries.Keys.Where(key => key.StartsWith(root, StringComparison.Ordinal))
+                    .Select(key => key[root.Length..].Split('/'))
+                    .Where(parts => parts.Length > 1 && parts[0].Length > 0)
+                    .Select(parts => parts[0]).Distinct(StringComparer.Ordinal).ToArray();
+            }
+            catch (Exception ex) { Log.Error("Paczka " + Id + ": assets: " + ex.Message); return Array.Empty<string>(); }
+            finally { Close(); }
+        }
+    }
 }
 
 /// <summary>Lista paczek zasobów: dostępne w folderze resourcepacks/ i aktywne (kolejność: pierwsza ma pierwszeństwo).</summary>
@@ -224,6 +297,14 @@ public static class ResourcePacks
 
     /// <summary>Odczyt z każdej aktywnej paczki osobno, w kolejności pierwszeństwa.</summary>
     public static IReadOnlyList<Func<string, byte[]>> Readers => _active.Select(p => (Func<string, byte[]>)p.Read).ToList();
+
+    /// <summary>Dźwięki są czytane pojedynczo podczas gry; każdy odczyt zwalnia archiwum.</summary>
+    public static IReadOnlyList<Func<string, byte[]>> SoundReaders => _active.Select(p => (Func<string, byte[]>)p.ReadAndClose).ToList();
+
+    public static IReadOnlyList<Func<string, bool>> SoundFileLookups => _active.Select(p => p.CreateFileLookup()).ToArray();
+
+    public static IReadOnlyList<string> SoundDomains => _active.SelectMany(p => p.ResourceDomains())
+        .Append("minecraft").Distinct(StringComparer.Ordinal).OrderBy(domain => domain, StringComparer.Ordinal).ToArray();
 
     public static void CloseAll() { foreach (var p in _active) p.Close(); }
 

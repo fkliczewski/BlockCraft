@@ -90,6 +90,8 @@ public class Item
     public Func<ItemStack, (int layer, uint color)> OverlayFn;
     /// <summary>Własna nazwa zależna od stacka (np. mikstury, zaklęta książka).</summary>
     public Func<ItemStack, string> NameFn;
+    /// <summary>Localized stack name; returning null preserves the game name.</summary>
+    public Func<ItemStack, string> TranslatedNameFn;
     /// <summary>Szary opis pod nazwą w dymku (np. wykonawca płyty).</summary>
     public Func<ItemStack, string> LoreFn;
     /// <summary>Własne użycie PPM na bloku: (gracz, stack, x, y, z, ściana, hx, hy, hz). True = obsłużone, domyślna logika się nie wykona.</summary>
@@ -156,7 +158,7 @@ public sealed class ItemStack
     public Nbt GetOrCreateTag() => Tag ??= new Nbt();
     /// <summary>Własna nazwa (kowadło, plakietka) z Tag display/Name.</summary>
     public string CustomName => Tag?.GetCompound("display")?.GetString("Name");
-    public string Name => CustomName ?? Item?.NameFn?.Invoke(this) ?? Item?.DisplayName(Damage) ?? "?";
+    public string Name => CustomName ?? LangKeys.Name(this) ?? Item?.NameFn?.Invoke(this) ?? Item?.DisplayName(Damage) ?? "?";
     public override string ToString() => $"{Count}x {Name}";
 
     /// <summary>Zwraca true gdy przedmiot się zepsuł.</summary>

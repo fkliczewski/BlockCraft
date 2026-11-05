@@ -114,6 +114,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (ResourcePacks.Active.Count > 0) Renderer.Entities.ReloadSkins(ResourcePacks.ReadImage);
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
         ResourcePacks.CloseAll();
+        // języki z pobranych zasobów 1.8 są dostępne dopiero po ich wczytaniu
+        Audio.AssetStore.Finished += () => _reloadDownloadedLanguages = true;
         Sound.Init(Settings);
         Renderer.SoundHook = (n, x, y, z, v, p) =>
         {

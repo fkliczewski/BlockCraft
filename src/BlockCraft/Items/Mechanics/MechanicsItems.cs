@@ -9,7 +9,7 @@ public static partial class ItemRegistry
     {
         Simple(I.GlassBottle, "glass_bottle", "Szklana butelka", Blocks.TabBrewing);
         var potion = Simple(I.Potion, "potion", "Mikstura", Blocks.TabBrewing, 1);
-        potion.Variants = Potions.CreativeVariants(); potion.NameFn = Potions.Name;
+        potion.Variants = Potions.CreativeVariants(); potion.NameFn = Potions.Name; potion.TranslatedNameFn = LangKeys.PotionName;
         potion.OverlayFn = s => (TextureGen.Layer("me_potion_liquid"), Potions.Color(s));
         potion.SpriteFn = s => TextureGen.Layer(Potions.Splash(s.Damage) ? "item_splash_potion" : "item_potion");
         Simple(I.ExpBottle, "experience_bottle", "Butelka z doświadczeniem", Blocks.TabMisc);
@@ -22,7 +22,7 @@ public static partial class ItemRegistry
         ItemsFood18();
         Simple(I.Bowl,"bowl","Miska",Blocks.TabMaterials);
         var skull=Simple(I.SkullItem,"skull_skeleton","Czaszka",Blocks.TabDecoration);
-        skull.Variants=new[]{0,1,2,3,4};skull.ArmorSlot=0;skull.NameFn=Skulls.Name;
+        skull.Variants=new[]{0,1,2,3,4};skull.ArmorSlot=0;skull.NameFn=Skulls.Name;skull.TranslatedNameFn=LangKeys.SkullName;
         skull.SpriteFn=s=>TextureGen.Layer("item_"+Skulls.Icons[Skulls.Type(s)]);
         skull.UseOnBlock=(p,s,x,y,z,face,hx,hy,hz)=>Skulls.Place(p,s,x,y,z,face);
         var rod = Simple(I.FishingRod, "fishing_rod", "Wędka", Blocks.TabTools, 1); rod.MaxDamage = 64; rod.Handheld = true;

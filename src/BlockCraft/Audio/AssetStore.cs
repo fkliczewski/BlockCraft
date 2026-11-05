@@ -36,7 +36,11 @@ public static class AssetStore
         lock (Lock) return Index.TryGetValue(key, out var h) && File.Exists(ObjectPath(h)) ? ObjectPath(h) : null;
     }
 
-    static bool Wanted(string key) => key.StartsWith("minecraft/sounds", StringComparison.Ordinal) || key.StartsWith("minecraft/music", StringComparison.Ordinal) || key.StartsWith("minecraft/records", StringComparison.Ordinal);
+    static bool Wanted(string key) => key.StartsWith("minecraft/sounds", StringComparison.Ordinal) || key.StartsWith("minecraft/music", StringComparison.Ordinal) || key.StartsWith("minecraft/records", StringComparison.Ordinal)
+        || key.StartsWith("minecraft/lang/", StringComparison.Ordinal);
+
+    /// <summary>Klucze pobranych zasobów (np. "minecraft/lang/de_DE.lang").</summary>
+    public static List<string> Keys { get { lock (Lock) return Index.Keys.ToList(); } }
 
     static void LoadIndex(string json)
     {

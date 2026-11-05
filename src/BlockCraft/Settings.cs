@@ -33,6 +33,8 @@ public sealed class Settings
     public List<string> ResourcePacks { get; set; } = new();
     /// <summary>Dodatkowe źródła paczek: foldery i repozytoria git (URL, opcjonalnie "#gałąź").</summary>
     public List<string> PackSources { get; set; } = new();
+    /// <summary>Język nazw przedmiotów z plików .lang MC 1.8 (np. "en_US"); pusty = polskie nazwy gry.</summary>
+    public string Language { get; set; } = "";
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

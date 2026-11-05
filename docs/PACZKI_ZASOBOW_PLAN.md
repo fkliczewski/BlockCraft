@@ -106,6 +106,16 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 - `lang/pl_PL.lang` i inne: nazwy przedmiotów/bloków przez klucze tłumaczeń (`tile.stone.name`),
   wybór języka w ustawieniach.
 
+**Etap 5 — zrobione:**
+- Dźwięki: `sounds.json` z paczek nakładany na sounds.json 1.8 od najmniej ważnej paczki (`"replace": true` zastępuje,
+  inaczej dopisuje), pliki `.ogg` (efekty, muzyka, płyty) najpierw z paczek, potem z pobranych zasobów 1.8.
+- Język: ekran Ustawienia → „Język...”, `Settings.Language`, `--language KOD` na sesję. Pliki `.lang` 1.8: en_US z client.jar,
+  pozostałe języki pobierane z zasobami 1.8 (około 7 MB), nadpisywane przez paczki; języki dodane w `pack.mcmeta` ("language").
+  Tłumaczone są nazwy przedmiotów i bloków: tabela 515 przypisań `Items/LangKeysTable.cs` (zgodność z oficjalnym pl_PL,
+  angielskie nazwy, kolory, ręczne uzupełnienia; każdy klucz sprawdzony w en_US.lang), mikstury i jajka składane jak w 1.8.
+- Bez zmian: teksty menu i komunikaty gry (są po polsku w kodzie), mikstury bez efektu (niezręczna, gęsta) — nazwa gry,
+  znaki spoza czcionki gry (np. ç, ə) jako „?” do czasu stron Unicode czcionki.
+
 ## Etap 6 — Modele bloków z JSON  *(największy, opcjonalny)*
 
 - `blockstates/*.json` + `models/block/*.json`: elementy, obroty, UV, `cull`, `tintindex`.
@@ -121,8 +131,9 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 | 1 | zrobiony — do odbioru |
 | 1b | zrobiony |
 | 3 | zrobiony |
-| 4 | zrobiony — do odbioru |
-| 2, 5, 6 | do zrobienia |
+| 4 | zrobiony |
+| 5 | zrobiony — do odbioru |
+| 2, 6 | do zrobienia |
 
 ### Etap 1 — co jest i jak sprawdzić
 

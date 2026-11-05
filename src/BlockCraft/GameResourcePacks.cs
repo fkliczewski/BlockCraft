@@ -11,6 +11,12 @@ public sealed partial class Game
     /// <summary>--resourcepack NAZWA (można powtórzyć): paczki tylko na tę sesję, bez zapisu w ustawieniach.</summary>
     private List<string> _packOverride;
     private bool _reloadPacks;
+    private volatile bool _reloadDownloadedLanguages;
+    private bool _clientLanguagesReady;
+
+    /// <summary>--language KOD: język nazw przedmiotów tylko na tę sesję.</summary>
+    private string _languageOverride;
+    private string ActiveLanguage => _languageOverride ?? Settings.Language;
 
     /// <summary>--pack-source ŚCIEŻKA|URL (można powtórzyć): źródła tylko na tę sesję.</summary>
     private List<string> _sourceOverride;
@@ -21,6 +27,7 @@ public sealed partial class Game
         {
             if (args[i] == "--resourcepack") (_packOverride ??= new()).Add(args[i + 1]);
             if (args[i] == "--pack-source") (_sourceOverride ??= new()).Add(args[i + 1]);
+            if (args[i] == "--language") _languageOverride = args[i + 1];
         }
         ContentSources.Configure(ActiveSourceSpecs);
     }
@@ -55,7 +62,24 @@ public sealed partial class Game
     /// <summary>Co klatkę: zmiana w obserwowanym folderze albo pobrane repo -> przeładowanie aktywnych paczek.</summary>
     private void CheckSourceChanges()
     {
+        if (_reloadDownloadedLanguages || (!_clientLanguagesReady && ClientAssets.Done))
+        {
+            _reloadDownloadedLanguages = false;
+            _clientLanguagesReady = ClientAssets.Done;
+            Sound.ReloadBank();
+            Lang.Load(ActiveLanguage, ResourcePacks.Readers);
+            ResourcePacks.CloseAll();
+        }
         if (ContentSources.ConsumeChange() && ActivePackIds.Count > 0) _reloadPacks = true;
+    }
+
+    /// <summary>Zmienia język nazw przedmiotów ("" = nazwy gry) i zapisuje w ustawieniach.</summary>
+    public void SetLanguage(string code)
+    {
+        if (_languageOverride != null) _languageOverride = code ?? "";
+        else { Settings.Language = code ?? ""; Settings.Save(); }
+        Lang.Load(ActiveLanguage, ResourcePacks.Readers);
+        ResourcePacks.CloseAll();
     }
 
     /// <summary>Paczki do użycia: z parametru uruchomienia albo z ustawień.</summary>
@@ -75,6 +99,7 @@ public sealed partial class Game
         ResourcePacks.SetActive(ActivePackIds);
         TextureGen.ApplyPacks(ResourcePacks.Readers);
         if (ResourcePacks.Active.Count > 0) SkinGen.Rebuild(ResourcePacks.ReadImage);
+        Lang.Load(ActiveLanguage, ResourcePacks.Readers);
         Sb.ReloadFont();
         // archiwa zamyka OnLoad po utworzeniu GUI i renderera (też czytają z paczek)
     }
@@ -97,6 +122,8 @@ public sealed partial class Game
         // inne mapy kolorów trawy i liści: siatki chunków do przebudowy
         Renderer.ReloadPackAssets();
         if (Biome.LoadColorMaps(ResourcePacks.ReadImage)) MarkAllDirty();
+        Sound.ReloadBank();
+        Lang.Reload(ResourcePacks.Readers);
         ResourcePacks.CloseAll();
         Log.Info($"Paczki zasobów przeładowane: {changed.Count} zmienionych tekstur, {sw.ElapsedMilliseconds} ms");
     }
