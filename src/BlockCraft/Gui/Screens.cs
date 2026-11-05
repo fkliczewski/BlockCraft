@@ -233,6 +233,7 @@ public sealed class VideoScreen : Screen
         Add(new Slider(l, y + 96, 150, 20, s.Brightness, v => "Jasność: " + (int)(v * 100) + "%", v => s.Brightness = v));
         Add(new Slider(r, y + 96, 150, 20, (s.RenderScale - 25) / 75f, v => "Skala renderu 3D: " + (25 + (int)Math.Round(v * 15) * 5) + "%", v => s.RenderScale = 25 + (int)Math.Round(v * 15) * 5, 15));
         Add(new Button(l, y + 120, 150, 20, "Profil słabego GPU", () => { BlockCraft.Render.GpuProfile.ApplyLaptop(s, BlockCraft.Render.GpuProfile.Kind.Integrated); G.ApplySettings(); G.SetScreen(new VideoScreen(_parent)); }));
+        Add(new Button(r, y + 120, 150, 20, () => "Dalekie postacie: " + (s.FarEntities ? "TAK" : "NIE"), () => s.FarEntities = !s.FarEntities));
         Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
     }
     private void Done() { G.Settings.Save(); G.ApplySettings(); G.SetScreen(_parent); }

@@ -145,6 +145,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         int rdOld = Renderer.RenderDistance;
         Renderer.RenderDistance = Settings.RenderDistance;
         Renderer.CloudsEnabled = Settings.Clouds;
+        Renderer.FarEntities = Settings.FarEntities;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
         // trudność świata zmienia tylko przycisk w opcjach (CurrentDifficulty) i /difficulty, nie każde zastosowanie ustawień

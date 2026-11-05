@@ -462,7 +462,7 @@ public sealed partial class RemoteClient : IPlayerHandler
     private void TrackEntities()
     {
         _seen.Clear(); _moves.Clear(); _links.Clear();
-        double range = Math.Min(ViewDistance * 16, 96);
+        double range = Math.Min(ViewDistance * 16, 128); // do końca mgły przy zasięgu 8, żeby moby wyłaniały się z niej także w sieci
         foreach (var e in W.Entities)
         {
             if (e == P || e.Removed) continue;

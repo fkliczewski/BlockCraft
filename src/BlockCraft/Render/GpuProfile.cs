@@ -33,6 +33,7 @@ public static class GpuProfile
     {
         s.FancyGraphics = false;                      // szybkie liście (jak "Fast" w MC)
         s.Clouds = false;
+        s.FarEntities = false;
         s.RenderDistance = k == Kind.Software ? 4 : 6;
         s.RenderScale = k == Kind.Software ? 50 : 75;
         s.VSync = true;

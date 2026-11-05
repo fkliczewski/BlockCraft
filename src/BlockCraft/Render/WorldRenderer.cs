@@ -67,6 +67,8 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     public int RenderedSections, TotalSections;
     public int RenderDistance = 8;
     public bool CloudsEnabled = true;
+    /// <summary>Encje rysowane do końca mgły, więc łagodnie się z niej wyłaniają.</summary>
+    public bool FarEntities = true;
     public float Gamma = 0.5f;
     private int _waterLayer, _lavaLayer;
 
@@ -764,7 +766,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (e == viewer && !thirdPerson) continue;
             if (e is Player pp && pp.Spectator) continue;
             double eds = e.DistanceSq(cam.X, cam.Y, cam.Z);
-            if (eds > maxD * maxD || !InRenderRange(e, eds, rangeWeight)) continue;
+            if (!(FarEntities ? InsideFog(e, cam) : eds <= maxD * maxD && InRenderRange(e, eds, rangeWeight))) continue;
             var bb = e.BoundingBox.Grow(0.5);
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
             if (e is TntEntity tnt && _tnt != null)
@@ -892,6 +894,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         }
         d *= 64 * weight;
         return distSq < d * d;
+    }
+
+    /// <summary>Tryb „Dalekie postacie”: encja rysowana, dopóki leży przed granicą mgły liczonej poziomo, jak w shaderze encji.</summary>
+    private bool InsideFog(Entity e, Vector3d cam)
+    {
+        double dx = e.X - cam.X, dz = e.Z - cam.Z;
+        return dx * dx + dz * dz < (double)FogEnd * FogEnd;
     }
 
     private static Vector3 cam_(Vector3d c) => new((float)c.X, (float)c.Y, (float)c.Z);

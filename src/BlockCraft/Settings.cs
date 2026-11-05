@@ -14,6 +14,8 @@ public sealed class Settings
     public bool SmoothLighting { get; set; } = true;
     public bool FancyGraphics { get; set; } = true;
     public bool Clouds { get; set; } = true;
+    /// <summary>Encje widoczne aż do granicy mgły (wyłaniają się z niej) zamiast znikać wg rozmiaru jak w MC.</summary>
+    public bool FarEntities { get; set; } = true;
     public bool ViewBobbing { get; set; } = true;
     public float Brightness { get; set; } = 0.5f;
     public bool VSync { get; set; } = true;
