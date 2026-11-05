@@ -71,7 +71,8 @@ public sealed partial class PlayerController
             if (HitEntity != null) { p.AttackEntity(HitEntity); ResetBreak(); return; }
         }
         if (!Hit.Hit) { ResetBreak(); if (!pressedNow) { } return; }
-        if (BlockHitDelay > 0) { BlockHitDelay--; return; }
+        // MC 1.8: opóźnienie dotyczy tylko trzymanego przycisku (onPlayerDamageBlock), świeże kliknięcie (clickBlock) je pomija
+        if (!pressedNow && BlockHitDelay > 0) { BlockHitDelay--; return; }
         int x = Hit.X, y = Hit.Y, z = Hit.Z;
         var b = Block.Get(W.GetBlock(x, y, z));
         if (b.Id == 0) return;
@@ -80,7 +81,6 @@ public sealed partial class PlayerController
         if (p.Creative)
         {
             if (tool?.Item?.Tool == ToolType.Sword) return;
-            if (!pressedNow && BlockHitDelay > 0) return;
             DestroyBlock(x, y, z, false);
             BlockHitDelay = 5;
             p.SwingArm();

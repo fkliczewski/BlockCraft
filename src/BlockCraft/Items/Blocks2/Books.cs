@@ -107,7 +107,8 @@ namespace BlockCraft.Items
             pot.UseOnBlock = (p, s, x, y, z, face, hx, hy, hz) => FlowerPots.Place(p, s, x, y, z, face);
             var writable = Simple(I.WritableBook, "writable_book", "Książka z piórem", Blocks.TabMisc, 1);
             writable.UseInAir = (p, s) => Books.Open(p, s, true);
-            var written = Simple(I.WrittenBook, "written_book", "Napisana książka", Blocks.TabMisc, 1);
+            // ItemEditableBook 1.8: stos 16 (kopiowanie daje do 8 sztuk naraz)
+            var written = Simple(I.WrittenBook, "written_book", "Napisana książka", Blocks.TabMisc, 16);
             written.InCreative = false; written.Glint = true; written.NameFn = Books.Name; written.LoreFn = Books.Lore;
             written.UseInAir = (p, s) => Books.Open(p, s, false);
             if (Item.ById[B.Barrier] is { } barrier) { barrier.Sprite = TextureGen.Layer("item_barrier"); barrier.InCreative = false; }
