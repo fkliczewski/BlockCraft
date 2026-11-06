@@ -45,7 +45,7 @@ public static partial class SelfTest
         if (args.Contains("--mob-survey")) { MobSpeedSurveyReport(args.SkipWhile(a => a != "--mob-survey").Skip(1).FirstOrDefault()); return 0; }
         if (args.Contains("--audio-only")) { TestAudioMix(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); return _fail == 0 ? 0 : 2; }
         if (args.Contains("--search-only")) { TestItemSearch(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); foreach (var f in Failures) Console.WriteLine(" - " + f); return _fail == 0 ? 0 : 2; }
-        if (args.Contains("--packs-only")) { TestResourcePacks(); TestPackHd(); TestContentSources(); TestPackAssets(); TestPackSkins(); TestPackSounds(); TestPackLang(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); foreach (var f in Failures) Console.WriteLine(" - " + f); return _fail == 0 ? 0 : 2; }
+        if (args.Contains("--packs-only")) { TestResourcePacks(); TestPackHd(); TestPackModels(); TestContentSources(); TestPackAssets(); TestPackSkins(); TestPackSounds(); TestPackLang(); Console.WriteLine($"=== Wynik: {_pass} OK, {_fail} FAIL ==="); foreach (var f in Failures) Console.WriteLine(" - " + f); return _fail == 0 ? 0 : 2; }
         if (args.Contains("--cmd-only"))
         {
             try { TestCommandSystem(); } catch (Exception e) { Check(false, "CMD", e.ToString()); }
@@ -96,6 +96,7 @@ public static partial class SelfTest
         try { TestPackAssets(); } catch (Exception e) { Check(false, "Paczki: GUI i kolory", e.ToString()); }
         try { TestPackSkins(); } catch (Exception e) { Check(false, "Paczki: encje", e.ToString()); }
         try { TestPackHd(); } catch (Exception e) { Check(false, "Paczki: HD", e.ToString()); }
+        try { TestPackModels(); } catch (Exception e) { Check(false, "Paczki: modele JSON", e.ToString()); }
         try { TestItemSearch(); } catch (Exception e) { Check(false, "Wyszukiwanie przedmiotów", e.ToString()); }
         try { TestPackSounds(); } catch (Exception e) { Check(false, "Paczki: dźwięki", e.ToString()); }
         try { TestPackLang(); } catch (Exception e) { Check(false, "Paczki: język", e.ToString()); }
