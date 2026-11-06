@@ -55,6 +55,7 @@ public sealed partial class Game
         if (_screen != null)
         {
             try { _screen.Render(MouseGuiX, MouseGuiY, pt); } catch (Exception ex) { Log.Error("Screen: " + ex); }
+            try { DrawPadOverlay(); } catch (Exception ex) { Log.Error("Pad: " + ex); }
         }
         DrawAchievementNotice();
         Sb.End();

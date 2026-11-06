@@ -11,6 +11,7 @@ public sealed class CommandBlockScreen : Screen
     private string _command, _output;
     private bool _track;
     public override bool PausesGame => false;
+    public override bool WantsText => true;
     public CommandBlockScreen(int x, int y, int z, int entityId, string command, bool track, string output)
     { _x = x; _y = y; _z = z; _entityId = entityId; _command = command; _track = track; _output = output; }
     protected override void Init()
