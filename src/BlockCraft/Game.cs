@@ -85,6 +85,11 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _showcase = args.Contains("--showcase");
         _stress = !_autotest && !_showcase && args.Contains("--stress");
         Settings = Settings.Load();
+        if (_showcase && (args.Contains("--gfx-preview") || args.Contains("--menus-preview")))
+        {
+            _gfxPreviewOriginalSettings = Settings;
+            Settings = Settings.CreatePreviewCopy();
+        }
         ParsePackArgs(args);
         // przekaźnik sieci: z ustawień, --relay nadpisuje na czas uruchomienia (autotesty przez gry.fimson.pl)
         int relay = Array.IndexOf(args, "--relay");
@@ -99,13 +104,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnLoad()
     {
         base.OnLoad();
-        string glRenderer = GL.GetString(StringName.Renderer);
+        string glRenderer = GlRenderer = GL.GetString(StringName.Renderer);
         Log.Info("Start BlockCraft, GL: " + glRenderer + " / " + GL.GetString(StringName.Version));
         // Pierwsze uruchomienie na danej karcie: słaba grafika (zintegrowana, programowa) dostaje profil "laptop".
         if (Settings.GpuProfileFor != glRenderer && !_autotest && !_showcase && !_stress)
         {
             var kind = GpuProfile.Detect(glRenderer);
             if (kind != GpuProfile.Kind.Dedicated) { GpuProfile.ApplyLaptop(Settings, kind); Log.Info("Profil grafiki: " + kind + " (zasięg " + Settings.RenderDistance + ", skala " + Settings.RenderScale + "%)"); }
+            // przejście ze słabej karty na mocną (np. po wyborze karty): pełna jakość zamiast profilu "laptop"
+            else if (Settings.GpuProfileFor != "" && GpuProfile.Detect(Settings.GpuProfileFor) != GpuProfile.Kind.Dedicated) { GpuProfile.ApplyDesktop(Settings); Log.Info("Profil grafiki: mocna karta, pełna jakość"); }
             Settings.GpuProfileFor = glRenderer; Settings.Save();
         }
         SharedQuadIndices.Init();
@@ -136,12 +143,14 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         ApplySettings();
         StartMenuWorld();
         SetScreen(new TitleScreen());
+        if (!ArgsNetAutotest && !_autotest && !_showcase && !_stress) CheckGpuAtStart();
         _lastTime = _clock.Elapsed.TotalSeconds;
         SyncSourcesInBackground();
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
         else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
         else if (_showcase && _args.Contains("--pad-preview")) SetupPadPreview();
+        else if (_showcase && _args.Contains("--gfx-preview")) SetupGfxPreview();
         else if (_showcase) SetupShowcase();
         else if (_stress) SetupStress();
     }
@@ -149,7 +158,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     // ================= ustawienia / GUI =================
     public void ApplySettings()
     {
-        VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;
+        ApplyVSync();
+        if (!GraphicsPresets.PostFxOn(Settings)) ReleasePostFx();
         ChunkMesher.SmoothLighting = Settings.SmoothLighting;
         bool fancyChanged = ChunkMesher.FancyLeaves != Settings.FancyGraphics;
         ChunkMesher.FancyLeaves = Settings.FancyGraphics;
@@ -157,6 +167,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         Renderer.RenderDistance = Settings.RenderDistance;
         Renderer.CloudsEnabled = Settings.Clouds;
         Renderer.FarEntities = Settings.FarEntities;
+        Renderer.WavingPlants = Settings.WavingPlants;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
         // trudność świata zmienia tylko przycisk w opcjach (CurrentDifficulty) i /difficulty, nie każde zastosowanie ustawień
@@ -555,8 +566,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        if (_gfxPreviewOriginalSettings != null) Settings = _gfxPreviewOriginalSettings;
         if (_netTestOriginalSettings != null) Settings = _netTestOriginalSettings;
-        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); if (!_stress) Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
+        try { NetShutdown(); Sound.Shutdown(); SaveWorld(); Dimensions?.Dispose(); World?.ChunkManager?.Dispose(); _menuCm?.Dispose(); if (!_stress && _gfxPreviewOriginalSettings == null) Settings.Save(); } catch (Exception ex) { Log.Error(ex.ToString()); }
 
         base.OnClosing(e);
     }
@@ -614,6 +626,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         else if (_stress) StressFrame();
         if (_screenshotRequested) { _screenshotRequested = false; TakeScreenshot(null); }
         SwapBuffers();
+        DwmSyncAfterSwap();
         int maxFps = _fpsOverride > 0 ? _fpsOverride : Settings.MaxFps;
         if ((!Settings.VSync || _fpsOverride > 0) && maxFps < 1000)
         {

@@ -28,9 +28,23 @@ public static class GpuProfile
         return Kind.Dedicated;
     }
 
+    /// <summary>Po przejściu ze słabej karty na mocną: cofa obniżenia profilu "laptop" (zasięg ustawiony przez gracza zostaje,
+    /// chyba że jest mniejszy niż 10 chunków).</summary>
+    public static void ApplyDesktop(Settings s)
+    {
+        s.FancyGraphics = true;
+        s.Clouds = true;
+        s.FarEntities = true;
+        s.MaxPackTextureSize = Math.Max(s.MaxPackTextureSize, 64);
+        s.RenderDistance = Math.Max(s.RenderDistance, 10);
+        s.RenderScale = 100;
+        if (s.GraphicsPreset is GraphicsPreset.Classic or GraphicsPreset.Nice) GraphicsPresets.Apply(s, GraphicsPreset.Cacy);
+    }
+
     /// <summary>Ustawienia dla słabego GPU. Mechanika gry się nie zmienia, tylko obraz.</summary>
     public static void ApplyLaptop(Settings s, Kind k)
     {
+        s.SmoothLighting = true;
         s.FancyGraphics = false;                      // szybkie liście (jak "Fast" w MC)
         s.Clouds = false;
         s.FarEntities = false;
@@ -38,5 +52,6 @@ public static class GpuProfile
         s.RenderDistance = k == Kind.Software ? 4 : 6;
         s.RenderScale = k == Kind.Software ? 50 : 75;
         s.VSync = true;
+        GraphicsPresets.Apply(s, k == Kind.Software ? GraphicsPreset.Classic : GraphicsPreset.Nice);
     }
 }

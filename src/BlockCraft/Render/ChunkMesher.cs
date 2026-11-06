@@ -12,6 +12,11 @@ public sealed class VertexBuffer
     public int Count; // wierzchołki
     public int Bytes => Count * Stride;
     public void Clear() => Count = 0;
+    /// <summary>Falowanie bieżącego bloku (ChunkMesher.Wave*) i wysokość jego nieruchomego spodu (rośliny).</summary>
+    public int Wave;
+    public Func<float, float, float, bool> IsLeafVertexPinned;
+    public Func<float, float, float, bool> IsVineVertexPinned;
+    public float WaveBaseY = float.NegativeInfinity;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe void V(float x, float y, float z, float u, float v, int layer, int flags, float shade, float sky, float blk, uint tint)
@@ -24,7 +29,10 @@ public sealed class VertexBuffer
             *(ushort*)(p + 12) = (ushort)Math.Clamp((int)(u * 4096f + 32768f), 0, 65535);
             *(ushort*)(p + 14) = (ushort)Math.Clamp((int)(v * 4096f + 32768f), 0, 65535);
             *(ushort*)(p + 16) = (ushort)layer;
-            p[18] = (byte)flags;
+            int wave = (Wave == ChunkMesher.WavePlant || Wave == ChunkMesher.WaveVine) && y <= WaveBaseY + 0.01f ? 0 : Wave;
+            if (wave == ChunkMesher.WaveLeaves && IsLeafVertexPinned?.Invoke(x, y, z) == true) wave = ChunkMesher.WaveNone;
+            if (wave == ChunkMesher.WaveVine && IsVineVertexPinned?.Invoke(x, y, z) == true) wave = ChunkMesher.WaveNone;
+            p[18] = (byte)(flags | wave << 2);
             p[19] = (byte)Math.Clamp((int)(shade * 255f + 0.5f), 0, 255);
             p[20] = (byte)Math.Clamp((int)(sky * 17f + 0.5f), 0, 255);
             p[21] = (byte)Math.Clamp((int)(blk * 17f + 0.5f), 0, 255);
@@ -54,7 +62,12 @@ public sealed partial class ChunkMesher
 
     private static readonly float[] FaceShade = { 0.5f, 1.0f, 0.8f, 0.8f, 0.6f, 0.6f };
 
-    public ChunkMesher() { _access = new SnapshotAccess(this); }
+    public ChunkMesher()
+    {
+        _access = new SnapshotAccess(this);
+        Solid.IsLeafVertexPinned = Translucent.IsLeafVertexPinned = IsLeafVertexPinned;
+        Solid.IsVineVertexPinned = Translucent.IsVineVertexPinned = IsVineVertexPinned;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int Idx(int x, int y, int z) => ((y + 1) * P + (z + 1)) * P + (x + 1);
@@ -161,6 +174,7 @@ public sealed partial class ChunkMesher
                     if (id == 0) continue;
                     var b = Block.ById[id];
                     int meta = _meta[i];
+                    SetWave(id, x, y, z, meta);
                     if (b.Render is RenderType.Cube or RenderType.Cross && PackModel(b, x, y, z, meta)) continue;
                     switch (b.Render)
                     {
@@ -174,6 +188,7 @@ public sealed partial class ChunkMesher
                         case RenderType.Cactus: Cactus(b, x, y, z, meta); break;
                     }
                 }
+        Solid.Wave = Translucent.Wave = 0;
         ComputeVisibility();
     }
 
@@ -513,7 +528,14 @@ public sealed partial class ChunkMesher
         var buf = b.Layer == RenderLayer.Translucent ? Translucent : Solid;
         uint tint = TintFor(b, x, y, z, meta);
         int ci = Idx(x, y, z);
-        foreach (var mb in _boxes) EmitBox(buf, mb, x, y, z, ci, tint, b.LightEmit > 0);
+        int blockWave = buf.Wave;
+        foreach (var mb in _boxes)
+        {
+            // Pozioma część pnącza pozostaje przy suficie; pionowe części falują wzdłuż ściany.
+            buf.Wave = blockWave == WaveVine && mb.Y0 == mb.Y1 ? WaveNone : blockWave;
+            EmitBox(buf, mb, x, y, z, ci, tint, b.LightEmit > 0);
+        }
+        buf.Wave = blockWave;
     }
 
     public void EmitBox(VertexBuffer buf, ModelBox mb, float x, float y, float z, int ci, uint tint, bool emissive)

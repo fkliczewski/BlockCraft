@@ -28,7 +28,8 @@ public sealed partial class Game
         {
             // Skala renderu 3D (słabe GPU): świat w mniejszym buforze, rozciągnięty na ekran; HUD i GUI w pełnej rozdzielczości.
             int sc = Math.Clamp(Settings.RenderScale, 25, 100);
-            if (sc < 100)
+            if (UsePostFx()) RenderWithPostFx((w, h) => RenderGameWorld(pt, w, h), fw, fh, sc);
+            else if (sc < 100)
             {
                 int sw = Math.Max(1, fw * sc / 100), sh = Math.Max(1, fh * sc / 100);
                 if (_scaleFb == null) _scaleFb = new Framebuffer(sw, sh);
@@ -47,7 +48,11 @@ public sealed partial class Game
             }
             else RenderGameWorld(pt, fw, fh);
         }
-        else if (_menuWorld != null && Renderer.World == _menuWorld) RenderMenuWorld(pt, fw, fh);
+        else if (_menuWorld != null && Renderer.World == _menuWorld)
+        {
+            if (UsePostFx()) RenderWithPostFx((w, h) => RenderMenuWorld(pt, w, h), fw, fh, 100);
+            else RenderMenuWorld(pt, fw, fh);
+        }
 
         // GUI
         Sb.Begin(fw, fh, GuiScale);
@@ -62,11 +67,51 @@ public sealed partial class Game
     }
 
     private Framebuffer _scaleFb;
+    private PostFx _postFx;
+    private bool _postFxFailed;
+
+    /// <summary>Efekty włączone w ustawieniach i dostępne (shader/bufor HDR się utworzył; jak nie, render klasyczny).</summary>
+    private void ReleasePostFx()
+    {
+        _postFx?.Dispose();
+        _postFx = null;
+    }
+
+    private bool UsePostFx()
+    {
+        if (_postFxFailed || !GraphicsPresets.PostFxOn(Settings))
+        {
+            ReleasePostFx();
+            return false;
+        }
+        try { _postFx ??= new PostFx(); return true; }
+        catch (Exception ex) { _postFxFailed = true; Log.Error("Efekty graficzne wyłączone: " + ex.Message); return false; }
+    }
+
+    /// <summary>Świat do bufora HDR (w skali renderu), potem przebieg końcowy z efektami na ekran.</summary>
+    private void RenderWithPostFx(Action<int, int> draw, int fw, int fh, int scale)
+    {
+        int sw = Math.Max(1, fw * scale / 100), sh = Math.Max(1, fh * scale / 100);
+        try { _postFx.Bind(sw, sh); }
+        catch (Exception ex)
+        {
+            // bufor HDR niedostępny (np. brak RGBA16F): od tej klatki render klasyczny
+            ReleasePostFx();
+            _postFxFailed = true; Log.Error("Efekty graficzne wyłączone: " + ex.Message);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0); GL.Viewport(0, 0, fw, fh);
+            draw(fw, fh); return;
+        }
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        // wyjątek w renderze świata nie może zostawić podpiętego bufora pośredniego (GUI rysowałoby się do niego)
+        try { draw(sw, sh); }
+        catch { GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0); GL.Viewport(0, 0, fw, fh); throw; }
+        _postFx.Present(fw, fh, Settings);
+    }
 
     private void RenderMenuWorld(float pt, int fw, int fh)
     {
         var w = _menuWorld;
-        _menuYaw = (_tickCount + pt) * 0.1f; // 1.8 GuiMainMenu: 0,1 stopnia na tick, niezależnie od liczby klatek
+        _menuYaw = _gfxPreviewMenuYaw ?? (_tickCount + pt) * 0.1f; // 1.8 GuiMainMenu: 0,1 stopnia na tick, niezależnie od liczby klatek
         int top = 0;
         for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) top = Math.Max(top, w.GetHeight(w.SpawnX + dx, w.SpawnZ + dz));
         var cam = new Vector3d(w.SpawnX + 0.5, Math.Max(w.SpawnY + 4, top + 2.5), w.SpawnZ + 0.5);

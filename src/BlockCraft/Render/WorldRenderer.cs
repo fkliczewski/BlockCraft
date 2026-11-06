@@ -16,6 +16,7 @@ public sealed class SectionMesh
     public ulong Vis = ChunkMesher.VisAll;
     /// <summary>Kubełki kierunków ścian (FacingSort): początki w wierzchołkach i skrajne płaszczyzny.</summary>
     public readonly int[] Start = new int[8];
+    public int WavingMask;
     public readonly float[] Plane = new float[6];
     public Mesh Trans;
     public int Version;      // wersja żądana
@@ -70,6 +71,31 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     public bool CloudsEnabled = true;
     /// <summary>Encje rysowane do końca mgły, więc łagodnie się z niej wyłaniają.</summary>
     public bool FarEntities = true;
+    /// <summary>Falujące liście, rośliny i woda (shader chunków; docs/GRAFIKA_PLAN.md, etap 2).</summary>
+    public bool WavingPlants = true;
+    private static readonly System.Diagnostics.Stopwatch _waveClock = System.Diagnostics.Stopwatch.StartNew();
+
+    // Ka?da fala zachowuje w?asn? faz?, tak?e daleko od pocz?tku ?wiata i po d?ugiej grze.
+    private static readonly (double Time, double X, double Y, double Z)[] WaveFrequencies =
+    {
+        (1.6, .7, .5, .3), (2.1, .9, 0, .8), (1.3, .2, .4, .6),
+        (.6, .05, 0, .04), (1.9, .6, 0, .4), (3.7, 1.3, 0, -.9),
+        (1.5, .3, 0, .7), (1.4, .8, 0, .6), (1.9, -.5, 0, 1.1)
+    };
+
+    private void SetWave(Shader s, Vector3d cam, float pt)
+    {
+        float wind = WavingPlants ? 1f + World.RainAt(pt) * 0.8f + World.ThunderAt(pt) * 0.7f : 0f;
+        s.Set("uWind", wind);
+        if (wind == 0) return;
+        double time = _waveClock.Elapsed.TotalSeconds;
+        for (int i = 0; i < WaveFrequencies.Length; i++)
+        {
+            var f = WaveFrequencies[i];
+            double phase = time * f.Time + cam.X * f.X + cam.Y * f.Y + cam.Z * f.Z;
+            s.Set($"uWavePhase[{i}]", (float)Math.IEEERemainder(phase, Math.Tau));
+        }
+    }
     public float Gamma = 0.5f;
     private int _waterLayer, _lavaLayer;
 
@@ -119,9 +145,18 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private const string ChunkVert = @"#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in float aLayer; layout(location=3) in vec2 aFS;
 layout(location=4) in vec2 aLight; layout(location=5) in vec4 aTint;
-uniform mat4 uViewProj; uniform vec3 uOffset;
+uniform mat4 uViewProj; uniform vec3 uOffset; uniform float uWavePhase[9]; uniform float uWind;
 out vec3 vUV; out vec2 vLight; out float vShade; out vec4 vTint; out float vMask; out float vOpaque; out float vDist;
-void main(){ vec3 p = aPos + uOffset; gl_Position = uViewProj*vec4(p,1.0);
+vec3 wave(vec3 p, float kind){ vec3 w = p;
+ // Pnacza przesuwaja sie tylko w plaszczyznie mocowania; bez odrywania od sciany.
+ if (kind > 3.5) return vec3(0.0, sin(uWavePhase[1] + w.x*0.9 + w.z*0.8)*0.014*uWind, 0.0);
+ if (kind < 1.5) return vec3(sin(uWavePhase[0] + w.x*0.7 + w.y*0.5 + w.z*0.3), sin(uWavePhase[1] + w.x*0.9 + w.z*0.8)*0.4, cos(uWavePhase[2] + w.z*0.6 + w.y*0.4 + w.x*0.2))*0.035*uWind;
+ if (kind < 2.5) { float g = sin(uWavePhase[3] + w.x*0.05 + w.z*0.04)*0.5 + 0.7;
+  return vec3(sin(uWavePhase[4] + w.x*0.6 + w.z*0.4) + 0.4*sin(uWavePhase[5] + w.x*1.3 - w.z*0.9), 0.0, cos(uWavePhase[6] + w.z*0.7 + w.x*0.3))*0.07*g*uWind; }
+ // Pelny naroznik tafli (obnizony o 0.001) pozostaje nieruchomy jak bok wodospadu.
+ if (fract(aPos.y) < 0.01 || fract(aPos.y) > 0.99) return vec3(0.0);
+ return vec3(0.0, (sin(uWavePhase[7] + w.x*0.8 + w.z*0.6) + sin(uWavePhase[8] - w.x*0.5 + w.z*1.1) - 2.0)*min(0.025*min(uWind, 1.5), fract(aPos.y)*0.125), 0.0); }
+void main(){ vec3 p = aPos + uOffset; float kind = floor(aFS.x / 4.0); if (uWind > 0.0 && kind > 0.5) p += wave(p, kind); gl_Position = uViewProj*vec4(p,1.0);
  vUV = vec3((aUV - 32768.0) / 4096.0, aLayer); vLight = aLight*15.0; vShade = aFS.y/255.0; vTint = aTint; vMask = mod(aFS.x, 2.0); vOpaque = mod(floor(aFS.x / 2.0), 2.0); vDist = length(p.xz); }";
     private static readonly string ChunkFrag = @"#version 330 core
 in vec3 vUV; in vec2 vLight; in float vShade; in vec4 vTint; in float vMask; in float vOpaque; in float vDist;
@@ -355,6 +390,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
     private void Upload(ChunkRender cr, int cx, int sy, int cz, SectionMesh sm, SortedSolid solid, byte[] trans, int tb)
     {
         FreeSolid(cr, sm);
+        sm.WavingMask = solid?.WavingMask ?? 0;
         if (solid != null && solid.Verts > 0)
         {
             int verts = solid.Verts;
@@ -483,6 +519,19 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         return true;
     }
 
+    private bool TerrainInFrustum(Vector3 min, Vector3 max)
+    {
+        // Cross: promień 0,45 + przesunięcie CrossOffset 0,25 - pół bloku = 0,2.
+        // Ten występ w osiach X/Z istnieje również przy wyłączonym falowaniu.
+        const float maxPlantOverhang = 0.2f;
+        // Shader wave: wiatr do 2,5; rośliny w osi X: 1,4 * 0,07 * 1,2 * 2,5 = 0,294.
+        // Zapas 0,3 obejmuje także pozosta?e osie, liście i wodę.
+        const float maxWaveDisplacement = 0.3f;
+        var margin = new Vector3(maxPlantOverhang, 0f, maxPlantOverhang);
+        if (WavingPlants) margin += new Vector3(maxWaveDisplacement);
+        return InFrustum(min - margin, max + margin);
+    }
+
     // ================= stan kamery / mgły =================
     public Vector3 FogColor, SkyColor;
     public float SunBrightness = 1f;
@@ -570,7 +619,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         var reg = cr.Region;
         if (!reg.Queued) { reg.Queued = true; _drawRegions.Add(reg); }
         // tylko kubełki ścian, które mogą być przodem do kamery; sąsiednie łączone w jeden zakres
+        // Pierwotne płaszczyzny są bezpieczne tylko dla nieruchomych kierunków ścian.
         int mask = FacingSort.VisibleMask(sm.Plane, -off.X, -off.Y, -off.Z);
+        if (WavingPlants) mask |= sm.WavingMask;
         int runStart = -1, runEnd = 0;
         for (int b = 0; b < FacingSort.Buckets; b++)
         {
@@ -597,14 +648,14 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             // najpierw cała kolumna (od najniższej do najwyższej niepustej sekcji)
             int lo = System.Numerics.BitOperations.TrailingZeroCount(secMask), hi = 31 - System.Numerics.BitOperations.LeadingZeroCount((uint)secMask);
             var colMin = new Vector3((float)ox, (float)(lo * 16 - cam.Y), (float)oz);
-            if (!InFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
+            if (!TerrainInFrustum(colMin, new Vector3((float)ox + 16, (float)((hi + 1) * 16 - cam.Y), (float)oz + 16))) continue;
             bool single = lo == hi;
             for (int sy = lo; sy <= hi; sy++)
             {
                 if ((secMask & (1 << sy)) == 0) continue;
                 var sm = cr.S[sy];
                 var off = new Vector3((float)ox, (float)(sy * 16 - cam.Y), (float)oz);
-                if (!single && !InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                if (!single && !TerrainInFrustum(off, off + new Vector3(16, 16, 16))) continue;
                 AddSection(cr, sm, off);
             }
         }
@@ -653,7 +704,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 {
                     var off = new Vector3((float)((ccx + gx - R) * 16 - cam.X), (float)(sy * 16 - cam.Y), (float)((ccz + gz - R) * 16 - cam.Z));
                     if (Math.Abs(off.X + 8) > maxD + 8 || Math.Abs(off.Z + 8) > maxD + 8) continue;
-                    if (!InFrustum(off, off + new Vector3(16, 16, 16))) continue;
+                    if (!TerrainInFrustum(off, off + new Vector3(16, 16, 16))) continue;
                     int n = (gx * W + gz) * 16 + sy;
                     _bfsStamp[n] = frame; _bfsIn[n] = 255; _bfsSet[n] = 0; _bfsQ[tail++] = n;
                 }
@@ -684,7 +735,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 if (_bfsStamp[nn] == frame) continue;
                 _bfsStamp[nn] = frame;
                 var noff = new Vector3(nox, off.Y + FaceDy[f] * 16, noz);
-                if (!InFrustum(noff, noff + new Vector3(16, 16, 16))) continue;
+                if (!TerrainInFrustum(noff, noff + new Vector3(16, 16, 16))) continue;
                 _bfsIn[nn] = (byte)f; _bfsSet[nn] = (byte)(set | (1 << f)); _bfsQ[tail++] = nn;
             }
         }
@@ -755,7 +806,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         GL.Disable(EnableCap.Blend);
         _chunk.Use();
         _chunk.Set("uViewProj", vp); _chunk.Set("uTex", 0); _chunk.Set("uAlphaCut", 0.5f);
-        SetFog(_chunk);
+        SetFog(_chunk); SetWave(_chunk, cam, pt);
         Terrain.Bind(0);
         RenderedSections = 0; TotalSections = 0;
         var visible = _visible; visible.Clear();
@@ -858,7 +909,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         // --- przezroczyste (woda) ---
         GL.Enable(EnableCap.Blend); GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         GL.Disable(EnableCap.CullFace);
-        _chunk.Use(); _chunk.Set("uAlphaCut", 0.0f); SetFog(_chunk);
+        _chunk.Use(); _chunk.Set("uAlphaCut", 0.0f); SetFog(_chunk); SetWave(_chunk, cam, pt);
         Terrain.Bind(0);
         visible.Sort((a, b) => b.d.CompareTo(a.d));
         foreach (var (sm, off, _) in visible)

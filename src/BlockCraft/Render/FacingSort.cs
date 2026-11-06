@@ -8,6 +8,8 @@ public sealed class SortedSolid
 {
     public byte[] Data;
     public int Verts;
+    /// <summary>Maska kierunków zawierających co najmniej jeden ruchomy wierzchołek.</summary>
+    public int WavingMask;
     public readonly int[] Start = new int[8];
     public readonly float[] Plane = new float[6];
 }
@@ -52,6 +54,13 @@ public static class FacingSort
                 {
                     b = nz > 0 ? 5 : 6; Track(plane, b, v0[2]);
                 }
+                // Flagi od bitu 2 opisują falowanie; sprawdzamy też częściowo zakotwiczone ściany.
+                for (int vertex = 0; vertex < 4; vertex++)
+                    if ((p[(q * 4 + vertex) * S + 18] >> 2) != 0)
+                    {
+                        res.WavingMask |= 1 << b;
+                        break;
+                    }
                 bucket[q] = (byte)b; count[b]++;
             }
             int acc = 0;

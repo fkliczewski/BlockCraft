@@ -47,8 +47,15 @@ public static class Program
             if (args.Contains("--server")) { EnsureConsole(); return Net.DedicatedServer.Run(args); }
             // zegar systemu co 1 ms: dokładny limiter FPS i krótsze uśpienia wątków
             try { if (OperatingSystem.IsWindows()) timeBeginPeriod(1); } catch { }
-            using var game = new Game(args);
-            game.Run();
+            bool restartForGpu;
+            using (var game = new Game(args))
+            {
+                game.Run();
+                restartForGpu = game.RestartForGpu;
+            }
+            // Nowy proces startuje dopiero po zapisach i zamkni?ciu starego okna.
+            if (restartForGpu && !GpuSwitch.Restart(args))
+                ShowError("Nie uda?o si? ponownie uruchomi? gry. Uruchom j? r?cznie; wyb?r karty zosta? zapisany.");
             return 0;
         }
         catch (Exception ex)
