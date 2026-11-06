@@ -1,3 +1,4 @@
+using BlockCraft.Core;
 using BlockCraft.Entities;
 using BlockCraft.Items;
 using BlockCraft.Render;
@@ -59,7 +60,7 @@ public static class GuiDraw
 }
 
 /// <summary>Ekran kontenera: ekwipunek, stół, piec, skrzynia.</summary>
-public class ContainerScreen : Screen
+public class ContainerScreen : Screen, IPadHints
 {
     protected readonly Container C;
     protected readonly Player P;
@@ -274,10 +275,28 @@ public class ContainerScreen : Screen
         chest.Parts.All(part => part is not TileEntity te || P.World.GetTileEntity(te.X, te.Y, te.Z) == te);
 
     public override void OnClose() { P.CloseContainer(); }
+
+    public override IEnumerable<(int x, int y)> PadTargets() =>
+        C.Slots.Select(s => (Left + s.X + 8, Top + s.Y + 8)).Concat(base.PadTargets());
+
+    /// <summary>Podpowiedzi pada przy slotach (ekwipunek, skrzynie, tryb kreatywny).</summary>
+    internal static readonly (PadButton, string)[] SlotPadHints =
+    {
+        (PadButton.A, "Weź / połóż"), (PadButton.X, "Połowa / jeden"),
+        (PadButton.Y, "Przenieś"), (PadButton.B, "Zamknij"),
+    };
+    public IEnumerable<(PadButton button, string label)> PadHints() => SlotPadHints;
+
+    /// <summary>Pad: kursor na wybranym slocie paska szybkiego wyboru.</summary>
+    public override (int x, int y)? PadStart()
+    {
+        var s = C.Slots.FirstOrDefault(s => s.Inv == P.Inventory && s.Index == P.Inventory.SelectedSlot);
+        return s != null ? (Left + s.X + 8, Top + s.Y + 8) : base.PadStart();
+    }
 }
 
 /// <summary>Ekwipunek kreatywny z zakładkami.</summary>
-public sealed class CreativeScreen : Screen
+public sealed class CreativeScreen : Screen, IPadHints, IPadTabs, IPadQuickMove
 {
     private readonly Player _p;
     private static int _tab;
@@ -417,6 +436,77 @@ public sealed class CreativeScreen : Screen
         return (-1, -1);
     }
 
+    public override IEnumerable<(int x, int y)> PadTargets()
+    {
+        for (int t = 0; t < TabNames.Length; t++) { var (tx, ty) = TabPos(t); yield return (tx + 14, ty + 16); }
+        for (int c = 0; c < 9; c++) yield return (_left + 17 + c * 18, _top + 120);
+        if (_tab != 9)
+        {
+            for (int r = 0; r < 5; r++) for (int c = 0; c < 9; c++) yield return (_left + 17 + c * 18, _top + 26 + r * 18);
+            if (_search.Visible) yield return (_search.X + _search.W / 2, _search.Y + _search.H / 2);
+        }
+        else
+        {
+            for (int i = 0; i < _inv.Slots.Count; i++) { var (x, y) = InvSlotPos(i); if (x >= 0) yield return (x + 8, y + 8); }
+            yield return (_left + 181, _top + 120);
+        }
+    }
+
+    public IEnumerable<(PadButton button, string label)> PadHints() =>
+        ContainerScreen.SlotPadHints.Append((PadButton.LeftBumper, "Zakładki"));
+
+    public override (int x, int y)? PadStart() => (_left + 17 + _p.Inventory.SelectedSlot * 18, _top + 120);
+
+    /// <summary>LB/RB: poprzednia/następna zakładka w kolejności rysowania.</summary>
+    public void PadTab(int dir)
+    {
+        int pos = (Array.IndexOf(TabOrder, _tab) + dir + TabOrder.Length) % TabOrder.Length;
+        SelectTab(TabOrder[pos]);
+    }
+
+    /// <summary>Y pada: w trybie kreatywnym Shift+klik usuwa przedmioty, więc szybkie przeniesienie idzie osobno.</summary>
+    public void PadQuickMove(int mx, int my)
+    {
+        int slot = PlayerSlotAt(mx, my);
+        if (slot >= 0) { _inv.Click(slot, 0, ClickType.QuickMove, _p); return; }
+        if (_tab != 9 && PaletteItemAt(mx, my) is { } it) _p.Inventory.Add(it.CopyWith(it.MaxStack));
+    }
+
+    private static bool InSlot(int mx, int my, int x, int y) => mx >= x - 1 && my >= y - 1 && mx < x + 17 && my < y + 17;
+
+    /// <summary>Indeks slotu kontenera gracza pod kursorem (pasek albo zakładka ekwipunku), -1 gdy brak.</summary>
+    private int PlayerSlotAt(int mx, int my)
+    {
+        for (int c = 0; c < 9; c++)
+            if (InSlot(mx, my, _left + 9 + c * 18, _top + 112)) return _inv.FirstPlayerSlot + 27 + c;
+        if (_tab != 9) return -1;
+        for (int i = 0; i < _inv.Slots.Count; i++)
+        {
+            var (x, y) = InvSlotPos(i);
+            if (x >= 0 && InSlot(mx, my, x, y)) return i;
+        }
+        return -1;
+    }
+
+    private ItemStack PaletteItemAt(int mx, int my)
+    {
+        for (int r = 0; r < 5; r++)
+            for (int c = 0; c < 9; c++)
+            {
+                if (!InSlot(mx, my, _left + 9 + c * 18, _top + 18 + r * 18)) continue;
+                int idx = (ScrollRow + r) * 9 + c;
+                return idx < _items.Count ? _items[idx] : null;
+            }
+        return null;
+    }
+
+    private void SelectTab(int t)
+    {
+        G.PlayUiClick();
+        if (t == SearchTab) { OpenSearch(null); return; }
+        _tab = t; _search.Visible = _search.Focused = false; Refresh();
+    }
+
     private void DrawTab(int t, bool active)
     {
         var (x, y) = TabPos(t);
@@ -432,9 +522,7 @@ public sealed class CreativeScreen : Screen
             var (tx, ty) = TabPos(t);
             if (mx >= tx && my >= ty && mx < tx + 28 && my < ty + 32)
             {
-                G.PlayUiClick();
-                if (t == SearchTab) { OpenSearch(null); return; }
-                _tab = t; _search.Visible = _search.Focused = false; Refresh(); return;
+                SelectTab(t); return;
             }
         }
         // prawy przycisk na polu wyszukiwania czyści je (jak w 1.8)

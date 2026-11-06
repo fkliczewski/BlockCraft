@@ -39,6 +39,14 @@ public sealed class Settings
     public int MaxPackTextureSize { get; set; } = 64;
     /// <summary>Własny przekaźnik sieci (np. gry.fimson.pl); puste = publiczne przekaźniki Tailscale.</summary>
     public string Relay { get; set; } = "";
+    /// <summary>Pad (kontroler): włączony, czułość kamery 0..1, martwa strefa gałek 0..0,5, odwrócona oś Y, wibracje.</summary>
+    public bool PadEnabled { get; set; } = true;
+    public float PadLookSensitivity { get; set; } = 0.5f;
+    public float PadDeadzone { get; set; } = 0.15f;
+    public bool PadInvertY { get; set; }
+    public bool PadVibration { get; set; } = true;
+    /// <summary>Przypisania akcji do przycisków pada różne od domyślnych (np. "Jump": "B").</summary>
+    public Dictionary<string, string> PadBindings { get; set; } = new();
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

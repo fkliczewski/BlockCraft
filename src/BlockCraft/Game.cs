@@ -33,7 +33,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     public int MouseGuiX => _input.Replaying?.MouseX ?? _mouseGuiX;
     public int MouseGuiY => _input.Replaying?.MouseY ?? _mouseGuiY;
     private int _mouseGuiX, _mouseGuiY;
-    public bool IsShiftDown => _input.Replaying?.Shift ?? (KeyboardState.IsKeyDown(Keys.LeftShift) || KeyboardState.IsKeyDown(Keys.RightShift));
+    public bool IsShiftDown => _input.Replaying?.Shift ?? (_padShift || KeyboardState.IsKeyDown(Keys.LeftShift) || KeyboardState.IsKeyDown(Keys.RightShift));
     /// <summary>Czas zdarzenia wejścia w ms (Environment.TickCount64); odłożone zdarzenie zachowuje czas, w którym przyszło (np. dwuklik).</summary>
     public long InputTime => _input.Replaying?.Time ?? Environment.TickCount64;
     public bool ShowDebug, HideGui;
@@ -141,6 +141,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
         else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
+        else if (_showcase && _args.Contains("--pad-preview")) SetupPadPreview();
         else if (_showcase) SetupShowcase();
         else if (_stress) SetupStress();
     }
@@ -197,6 +198,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (s == null && World == null) s = new TitleScreen();
         _screen = s;
         s?.Open(this, GuiW, GuiH);
+        PadPlaceCursor(s);
         UpdateCursor();
         _leftDown = _rightDown = false;
         if (Ctrl != null) Ctrl.ResetBreak();
@@ -206,7 +208,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     private void UpdateCursor()
     {
         bool grab = _screen == null && World != null && IsFocused;
-        CursorState = grab ? CursorState.Grabbed : CursorState.Normal;
+        var state = grab ? CursorState.Grabbed : PadActive && _screen != null ? CursorState.Hidden : CursorState.Normal;
+        if (CursorState != state) _padIgnoreMouseUntil = Environment.TickCount64 + 300;
+        CursorState = state;
     }
 
     public void PlayUiClick() => Sound.PlayUi("random.click", 1f, 1f);
@@ -407,10 +411,17 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnMouseMove(MouseMoveEventArgs e)
     {
         base.OnMouseMove(e);
-        float sx = FramebufferSize.X / (float)Math.Max(1, ClientSize.X), sy = FramebufferSize.Y / (float)Math.Max(1, ClientSize.Y);
-        _mouseGuiX = (int)(e.X * sx / GuiScale); _mouseGuiY = (int)(e.Y * sy / GuiScale);
+        if (PadKeepsMouse(e.X, e.Y)) return;
+        SetMouseGuiFromWindow(e.X, e.Y);
         int mx = MouseGuiX, my = MouseGuiY;
         RunOrDefer(() => _screen?.MouseMove(mx, my));
+    }
+
+    /// <summary>Pozycja myszy w GUI z pozycji w oknie (piksele okna → framebuffer → skala GUI).</summary>
+    private void SetMouseGuiFromWindow(float x, float y)
+    {
+        float sx = FramebufferSize.X / (float)Math.Max(1, ClientSize.X), sy = FramebufferSize.Y / (float)Math.Max(1, ClientSize.Y);
+        _mouseGuiX = (int)(x * sx / GuiScale); _mouseGuiY = (int)(y * sy / GuiScale);
     }
 
     // Wejście w połowie dzielonego ticku czeka na jego koniec: akcje GUI (odrodzenie, komendy z czatu, upuszczanie)
@@ -425,6 +436,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         base.OnMouseDown(e);
+        SetPadActive(false);
         int btn = e.Button == MouseButton.Left ? 0 : e.Button == MouseButton.Right ? 1 : e.Button == MouseButton.Middle ? 2 : -1;
         if (btn < 0) return;
         int mx = MouseGuiX, my = MouseGuiY;
@@ -487,6 +499,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
     protected override void OnKeyDown(KeyboardKeyEventArgs e)
     {
         base.OnKeyDown(e);
+        SetPadActive(false);
         RunOrDefer(() => KeyDownNow(e));
     }
     private void KeyDownNow(KeyboardKeyEventArgs e)
@@ -499,9 +512,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         if (e.Key == Keys.F11) { WindowState = WindowState == WindowState.Fullscreen ? WindowState.Normal : WindowState.Fullscreen; return; }
         if (e.Key == Keys.F2) { _screenshotRequested = true; return; }
         if (_screen != null) { _screen.KeyDown(e.Key, ctrl, e.Shift); return; }
+        GameKeyNow(e.Key, ctrl, e.Alt);
+    }
+
+    /// <summary>Klawisz w grze (bez otwartego ekranu); pad woła to samo dla swoich akcji.</summary>
+    private void GameKeyNow(Keys key, bool ctrl, bool alt)
+    {
         if (World == null || Player == null) return;
         var p = Player;
-        switch (e.Key)
+        switch (key)
         {
             case Keys.Escape: SetScreen(new PauseScreen()); break;
             case Keys.E:
@@ -509,9 +528,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 if (Client != null) { Client.Out.Begin(Net.C2S.OpenInventory); Client.Out.End(); }
                 else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
-                _ignoreNextChar = !ctrl && !e.Alt; break; // znak „e” z tego wciśnięcia nie ma trafić do pola wyszukiwania
-            case Keys.T: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("")); break; // Ctrl/Alt+T nie daje znaku
-            case Keys.Slash: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("/")); break;
+                _ignoreNextChar = !ctrl && !alt; break; // znak „e” z tego wciśnięcia nie ma trafić do pola wyszukiwania
+            case Keys.T: _ignoreNextChar = !ctrl && !alt; SetScreen(new ChatScreen("")); break; // Ctrl/Alt+T nie daje znaku
+            case Keys.Slash: _ignoreNextChar = !ctrl && !alt; SetScreen(new ChatScreen("/")); break;
             case Keys.F1: HideGui = !HideGui; break;
             case Keys.F3: ShowDebug = !ShowDebug; break;
             case Keys.F5: CameraMode = (CameraMode + 1) % 3; break;
@@ -529,7 +548,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                     break;
                 }
             default:
-                if (e.Key >= Keys.D1 && e.Key <= Keys.D9) p.Inventory.SelectedSlot = e.Key - Keys.D1;
+                if (key >= Keys.D1 && key <= Keys.D9) p.Inventory.SelectedSlot = key - Keys.D1;
                 break;
         }
     }
@@ -556,6 +575,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             long day = World?.DayTime ?? 0; _dayRate = (int)(day - _tpsLastDay); _tpsLastDay = day;
         }
         _acc += dt;
+        try { PadFrame(dt); } catch (Exception ex) { Log.Error("Pad: " + ex); }
         // Budżet czasu ticków na klatkę: ciężki tick (np. tysiące wybuchów TNT) dzieli się na kawałki
         // i klatka rysuje się między nimi, więc obraz i mysz nie stają. Wynik ticku jest ten sam.
         // Autotest liczy na stary rytm (całe ticki), więc tam bez budżetu.
@@ -717,6 +737,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         fovT *= (p.GetSpeed() / .1f + 1) / 2;
         if (p.ItemInUse?.Id == I.Bow) { float bc = p.BowCharge; fovT *= 1f - bc * bc * 0.15f; }
         _fovMod += (fovT - _fovMod) * 0.5f;
+        PadRumbleTick();
         // autozapis co 5 minut
         if (w.TotalTime % 6000 == 0) SaveWorld();
         if (p.Dead && _screen is not DeathScreen) OnDeath(p.DeathMessage);
@@ -733,10 +754,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         bool left = inGame && kb.IsKeyDown(Keys.A), right = inGame && kb.IsKeyDown(Keys.D);
         bool jump = inGame && kb.IsKeyDown(Keys.Space), sneak = inGame && (kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift));
         bool sprintKey = inGame && (kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl));
-        if (_autoInput.HasValue) { (fwd, jump, sneak, sprintKey) = _autoInput.Value; }
-        if (p.Sleeping) { if (sneak) p.WakeUp(); fwd = back = left = right = jump = false; }
+        // pad: gałka analogowo (lekkie wychylenie = wolny chód), sprint przy wychyleniu do przodu od 0,8 jak w MC
+        var pad = inGame ? PadMovement() : default;
+        jump |= pad.jump; sneak |= pad.sneak; sprintKey |= pad.sprint;
+        if (_autoInput.HasValue) { (fwd, jump, sneak, sprintKey) = _autoInput.Value; pad = default; }
+        if (p.Sleeping) { if (sneak) p.WakeUp(); fwd = back = left = right = jump = false; pad = default; }
         p.MoveForward = (fwd ? 1 : 0) - (back ? 1 : 0);
         p.MoveStrafe = (left ? 1 : 0) - (right ? 1 : 0);
+        if (p.MoveForward == 0 && p.MoveStrafe == 0) { p.MoveForward = pad.forward; p.MoveStrafe = pad.strafe; }
+        bool fwdSprint = fwd || pad.forward >= 0.8f;
         p.IsJumping = jump;
         p.Sneaking = sneak;
         bool canSprint = p.FoodLevel > 6 || p.AllowFlying;
@@ -746,8 +772,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
             if (_tickCount - _lastFwdTap <= 7 && canSprint && !sneak) p.Sprinting = true;
             _lastFwdTap = (int)_tickCount;
         }
-        if (sprintKey && fwd && canSprint && !sneak && p.ItemInUse == null) p.Sprinting = true;
-        if (!fwd) p.Sprinting = false;
+        if (sprintKey && fwdSprint && canSprint && !sneak && p.ItemInUse == null) p.Sprinting = true;
+        if (!fwdSprint) p.Sprinting = false;
         _prevFwd = fwd;
         // latanie: podwójna spacja
         if (jump && !_prevJump && p.AllowFlying && !p.Spectator)

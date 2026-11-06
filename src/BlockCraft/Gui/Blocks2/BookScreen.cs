@@ -34,11 +34,15 @@ public sealed class BookScreen : Screen
     public IReadOnlyList<string> Pages => _pages;
     public int Page => _page;
     public bool Signing => _signing;
+    public override bool WantsText => _editable || _signing;
+    /// <summary>Wiersz z kursorem (tytuł albo ostatnia linia strony): klawiatura ekranowa staje po drugiej stronie.</summary>
+    public override int TextY => _signing ? TitleTop : PageTop + (Wrap(_pages[_page] + "_").Count() - 1) * LineH;
     public string TitleText => _title;
+    private const int BookTop = 2, PageTop = BookTop + 32, TitleTop = BookTop + 48;
 
     protected override void Init()
     {
-        int left = (W - BookW) / 2, top = 2;
+        int left = (W - BookW) / 2, top = BookTop;
         if (_editable)
         {
             _sign = Add(new Button(W / 2 - 100, top + BookH + 4, 98, 20, "Podpisz", () => { _signing = true; Refresh(); }));
@@ -161,7 +165,7 @@ public sealed class BookScreen : Screen
     {
         DrawDim();
         var sb = G.Sb;
-        int left = (W - BookW) / 2, top = 2;
+        int left = (W - BookW) / 2, top = BookTop;
         // okładka i strona (gui/book.png)
         sb.Fill(left + 18, top, BookW - 36, BookH - 10, SpriteBatch.Hex(0x6B3A14));
         sb.Fill(left + 22, top + 4, BookW - 44, BookH - 18, SpriteBatch.Hex(0xF2EAD0));
@@ -173,7 +177,7 @@ public sealed class BookScreen : Screen
             string head = "Wprowadź tytuł książki:";
             sb.Text(head, left + 36 + (PageW - Measure(head)) / 2, top + 32, black, false);
             string t = _title + (cursor ? "_" : "");
-            sb.Text(t, left + 36 + (PageW - Measure(_title + "_")) / 2, top + 48, black, false);
+            sb.Text(t, left + 36 + (PageW - Measure(_title + "_")) / 2, TitleTop, black, false);
             string by = "autor: " + _author;
             sb.Text(by, left + 36 + (PageW - Measure(by)) / 2, top + 58, 0xFF555555, false);
             int y = top + 80;
@@ -185,7 +189,7 @@ public sealed class BookScreen : Screen
             sb.Text(ind, left - Measure(ind) + BookW - 44, top + 16, black, false);
             string text = _pages[_page];
             if (_editable && _ticks / 6 % 2 == 0) text += "_";
-            int y = top + 32;
+            int y = PageTop;
             foreach (var line in Wrap(text)) { sb.Text(line, left + 36, y, black, false); y += LineH; }
         }
         base.Render(mx, my, pt);

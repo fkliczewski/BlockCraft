@@ -108,8 +108,12 @@ public sealed partial class PlayerController
         }
     }
 
+    /// <summary>Licznik bloków zniszczonych przez gracza (wibracja pada).</summary>
+    public int BlocksBroken;
+
     private void DestroyBlock(int x, int y, int z, bool drop)
     {
+        BlocksBroken++;
         var b = Block.Get(W.GetBlock(x, y, z));
         int meta = W.GetMeta(x, y, z);
         var tool = P.Inventory.Selected;

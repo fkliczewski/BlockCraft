@@ -277,7 +277,8 @@ public sealed class ControlsScreen : Screen
         var s = G.Settings;
         Add(new Slider(W / 2 - 155, 30, 150, 20, s.Sensitivity, v => "Czułość myszy: " + (int)(v * 200) + "%", v => s.Sensitivity = v));
         Add(new Button(W / 2 + 5, 30, 150, 20, () => "Odwróć mysz: " + (s.InvertMouse ? "TAK" : "NIE"), () => s.InvertMouse = !s.InvertMouse));
-        Add(new Button(W / 2 - 100, H - 28, 200, 20, "Gotowe", () => { s.Save(); G.SetScreen(_parent); }));
+        Add(new Button(W / 2 - 155, H - 28, 150, 20, "Kontroler...", () => G.SetScreen(new ControllerScreen(this))));
+        Add(new Button(W / 2 + 5, H - 28, 150, 20, "Gotowe", () => { s.Save(); G.SetScreen(_parent); }));
     }
     protected override void Escape() { G.Settings.Save(); G.SetScreen(_parent); }
     private static readonly (string, string)[] Keys_ =

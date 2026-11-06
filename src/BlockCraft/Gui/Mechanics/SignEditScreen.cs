@@ -20,6 +20,7 @@ public sealed class SignEditScreen : Screen
     }
 
     public override void Tick() { _ticks++; }
+    public override bool WantsText => true;
 
     /// <summary>onGuiClosed: zapis lokalnie albo pakiet do hosta.</summary>
     public override void OnClose()

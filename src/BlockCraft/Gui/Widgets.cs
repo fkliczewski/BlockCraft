@@ -80,6 +80,12 @@ public sealed class Slider : Widget
     }
     public override void MouseDrag(Game g, int mx, int my) { if (_drag) Set(mx); }
     public override void MouseUp(Game g, int mx, int my, int btn) { if (_drag) { _drag = false; g.PlayUiClick(); } }
+    /// <summary>Krok w lewo/prawo (krzyżak pada): o jedną podziałkę albo 5%.</summary>
+    public void Nudge(int dir)
+    {
+        float v = Math.Clamp(Value + dir * (Steps > 0 ? 1f / Steps : 0.05f), 0, 1);
+        if (v != Value) { Value = v; OnChange?.Invoke(v); }
+    }
 }
 
 public sealed class TextField : Widget
@@ -159,6 +165,18 @@ public abstract class Screen
     public virtual void CharTyped(char c) { foreach (var w in Widgets) if (w.Char(G, c)) return; }
     protected virtual void Escape() => G.SetScreen(null);
 
+    // ===== pad =====
+    /// <summary>Punkty, do których krzyżak przeskakuje kursorem (domyślnie środki widocznych, aktywnych widżetów).</summary>
+    public virtual IEnumerable<(int x, int y)> PadTargets() =>
+        Widgets.Where(w => w.Visible && w.Enabled).Select(w => (w.X + w.W / 2, w.Y + w.H / 2));
+    /// <summary>Gdzie stanąć kursorem po otwarciu ekranu z pada (null = bez zmiany).</summary>
+    public virtual (int x, int y)? PadStart() { foreach (var t in PadTargets()) return t; return null; }
+    public Widget WidgetAt(int mx, int my) => Widgets.LastOrDefault(w => w.Visible && w.Hover(mx, my));
+    /// <summary>Czy ekran czeka na tekst (pokazać klawiaturę ekranową).</summary>
+    public virtual bool WantsText => Widgets.Any(w => w is TextField { Visible: true, Focused: true });
+    /// <summary>Wysokość pola tekstowego: klawiatura ekranowa staje po drugiej stronie ekranu.</summary>
+    public virtual int TextY => Widgets.OfType<TextField>().FirstOrDefault(f => f.Visible && f.Focused)?.Y ?? 0;
+
     protected void DrawDirtBackground()
     {
         var sb = G.Sb;
@@ -170,3 +188,4 @@ public abstract class Screen
         G.Sb.Gradient(0, 0, W, H, 0xC0101010, 0xD0101010);
     }
 }
+

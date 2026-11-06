@@ -156,6 +156,7 @@ Pierwotny plan:
 | 5 | zrobiony |
 | 2 | zrobiony |
 | 6 | zrobiony (bloki pełne i rośliny) — do odbioru |
+| B (pady) | zrobiony — do odbioru |
 
 ### Etap 1 — co jest i jak sprawdzić
 
@@ -197,6 +198,22 @@ Do zrobienia:
 - wyszukiwarka w ekwipunku przetrwania: podświetlanie pasujących przedmiotów w otwartych skrzyniach i ekwipunku (opcjonalnie).
 
 ## B. Kontrolery (pady) i klawiatura ekranowa
+
+Stan: zrobione — do odbioru (gałąź `feature/pad`).
+- Kod: `Core/Gamepad.cs` (odczyt GLFW, martwa strefa), `Core/PadRumble.cs` (wibracje XInput), `Core/PadBindings.cs` (przypisania),
+  `GamePad.cs` (gra), `Gui/PadMenu.cs` i `Gui/PadMenuOverlay.cs` (menu, klawiatura), `Gui/PadScreens.cs`, `Gui/OnScreenKeyboard.cs`, `Gui/PadUi.cs`,
+  `Gui/ControllerScreen.cs` (Ustawienia → Sterowanie → „Kontroler...” i „Przyciski...”), `PadSelfTest.cs`.
+- Domyślnie: lewa gałka ruch (analogowo), prawa kamera, RT atak, LT użyj, A skok, B skradanie, X wyrzuć, Y ekwipunek,
+  LB/RB slot, LS sprint, RS wybierz blok, Start pauza, Back czat, krzyżak w górę perspektywa, w dół komenda.
+- Menu: lewa gałka kursor (zwalnia nad przyciskiem/slotem), krzyżak przeskakuje, A klik (trzymanie = przeciąganie),
+  X prawy klik, Y Shift+klik, B wstecz, Start powrót do gry, LB/RB zakładki kreatywne, prawa gałka przewija, suwaki krzyżakiem.
+- Klawiatura ekranowa: sama przy polu tekstowym (czat, wyszukiwanie, nazwy, tabliczki, książki, kowadło, blok poleceń);
+  A wpisz, B usuń, X spacja, Y ukryj (Back pokazuje znowu), Start Enter, LT Shift, RT symbole.
+- Mysz albo klawiatura wyłączają tryb pada (wraca kursor systemowy). Pady bez mapowania w GLFW: `gamecontrollerdb.txt` obok gry.
+- Sprawdzenie bez pada: `BlockCraft.exe --showcase --pad-preview` (zrzuty `pad_*.png`), selftest `--selftest --pad-only`.
+- Nie zrobione: ikony PlayStation (zawsze układ Xbox), listy światów/paczek bez przeskoku krzyżakiem (gałką działają).
+
+Pierwotny plan:
 
 - Obsługa padów przez GLFW (OpenTK `JoystickState` / mapowania gamepad SDL z GLFW): Xbox, PlayStation, ogólne.
 - Sterowanie w grze: lewa gałka ruch, prawa kamera (czułość, martwa strefa, odwrócenie osi), spusty kopanie/stawianie,

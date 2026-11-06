@@ -96,6 +96,9 @@ public sealed class AnvilScreen : ContainerScreen
         base.KeyDown(k, ctrl, shift);
     }
 
+    public override bool WantsText => _ac.Inv.Get(0) != null;
+    public override int TextY => _name.Y;
+
     public override void CharTyped(char c)
     {
         if (_ac.Inv.Get(0) == null || c == '§') return;
