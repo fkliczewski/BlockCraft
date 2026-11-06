@@ -67,9 +67,14 @@ public static partial class SelfTest
         Check(d.Blocks.AsSpan().SequenceEqual(c.Blocks) && d.Meta.AsSpan().SequenceEqual(c.Meta) && d.Biomes.AsSpan().SequenceEqual(c.Biomes), $"Sieć: chunk kodowanie ({data.Length} B)");
         Check(d.TileEntities.Values.OfType<ChestTileEntity>().FirstOrDefault()?.Slots[5]?.Count == 12, "Sieć: tile entity w chunku");
         Check(NetServer.UnAng(NetServer.Ang(90)) is > 88 and < 92 && NetServer.UnAng(NetServer.Ang(-170)) is > -172 and < -168, "Sieć: kąty w bajcie");
-        var map = RelayGateway.Map(RelayOptions.Default);
+        var pub = RelayOptions.Parse("");
+        Check(!pub.Own && RelayGateway.For(pub) is PublicRelayGateway, "Sieć: domyślnie publiczne przekaźniki Tailscale");
+        var own = RelayOptions.Parse(" https://Gry.Fimson.pl/ ");
+        Check(own.Own && own.Host == "gry.fimson.pl" && own.Port == 443 && RelayGateway.For(own) is RelayGateway && RelayOptions.Parse("gry.fimson.pl:8443").Port == 8443,
+            "Sieć: własny przekaźnik z adresu (host, port, https://)");
+        var map = RelayGateway.Map(own);
         Check(map.Regions.Count == 1 && map.Regions.TryGetValue(304, out var reg) && reg.Nodes.All(n => n.HostName == "gry.fimson.pl" && n.DERPPort == 443),
-            "Sieć: mapa DERP tylko z gry.fimson.pl (region 304)");
+            "Sieć: mapa DERP własnego przekaźnika (region 304, zgodny ze starszymi wersjami)");
     }
 
     /// <summary>Host i klient połączeni pętlą w pamięci, pełna wymiana przez NetServer/NetClient.</summary>

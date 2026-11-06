@@ -30,7 +30,7 @@ public sealed class NetHostScreen : Screen
         _lastClients = G.Server?.Clients.Count ?? 0;
         if (!hosting)
         {
-            _nick = Add(new TextField(W / 2 - 100, H / 4 + 98, 200, 20) { MaxLength = 16, Text = G.Player?.Name ?? G.Settings.PlayerName ?? "Steve" });
+            _nick = Add(new TextField(W / 2 - 100, H / 4 + 98, 200, 20) { MaxLength = 16, Text = _nick?.Text ?? G.Player?.Name ?? G.Settings.PlayerName ?? "Steve" });
             _nick.OnEnter = Open;
             Add(new Button(W / 2 - 100, H / 4 + 60, 200, 20, () => G.HostStarting ? "Uruchamianie..." : "Otwórz świat w sieci", Open) { Enabled = !G.HostStarting });
         }
@@ -49,7 +49,13 @@ public sealed class NetHostScreen : Screen
                     y += 20;
                 }
         }
-        Add(new Button(W / 2 - 100, H - 30, 200, 20, "Gotowe", () => G.SetScreen(_parent)));
+        if (hosting) Add(new Button(W / 2 - 100, H - 30, 200, 20, "Gotowe", () => G.SetScreen(_parent)));
+        else
+        {
+            // przekaźnik zmienia się tylko przed otwarciem sieci (otwarty host zostaje na swoim)
+            Add(new Button(W / 2 - 100, H - 30, 98, 20, "Przekaźnik...", () => G.SetScreen(new RelayScreen(this))) { Enabled = !G.HostStarting });
+            Add(new Button(W / 2 + 2, H - 30, 98, 20, "Gotowe", () => G.SetScreen(_parent)));
+        }
     }
 
     private TextField _nick;
@@ -81,7 +87,7 @@ public sealed class NetHostScreen : Screen
         if (G.HostLink == null)
         {
             sb.TextCentered("Inni gracze dołączą do tego świata kodem zaproszenia,", W / 2f, H / 4f, 0xFFE0E0E0);
-            sb.TextCentered("bez serwera i bez przekierowania portów (przekaźnik " + RelayOptions.Default.Host + ").", W / 2f, H / 4f + 12, 0xFFA0A0A0);
+            sb.TextCentered("bez serwera i bez przekierowania portów (przekaźnik: " + G.Relay.Current.Describe() + ").", W / 2f, H / 4f + 12, 0xFFA0A0A0);
             if (G.HostStatus != null) sb.TextCentered(G.HostStatus, W / 2f, H / 4f + 30, G.HostStatus.StartsWith("Nie") ? 0xFFFF6060 : 0xFFFFFF80);
             sb.Text("Twój nick", W / 2 - 100, H / 4 + 88, 0xFFA0A0A0);
         }
@@ -116,13 +122,14 @@ public sealed class MultiplayerScreen : Screen
 
     protected override void Init()
     {
-        _code = Add(new TextField(W / 2 - 100, 70, 200, 20) { MaxLength = 200, Placeholder = "np. kod od hosta", Focused = true });
-        _nick = Add(new TextField(W / 2 - 100, 112, 200, 20) { MaxLength = 16, Text = G.Settings.PlayerName ?? "Steve" });
+        _code = Add(new TextField(W / 2 - 100, 70, 200, 20) { MaxLength = 200, Placeholder = "np. kod od hosta", Text = _code?.Text ?? "", Focused = true });
+        _nick = Add(new TextField(W / 2 - 100, 112, 200, 20) { MaxLength = 16, Text = _nick?.Text ?? G.Settings.PlayerName ?? "Steve" });
         _code.OnEnter = Join;
         Add(new Button(W / 2 - 100, 142, 200, 20, "Dołącz", Join));
         Add(new Button(W / 2 - 100, 166, 200, 20, "Wklej kod ze schowka", () => { var s = G.GetClipboard(); if (!string.IsNullOrWhiteSpace(s)) _code.Text = s.Trim(); }));
         Add(new Button(W / 2 - 100, 190, 200, 20, "Dołącz ponownie (ostatni host)", () => Start(null)) { Enabled = LinkSetup.HasClientPairing() });
-        Add(new Button(W / 2 - 100, H - 30, 200, 20, "Anuluj", () => G.SetScreen(_parent)));
+        Add(new Button(W / 2 - 100, H - 30, 98, 20, "Przekaźnik...", () => G.SetScreen(new RelayScreen(this))));
+        Add(new Button(W / 2 + 2, H - 30, 98, 20, "Anuluj", () => G.SetScreen(_parent)));
     }
 
     private void Join()
@@ -148,6 +155,52 @@ public sealed class MultiplayerScreen : Screen
         sb.TextCentered("Host otwiera świat: Esc -> Otwórz w sieci i podaje Ci kod.", W / 2f, 36, 0xFFA0A0A0);
         sb.Text("Kod zaproszenia", W / 2 - 100, 60, 0xFFA0A0A0);
         sb.Text("Twój nick", W / 2 - 100, 102, 0xFFA0A0A0);
+        sb.TextCentered("Przekaźnik: " + G.Relay.Current.Describe() + " (taki sam jak u hosta)", W / 2f, H - 44, 0xFFA0A0A0);
+        base.Render(mx, my, pt);
+    }
+}
+
+/// <summary>Wybór przekaźnika: publiczne przekaźniki Tailscale albo własny (np. gry.fimson.pl). Host i gracze muszą mieć ten sam.</summary>
+public sealed class RelayScreen : Screen
+{
+    private readonly Screen _parent;
+    private TextField _host;
+    private string _error;
+    public RelayScreen(Screen parent) { _parent = parent; }
+    public override bool PausesGame => false;
+
+    protected override void Init()
+    {
+        _host = Add(new TextField(W / 2 - 100, H / 2 - 10, 200, 20) { MaxLength = 120, Placeholder = "puste = publiczne Tailscale", Text = G.Relay.Text, Focused = true });
+        _host.OnEnter = Save;
+        Add(new Button(W / 2 - 100, H / 2 + 20, 200, 20, "Publiczne przekaźniki Tailscale", () => { _host.Text = ""; Save(); }));
+        Add(new Button(W / 2 - 100, H - 30, 98, 20, "Zapisz", Save));
+        Add(new Button(W / 2 + 2, H - 30, 98, 20, "Anuluj", () => G.SetScreen(_parent)));
+    }
+
+    private void Save()
+    {
+        string text = (_host.Text ?? "").Trim();
+        if (!RelayOptions.IsValid(text))
+        {
+            _error = "Podaj nazwę hosta, np. gry.fimson.pl albo gry.fimson.pl:443";
+            return;
+        }
+        G.Relay.Save(text);
+        G.SetScreen(_parent);
+    }
+
+    protected override void Escape() => G.SetScreen(_parent);
+
+    public override void Render(int mx, int my, float pt)
+    {
+        if (G.World == null) DrawDirtBackground(); else DrawDim();
+        var sb = G.Sb;
+        sb.TextCentered("Przekaźnik sieci", W / 2f, 20, 0xFFFFFFFF);
+        sb.TextCentered("Host i wszyscy gracze muszą używać tego samego przekaźnika.", W / 2f, H / 2f - 52, 0xFFE0E0E0);
+        sb.TextCentered("Puste pole: publiczne przekaźniki Tailscale. Własny: np. gry.fimson.pl", W / 2f, H / 2f - 40, 0xFFA0A0A0);
+        sb.Text("Własny przekaźnik (host[:port])", W / 2 - 100, H / 2 - 20, 0xFFA0A0A0);
+        if (_error != null) sb.TextCentered(_error, W / 2f, H / 2f + 48, 0xFFFF6060);
         base.Render(mx, my, pt);
     }
 }
@@ -171,7 +224,7 @@ public sealed class ConnectingScreen : Screen
         if (_task == null)
         {
             _cts.CancelAfter(TimeSpan.FromSeconds(45));
-            _task = NetClient.JoinAsync(_code, _nick, G.Settings.RenderDistance, LinkSetup.Options("client"), _cts.Token);
+            _task = NetClient.JoinAsync(_code, _nick, G.Settings.RenderDistance, LinkSetup.Options("client", RelayGateway.For(G.Relay.Current)), _cts.Token);
         }
     }
 
@@ -195,7 +248,7 @@ public sealed class ConnectingScreen : Screen
             if (!_task.IsCompleted) return;
             if (_task.IsFaulted || _task.IsCanceled)
             {
-                _error = _task.IsCanceled ? "Przekroczono czas łączenia (host wyłączony albo zły kod)" : NetErrors.Describe(_task.Exception);
+                _error = _task.IsCanceled ? "Przekroczono czas łączenia (" + NetErrors.TimeoutHint + ")" : NetErrors.Describe(_task.Exception, G.Relay.Current);
                 Log.Error("Sieć: dołączanie: " + _task.Exception);
                 return;
             }
