@@ -16,6 +16,7 @@ namespace BlockCraft;
 public sealed partial class Game : GameWindow, IPlayerHandler
 {
     public Settings Settings;
+    public Net.RelaySetting Relay;
     public SpriteBatch Sb;
     public GuiTextures Gui;
     public WorldRenderer Renderer;
@@ -85,6 +86,9 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _stress = !_autotest && !_showcase && args.Contains("--stress");
         Settings = Settings.Load();
         ParsePackArgs(args);
+        // przekaźnik sieci: z ustawień, --relay nadpisuje na czas uruchomienia (autotesty przez gry.fimson.pl)
+        int relay = Array.IndexOf(args, "--relay");
+        Relay = new Net.RelaySetting(Settings, relay >= 0 && relay + 1 < args.Length ? args[relay + 1] : null);
         int fps = Array.IndexOf(args, "--fps");
         if (fps >= 0 && fps + 1 < args.Length && int.TryParse(args[fps + 1], out int f) && f > 0) _fpsOverride = f;
         VSync = Settings.VSync && _fpsOverride == 0 ? VSyncMode.On : VSyncMode.Off;

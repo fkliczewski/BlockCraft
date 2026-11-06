@@ -37,6 +37,8 @@ public sealed class Settings
     public string Language { get; set; } = "";
     /// <summary>Największa rozdzielczość tekstur bloków z paczek (16, 32, 64, 128); większe paczki są zmniejszane.</summary>
     public int MaxPackTextureSize { get; set; } = 64;
+    /// <summary>Własny przekaźnik sieci (np. gry.fimson.pl); puste = publiczne przekaźniki Tailscale.</summary>
+    public string Relay { get; set; } = "";
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

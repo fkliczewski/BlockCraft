@@ -28,7 +28,15 @@ przekaźnika gier `gry.fimson.pl:443` (region 304, kod `fimson-gry`). Nie wymaga
 Hamachi ani osobnego procesu serwera. `--server` pozostaje starszą atrapą;
 obsługiwany tryb to host w oknie gry.
 
-Przekaźnik (od 2026-10-31): gra używa osobnego przekaźnika gier `gry.fimson.pl`.
+Przekaźnik (od 2026-11-05): domyślnie publiczne przekaźniki Tailscale - ta sama mapa DERP co w
+bibliotece Tailcat (`PublicRelayGateway`, zapisany region spoza mapy jest pomijany). Własny przekaźnik
+wpisuje się w grze: Tryb wieloosobowy albo Otwórz w sieci -> Przekaźnik... (np. `gry.fimson.pl`,
+`host:port`), zapis w `options.json` (`Relay`). `--relay <host|tailscale>` nadpisuje ustawienie na czas
+uruchomienia; `tools/dev/Test-Net.ps1 -Relay tailscale` testuje publiczne przekaźniki (domyślnie
+`gry.fimson.pl`). Host i gracze muszą mieć ten sam przekaźnik. Własny przekaźnik zawsze używa regionu 304,
+więc kody ze starszych wersji gry (gry.fimson.pl) nadal działają.
+
+Wcześniej (2026-10-31): gra używa osobnego przekaźnika gier `gry.fimson.pl`.
 `derp.fimson.pl` jest zarezerwowany dla Centrum Domowego i Modus Operandi, gra
 nie może z niego korzystać. Kod zaproszenia niesie tylko numer regionu, a nazwę
 hosta bierze z mapy DERP w grze, dlatego `RelayGateway` ignoruje zapisany region
@@ -59,7 +67,7 @@ ASCII (litery, cyfry, `_`, `-`). Dane świata i graczy pozostają w zwykłym zap
 
 | Plik | Zadanie |
 |---|---|
-| `Net/Relay.cs` | Własna mapa DERP i `INodeGatewayFactory`, bez publicznych przekaźników Tailscale |
+| `Net/Relay.cs` | Wybór przekaźnika (`RelayOptions`): publiczne przekaźniki Tailscale (`PublicRelayGateway`, domyślnie) albo własna mapa DERP (`RelayGateway`, region 304) |
 | `Net/Transport.cs` | Połączenie kolejkowane, host `HostManyAsync`, klient, parowanie i profile |
 | `Net/Protocol.cs` | Wersja protokołu, typy pakietów, ramki, input i kompresja chunków |
 | `Net/NetServer.cs` | Logowanie, uprawnienia, śledzenie encji, słuchacze świata i zapis graczy |

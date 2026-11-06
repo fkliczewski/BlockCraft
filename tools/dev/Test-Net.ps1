@@ -1,4 +1,5 @@
-﻿param([string]$OutputDirectory)
+﻿# -Relay: przekaźnik obu procesów (domyślnie gry.fimson.pl; 'tailscale' = publiczne przekaźniki Tailscale)
+param([string]$OutputDirectory, [string]$Relay = 'gry.fimson.pl')
 
 $ErrorActionPreference = 'Stop'
 $netRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -17,10 +18,12 @@ $netExe = Join-Path $netRepo 'src\BlockCraft\bin\Release\net10.0\BlockCraft.exe'
 $netProcesses = @()
 try {
     foreach ($netRole in @('host', 'join')) {
-        $netProcesses += Start-Process -FilePath $netExe -ArgumentList @(
+        $netArgs = @(
             ('--autotest-' + $netRole), '--net-profile', ('test-' + $netRunId + '-' + $netRole),
             '--net-test-dir', ('"' + $netOutput + '"')
-        ) -WindowStyle Hidden -PassThru
+        )
+        $netArgs += @('--relay', $Relay)
+        $netProcesses += Start-Process -FilePath $netExe -ArgumentList $netArgs -WindowStyle Hidden -PassThru
     }
     $netDeadline = [DateTime]::UtcNow.AddSeconds(270)
     while (@($netProcesses | Where-Object { -not $_.HasExited }).Count -gt 0) {
