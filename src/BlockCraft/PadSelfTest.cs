@@ -88,6 +88,32 @@ public static partial class SelfTest
 
         TestPadMenu();
         TestPadRumble();
+        TestPadListsAndLayout();
+    }
+
+    private static void TestPadListsAndLayout()
+    {
+        // ikony PlayStation wg nazwy pada
+        Check(Gamepad.DetectLayout("PS4 Controller") == PadLayout.PlayStation && Gamepad.DetectLayout("Sony DualSense") == PadLayout.PlayStation,
+            "Układ: pady Sony = PlayStation");
+        Check(Gamepad.DetectLayout("Xbox Controller") == PadLayout.Xbox && Gamepad.DetectLayout("8BitDo Pro 2") == PadLayout.Xbox
+            && Gamepad.DetectLayout("") == PadLayout.Xbox, "Układ: Xbox, 8BitDo i brak nazwy = Xbox");
+        Check(PadBindings.ShortName(PadButton.RightTrigger, PadLayout.PlayStation) == "R2" && PadBindings.ButtonName(PadButton.A, PadLayout.PlayStation) == "Krzyżyk"
+            && PadBindings.ButtonName(PadButton.A) == "A", "Nazwy przycisków PlayStation (R2, krzyżyk) i Xbox");
+
+        // lista: 10 wierszy po 20 px, widać 4 (obszar 0..80)
+        float scroll = 0;
+        var list = new PadList { Left = 0, Width = 100, Top = 0, Bottom = 80, Offset = 0, RowH = 20, ItemH = 16, Count = 10,
+            MaxScroll = 10 * 20 - 80, GetScroll = () => scroll, SetScroll = v => scroll = v };
+        Check(list.Targets().Count() == 4, "Lista: cele = widoczne wiersze", list.Targets().Count().ToString());
+        var row = list.Move(50, 68, 1);
+        Check(row is { } r1 && scroll == 16 && r1.y == 4 * 20 - 16 + 8, "Lista: krok w dół za widoczne przewija o wiersz", $"{row} {scroll}");
+        scroll = 120;
+        row = list.Move(50, 4, -1);
+        Check(row is { } r2 && scroll == 100 && r2.y == 8, "Lista: krok w górę przewija w górę", $"{row} {scroll}");
+        scroll = 120;
+        Check(list.Move(50, 68, 1) == null, "Lista: za ostatnim wierszem krzyżak idzie dalej (przyciski)");
+        Check(list.Move(150, 10, 1) == null, "Lista: kursor poza listą");
     }
 
     /// <summary>Menu i klawiatura ekranowa bez okna gry: podstawiony host zapisuje zdarzenia.</summary>

@@ -10,6 +10,12 @@ public enum PadButton
     LeftTrigger, RightTrigger,
 }
 
+/// <summary>Układ oznaczeń przycisków na ekranie: Xbox (A/B/X/Y, LB/RT...) albo PlayStation (krzyżyk/kółko/kwadrat/trójkąt, L1/R2...).</summary>
+public enum PadLayout { Xbox, PlayStation }
+
+/// <summary>Ustawienie ikon przycisków: wg pada (wykryty układ), zawsze Xbox albo zawsze PlayStation.</summary>
+public enum PadIconStyle { Auto, Xbox, PlayStation }
+
 /// <summary>Stan pada w jednej klatce: przyciski i osie (gałki -1..1, Y w dół dodatni jak w GLFW; spusty 0..1).</summary>
 public sealed class PadState
 {
@@ -41,15 +47,32 @@ public sealed class Gamepad
     private int _jid = -1;
     private bool _mappingsLoaded;
 
-    /// <summary>Podstawia stan pada zamiast GLFW (null = z powrotem prawdziwy pad).</summary>
-    public void Inject(PadState s) => _injected = s?.Clone();
+    private string _injectedName = "Pad testowy";
+
+    /// <summary>Podstawia stan pada zamiast GLFW (null = z powrotem prawdziwy pad); name = nazwa pada (np. do ikon PlayStation).</summary>
+    public void Inject(PadState s, string name = null)
+    {
+        _injected = s?.Clone();
+        if (name != null) _injectedName = name;
+    }
+
+    /// <summary>Układ przycisków wg nazwy pada: Sony (DualShock, DualSense) = PlayStation, reszta = Xbox.</summary>
+    public PadLayout Layout => DetectLayout(Name);
+
+    public static PadLayout DetectLayout(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return PadLayout.Xbox;
+        foreach (var key in new[] { "PS3", "PS4", "PS5", "DualShock", "DualSense", "PlayStation", "Sony" })
+            if (name.Contains(key, StringComparison.OrdinalIgnoreCase)) return PadLayout.PlayStation;
+        return PadLayout.Xbox;
+    }
     public bool Injected => _injected != null;
 
     /// <summary>Odczyt stanu (wątek główny, raz na klatkę).</summary>
     public void Poll()
     {
         Previous = Current;
-        if (_injected != null) { Current = _injected.Clone(); Connected = true; Name = "Pad testowy"; return; }
+        if (_injected != null) { Current = _injected.Clone(); Connected = true; Name = _injectedName; return; }
         Current = ReadGlfw();
     }
 

@@ -6,7 +6,7 @@ namespace BlockCraft.Gui;
 
 /// <summary>Ustawienia -> „Paczki zasobów...” (jak GuiScreenResourcePacks z 1.8): dostępne po lewej, wybrane po prawej.
 /// Klik w dostępną dodaje ją na górę wybranych; przy wybranej strzałki na ikonie: usuń (lewa połowa), wyżej/niżej (prawa).</summary>
-public sealed class ResourcePackScreen : Screen
+public sealed class ResourcePackScreen : Screen, IPadLists, IPadHints
 {
     private readonly Screen _parent;
     private List<ResourcePack> _available = new(), _selected = new();
@@ -34,6 +34,7 @@ public sealed class ResourcePackScreen : Screen
     private int RightX => W / 2 + 4;
     private int ListTop => 32;
     private int ListBottom => H - 58;
+    private const int RowOffset = 2, ItemH = 32;
 
     /// <summary>Lista plików w resourcepacks/ (nazwa + czas zmiany): odświeżamy tylko, gdy coś się zmieniło.</summary>
     private static string Signature()
@@ -119,10 +120,10 @@ public sealed class ResourcePackScreen : Screen
             sb.TextCentered(selected ? "§7(brak - gra użyje własnych tekstur)" : "§7(brak paczek)", x + ListW / 2f, ListTop + 8, 0xFFFFFFFF);
         for (int i = 0; i < list.Count; i++)
         {
-            int y = ListTop + 2 + i * Row - (int)scroll;
-            if (y < ListTop || y + 32 > ListBottom) continue;
+            int y = ListTop + RowOffset + i * Row - (int)scroll;
+            if (y < ListTop || y + ItemH > ListBottom) continue;
             var p = list[i];
-            bool hover = mx >= x && mx < x + ListW && my >= y && my < y + 32;
+            bool hover = mx >= x && mx < x + ListW && my >= y && my < y + ItemH;
             if (hover) sb.Fill(x + 1, y - 1, ListW - 2, 34, 0x40FFFFFF);
             var tex = Icon(p);
             if (tex != null) sb.Draw(tex, x + 2, y, 32, 32);
@@ -176,6 +177,13 @@ public sealed class ResourcePackScreen : Screen
 
     public override void MouseDown(int mx, int my, int btn)
     {
+        // prawy przycisk (X na padzie) na wybranej paczce: wyżej na liście, czyli ważniejsza
+        if (btn == 1 && my >= ListTop && my < ListBottom && mx >= RightX && mx < RightX + ListW)
+        {
+            int i = RowAt(my, _scrollR);
+            if (i > 0 && i < _selected.Count) SwapSelected(i - 1, i);
+            return;
+        }
         if (btn == 0 && my >= ListTop && my < ListBottom)
         {
             bool left = mx >= LeftX && mx < LeftX + ListW, right = mx >= RightX && mx < RightX + ListW;
@@ -183,17 +191,17 @@ public sealed class ResourcePackScreen : Screen
             {
                 var list = left ? _available : _selected;
                 int x = left ? LeftX : RightX;
-                int i = (int)((my - ListTop - 2 + (left ? _scrollL : _scrollR)) / Row);
-                if (i >= 0 && i < list.Count && (right || list[i].Error == null) && (my - ListTop - 2 + (int)(left ? _scrollL : _scrollR)) % Row < 32)
+                int i = RowAt(my, left ? _scrollL : _scrollR);
+                if (i >= 0 && i < list.Count && (right || list[i].Error == null) && (my - ListTop - RowOffset + (int)(left ? _scrollL : _scrollR)) % Row < ItemH)
                 {
                     var p = list[i];
                     if (left) { _available.RemoveAt(i); _selected.Insert(0, p); Changed(); }
                     else if (mx < x + 34)
                     {
-                        int y = ListTop + 2 + i * Row - (int)_scrollR;
+                        int y = ListTop + RowOffset + i * Row - (int)_scrollR;
                         if (mx < x + 18) { _selected.RemoveAt(i); _available.Add(p); _available.Sort((a, b) => a.Builtin != b.Builtin ? (a.Builtin ? -1 : 1) : string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase)); Changed(); }
-                        else if (my < y + 16 && i > 0) { (_selected[i - 1], _selected[i]) = (_selected[i], _selected[i - 1]); Changed(); }
-                        else if (my >= y + 16 && i < _selected.Count - 1) { (_selected[i + 1], _selected[i]) = (_selected[i], _selected[i + 1]); Changed(); }
+                        else if (my < y + 16 && i > 0) SwapSelected(i - 1, i);
+                        else if (my >= y + 16 && i < _selected.Count - 1) SwapSelected(i, i + 1);
                     }
                     return;
                 }
@@ -202,13 +210,41 @@ public sealed class ResourcePackScreen : Screen
         base.MouseDown(mx, my, btn);
     }
 
+    private int RowAt(int my, float scroll) => (int)((my - ListTop - RowOffset + scroll) / Row);
+
+    private void SwapSelected(int a, int b) { (_selected[a], _selected[b]) = (_selected[b], _selected[a]); Changed(); }
+
     private void Changed() { _changed = true; G.PlayUiClick(); }
+
+    /// <summary>Pad: na wybranych kursor staje na lewej połowie ikony (A = usuń z wybranych), na dostępnych A = dodaj.</summary>
+    public override IEnumerable<(int x, int y)> PadTargets() => this.ListTargets().Concat(base.PadTargets());
+
+    private float MaxScroll(int count) => Math.Max(0, count * Row - (ListBottom - ListTop) + 4);
+
+    public IEnumerable<PadList> PadLists()
+    {
+        yield return new PadList
+        {
+            Left = LeftX, Width = ListW, Top = ListTop, Bottom = ListBottom, Offset = RowOffset, RowH = Row, ItemH = ItemH, Count = _available.Count,
+            MaxScroll = MaxScroll(_available.Count), GetScroll = () => _scrollL, SetScroll = v => _scrollL = v,
+        };
+        yield return new PadList
+        {
+            Left = RightX, Width = ListW, Top = ListTop, Bottom = ListBottom, Offset = RowOffset, RowH = Row, ItemH = ItemH, Count = _selected.Count,
+            MaxScroll = MaxScroll(_selected.Count), GetScroll = () => _scrollR, SetScroll = v => _scrollR = v, TargetX = RightX + 9,
+        };
+    }
+
+    public IEnumerable<(PadButton button, string label)> PadHints() => new[]
+    {
+        (PadButton.A, "Dodaj / usuń"), (PadButton.X, "Wyżej (ważniejsza)"), (PadButton.B, "Wstecz"),
+    };
 
     public override void Scroll(int mx, int my, float d)
     {
         bool left = mx < W / 2;
         int count = left ? _available.Count : _selected.Count;
-        float max = Math.Max(0, count * Row - (ListBottom - ListTop) + 4);
+        float max = MaxScroll(count);
         if (left) _scrollL = Math.Clamp(_scrollL - d * 20, 0, max);
         else _scrollR = Math.Clamp(_scrollR - d * 20, 0, max);
     }

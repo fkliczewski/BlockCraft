@@ -55,20 +55,35 @@ public sealed class PadBindings
     public Dictionary<string, string> ToSettings() =>
         _map.Where(kv => Defaults[kv.Key] != kv.Value).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.ToString());
 
-    /// <summary>Krótka nazwa przycisku (ikony podpowiedzi); jedyne źródło skrótów.</summary>
-    public static string ShortName(PadButton b) => b switch
-    {
-        PadButton.LeftBumper => "LB", PadButton.RightBumper => "RB", PadButton.LeftTrigger => "LT", PadButton.RightTrigger => "RT",
-        PadButton.LeftStick => "LS", PadButton.RightStick => "RS", PadButton.Back => "Back", PadButton.Start => "Start",
-        PadButton.Guide => "Guide", PadButton.DPadUp => "+G", PadButton.DPadDown => "+D", PadButton.DPadLeft => "+L", PadButton.DPadRight => "+P",
-        _ => b.ToString(),
-    };
+    /// <summary>Krótka nazwa przycisku (ikony podpowiedzi); jedyne źródło skrótów. Na PlayStation przyciski A/B/X/Y
+    /// mają ikony-kształty, a tu zastępcze skróty.</summary>
+    public static string ShortName(PadButton b, PadLayout layout = PadLayout.Xbox) => layout == PadLayout.PlayStation
+        ? b switch
+        {
+            PadButton.A => "X", PadButton.B => "O", PadButton.X => "Kw", PadButton.Y => "Tr",
+            PadButton.LeftBumper => "L1", PadButton.RightBumper => "R1", PadButton.LeftTrigger => "L2", PadButton.RightTrigger => "R2",
+            PadButton.LeftStick => "L3", PadButton.RightStick => "R3", PadButton.Back => "Share", PadButton.Start => "Options",
+            PadButton.Guide => "PS", _ => ShortName(b),
+        }
+        : b switch
+        {
+            PadButton.LeftBumper => "LB", PadButton.RightBumper => "RB", PadButton.LeftTrigger => "LT", PadButton.RightTrigger => "RT",
+            PadButton.LeftStick => "LS", PadButton.RightStick => "RS", PadButton.Back => "Back", PadButton.Start => "Start",
+            PadButton.Guide => "Guide", PadButton.DPadUp => "+G", PadButton.DPadDown => "+D", PadButton.DPadLeft => "+L", PadButton.DPadRight => "+P",
+            _ => b.ToString(),
+        };
 
     /// <summary>Pełna nazwa przycisku (ekran przypisań): opis tam, gdzie skrót nie wystarcza.</summary>
-    public static string ButtonName(PadButton b) => b switch
+    public static string ButtonName(PadButton b, PadLayout layout = PadLayout.Xbox) => b switch
     {
-        PadButton.LeftStick or PadButton.RightStick => ShortName(b) + " (wciśnięcie)", PadButton.Back => "Back / View",
-        PadButton.Start => "Start / Menu", PadButton.DPadUp => "Krzyżak w górę", PadButton.DPadDown => "Krzyżak w dół",
-        PadButton.DPadLeft => "Krzyżak w lewo", PadButton.DPadRight => "Krzyżak w prawo", _ => ShortName(b),
+        PadButton.A when layout == PadLayout.PlayStation => "Krzyżyk",
+        PadButton.B when layout == PadLayout.PlayStation => "Kółko",
+        PadButton.X when layout == PadLayout.PlayStation => "Kwadrat",
+        PadButton.Y when layout == PadLayout.PlayStation => "Trójkąt",
+        PadButton.LeftStick or PadButton.RightStick => ShortName(b, layout) + " (wciśnięcie)",
+        PadButton.Back => layout == PadLayout.PlayStation ? "Share / Create" : "Back / View",
+        PadButton.Start => layout == PadLayout.PlayStation ? "Options" : "Start / Menu",
+        PadButton.DPadUp => "Krzyżak w górę", PadButton.DPadDown => "Krzyżak w dół",
+        PadButton.DPadLeft => "Krzyżak w lewo", PadButton.DPadRight => "Krzyżak w prawo", _ => ShortName(b, layout),
     };
 }

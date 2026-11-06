@@ -73,7 +73,7 @@ public sealed class HelpScreen : Screen
     }
 }
 
-public sealed class WorldSelectScreen : Screen
+public sealed class WorldSelectScreen : Screen, IPadLists
 {
     private List<(string dir, LevelData data)> _worlds = new();
     private int _sel = -1; private float _scroll;
@@ -97,6 +97,7 @@ public sealed class WorldSelectScreen : Screen
     }
     protected override void Escape() => G.SetScreen(new TitleScreen());
     private int ListTop => 32; private int ListBottom => H - 64;
+    private const int RowOffset = 4, RowH = 36, ItemH = 30;
     public override void Render(int mx, int my, float pt)
     {
         DrawDirtBackground();
@@ -107,9 +108,8 @@ public sealed class WorldSelectScreen : Screen
         if (_worlds.Count == 0) sb.TextCentered("Brak światów - stwórz nowy!", W / 2f, ListTop + 20, 0xFFA0A0A0);
         for (int i = 0; i < _worlds.Count; i++)
         {
-            int y = ListTop + 4 + i * 36 - (int)_scroll;
-            if (y < ListTop - 30 || y > ListBottom) continue;
-            int x = W / 2 - 110;
+            if (!RowVisible(i)) continue; // tylko całe wiersze: przewinięte nie nachodzą na tytuł i przyciski
+            int x = W / 2 - 110, y = RowY(i);
             var d = _worlds[i].data;
             if (i == _sel) { sb.Fill(x - 2, y - 2, 224, 34, 0xFF808080); sb.Fill(x - 1, y - 1, 222, 32, 0xFF000000); }
             string mode = d.Hardcore ? "§cHardkor" : d.GameMode == 1 ? "Kreatywny" : "Przetrwanie";
@@ -123,8 +123,8 @@ public sealed class WorldSelectScreen : Screen
     {
         if (my > ListTop && my < ListBottom && mx > W / 2 - 112 && mx < W / 2 + 112)
         {
-            int i = (int)((my - ListTop - 4 + _scroll) / 36);
-            if (i >= 0 && i < _worlds.Count)
+            int i = (int)((my - ListTop - RowOffset + _scroll) / RowH);
+            if (i >= 0 && i < _worlds.Count && RowVisible(i))
             {
                 if (i == _sel && btn == 0 && (Environment.TickCount64 - _lastClick) < 400) { G.LoadWorld(_worlds[i].dir); return; }
                 _sel = i; _confirmDelete = false; _lastClick = Environment.TickCount64; return;
@@ -133,7 +133,20 @@ public sealed class WorldSelectScreen : Screen
         base.MouseDown(mx, my, btn);
     }
     private long _lastClick;
-    public override void Scroll(int mx, int my, float d) { _scroll = Math.Clamp(_scroll - d * 20, 0, Math.Max(0, _worlds.Count * 36 - (ListBottom - ListTop) + 8)); }
+    public override void Scroll(int mx, int my, float d) { _scroll = Math.Clamp(_scroll - d * 20, 0, MaxScroll); }
+    private float MaxScroll => Math.Max(0, _worlds.Count * RowH - (ListBottom - ListTop) + 2 * RowOffset);
+    private bool RowVisible(int i) => RowY(i) >= ListTop && RowY(i) + ItemH <= ListBottom;
+    private int RowY(int i) => ListTop + RowOffset + i * RowH - (int)_scroll;
+    public override IEnumerable<(int x, int y)> PadTargets() => this.ListTargets().Concat(base.PadTargets());
+
+    public IEnumerable<PadList> PadLists()
+    {
+        yield return new PadList
+        {
+            Left = W / 2 - 112, Width = 224, Top = ListTop, Bottom = ListBottom, Offset = RowOffset, RowH = RowH, ItemH = ItemH, Count = _worlds.Count,
+            MaxScroll = MaxScroll, GetScroll = () => _scroll, SetScroll = v => _scroll = v,
+        };
+    }
 }
 
 public sealed class CreateWorldScreen : Screen

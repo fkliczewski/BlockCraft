@@ -11,6 +11,8 @@ public sealed partial class Game : IPadMenuHost
     public readonly Gamepad Pad = new();
     private PadBindings _padBinds;
     public PadBindings PadBinds => _padBinds ??= PadBindings.FromSettings(Settings.PadBindings);
+    /// <summary>Układ ikon przycisków na ekranie (ustawienie albo wykryty z nazwy pada).</summary>
+    public PadLayout PadLayout => Settings.PadIconStyle switch { PadIconStyle.Xbox => PadLayout.Xbox, PadIconStyle.PlayStation => PadLayout.PlayStation, _ => Pad.Layout };
     /// <summary>Ostatnio używano pada (kursor GUI z gałki, podpowiedzi przycisków, klawiatura ekranowa).</summary>
     public bool PadActive { get; private set; }
     private PadMenuController _padMenuController;

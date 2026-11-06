@@ -20,11 +20,18 @@ public sealed class ControllerScreen : Screen
         Add(new Slider(W / 2 + 5, y + 24, 150, 20, s.PadDeadzone / 0.5f, v => "Martwa strefa: " + (int)MathF.Round(v * 50) + "%", v => s.PadDeadzone = v * 0.5f, 25));
         Add(new Button(W / 2 - 155, y + 48, 150, 20, () => "Odwróć oś Y: " + (s.PadInvertY ? "TAK" : "NIE"), () => s.PadInvertY = !s.PadInvertY));
         Add(new Button(W / 2 + 5, y + 48, 150, 20, "Przyciski...", () => G.SetScreen(new PadBindingsScreen(this))));
+        Add(new Button(W / 2 - 155, y + 72, 150, 20, () => "Ikony: " + IconStyleName(s.PadIconStyle), () => s.PadIconStyle = NextIconStyle(s.PadIconStyle)));
         Add(new Button(W / 2 - 100, H - 28, 200, 20, "Gotowe", Close));
     }
 
     private void Close() { G.Settings.Save(); G.SetScreen(_parent); }
     protected override void Escape() => Close();
+
+    private string IconStyleName(PadIconStyle style) =>
+        style == PadIconStyle.Auto ? "wg pada (" + G.Pad.Layout + ")" : style.ToString();
+
+    private static PadIconStyle NextIconStyle(PadIconStyle style) =>
+        (PadIconStyle)(((int)style + 1) % Enum.GetValues<PadIconStyle>().Length);
 
     public override void Render(int mx, int my, float pt)
     {
@@ -33,7 +40,7 @@ public sealed class ControllerScreen : Screen
         sb.TextCentered("Kontroler", W / 2f, 8, 0xFFFFFFFF);
         string status = G.Pad.Connected ? "§a" + G.Pad.Name : "§7Nie wykryto pada (podłącz go i naciśnij dowolny przycisk)";
         sb.TextCentered(status, W / 2f, 20, 0xFFFFFFFF);
-        int top = 34 + 72 + 4;
+        int top = 34 + 96 + 4;
         if (H - 32 - top >= 56) DrawPadPreview(W / 2, top + (H - 32 - top) / 2 - 26);
         base.Render(mx, my, pt);
     }
@@ -70,8 +77,8 @@ public sealed class ControllerScreen : Screen
         if (st[PadButton.DPadLeft]) sb.Fill(dx - 10, dy - 3, 7, 7, 0xFFFFFFFF);
         if (st[PadButton.DPadRight]) sb.Fill(dx + 4, dy - 3, 7, 7, 0xFFFFFFFF);
         // Back / Start i A B X Y w karo
-        PadIcons.Draw(G, PadButton.Back, cx - 26, y + 14, st[PadButton.Back]);
-        PadIcons.Draw(G, PadButton.Start, cx + 2, y + 14, st[PadButton.Start]);
+        int backW = PadIcons.Draw(G, PadButton.Back, cx - 26, y + 14, st[PadButton.Back]);
+        PadIcons.Draw(G, PadButton.Start, cx - 26 + backW + 1, y + 14, st[PadButton.Start]); // za Back (Share jest szerszy)
         int bx = cx + 76, by = y + 34;
         PadIcons.Draw(G, PadButton.Y, bx, by - 11, st[PadButton.Y]);
         PadIcons.Draw(G, PadButton.X, bx - 11, by, st[PadButton.X]);
@@ -97,7 +104,7 @@ public sealed class PadBindingsScreen : Screen, IPadCapture
             var a = actions[i];
             int x = i < rows ? W / 2 - 155 : W / 2 + 5, y = 28 + (i % rows) * 22;
             Add(new Button(x, y, 150, 20, () => PadBindings.ActionNames[a] + ": " +
-                (_waiting == a ? "§e> naciśnij <" : PadBindings.ButtonName(G.PadBinds[a])), () => { _waiting = a; _waitUntil = Environment.TickCount64 + 5000; }));
+                (_waiting == a ? "§e> naciśnij <" : PadBindings.ButtonName(G.PadBinds[a], G.PadLayout)), () => { _waiting = a; _waitUntil = Environment.TickCount64 + 5000; }));
         }
         Add(new Button(W / 2 - 155, H - 28, 150, 20, "Domyślne", () => { G.PadBinds.Reset(); Save(); }));
         Add(new Button(W / 2 + 5, H - 28, 150, 20, "Gotowe", () => { Save(); G.SetScreen(_parent); }));
@@ -125,11 +132,18 @@ public sealed class PadBindingsScreen : Screen, IPadCapture
 
     protected override void Escape() { Save(); G.SetScreen(_parent); }
 
+    private string MenuHint()
+    {
+        string Name(PadButton b) => PadBindings.ButtonName(b, G.PadLayout);
+        return "§7Ruch i kamera: gałki. W menu: " + Name(PadButton.A) + " wybierz, " + Name(PadButton.B) + " wstecz, "
+            + Name(PadButton.X) + " prawy klik, " + Name(PadButton.Y) + " szybkie przeniesienie.";
+    }
+
     public override void Render(int mx, int my, float pt)
     {
         if (G.World == null) DrawDirtBackground(); else DrawDim();
         G.Sb.TextCentered("Przyciski pada", W / 2f, 10, 0xFFFFFFFF);
-        G.Sb.TextCentered("§7Ruch i kamera: gałki. W menu: A wybierz, B wstecz, X prawy klik, Y szybkie przeniesienie.", W / 2f, H - 40, 0xFFFFFFFF);
+        G.Sb.TextCentered(MenuHint(), W / 2f, H - 40, 0xFFFFFFFF);
         base.Render(mx, my, pt);
     }
 }
