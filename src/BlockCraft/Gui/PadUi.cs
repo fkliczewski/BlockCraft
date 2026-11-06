@@ -32,13 +32,32 @@ public static class PadIcons
         PadButton.A => 0xFF3CA03C, PadButton.B => 0xFF3232C8, PadButton.X => 0xFFC86432, PadButton.Y => 0xFF1EA0C8, _ => 0xFF505050,
     };
 
-    public static string Short(PadButton b) => PadBindings.ShortName(b);
+    public static string Short(Game g, PadButton b) => PadBindings.ShortName(b, g.PadLayout);
+
+    /// <summary>Kształty przycisków PlayStation 7x7 (krzyżyk, kółko, kwadrat, trójkąt) i ich kolory (0xAABBGGRR).</summary>
+    private static readonly Dictionary<PadButton, (string[] mask, uint color)> PlayStationShapes = new()
+    {
+        [PadButton.A] = (new[] { "X.....X", ".X...X.", "..X.X..", "...X...", "..X.X..", ".X...X.", "X.....X" }, 0xFFE8B27C),
+        [PadButton.B] = (new[] { "..XXX..", ".X...X.", "X.....X", "X.....X", "X.....X", ".X...X.", "..XXX.." }, 0xFF6666FF),
+        [PadButton.X] = (new[] { ".......", ".XXXXX.", ".X...X.", ".X...X.", ".X...X.", ".XXXXX.", "......." }, 0xFFF869FF),
+        [PadButton.Y] = (new[] { ".......", "...X...", "..X.X..", "..X.X..", ".X...X.", ".XXXXX.", "......." }, 0xFFA0E240),
+    };
 
     /// <summary>Ikona przycisku (podświetlona, gdy wciśnięty); zwraca szerokość.</summary>
     public static int Draw(Game g, PadButton b, int x, int y, bool lit = false)
     {
         var sb = g.Sb;
-        string label = Short(b);
+        if (g.PadLayout == PadLayout.PlayStation && PlayStationShapes.TryGetValue(b, out var shape))
+        {
+            uint bg = lit ? 0xFFFFFFFF : 0xFF303030;
+            sb.Fill(x + 1, y, 7, 9, bg);
+            sb.Fill(x, y + 1, 9, 7, bg);
+            for (int r = 0; r < 7; r++)
+                for (int col = 0; col < 7; col++)
+                    if (shape.mask[r][col] == 'X') sb.Fill(x + 1 + col, y + 1 + r, 1, 1, lit ? 0xFF000000 : shape.color);
+            return 9;
+        }
+        string label = Short(g, b);
         int w = Math.Max(9, sb.Measure(label) + 4);
         uint c = Color(b);
         if (lit) c = 0xFFFFFFFF;

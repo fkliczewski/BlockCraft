@@ -34,6 +34,17 @@ public sealed partial class Game
         // menu główne: krzyżak przeskakuje po przyciskach
         Tap(PadButton.DPadDown); Tap(PadButton.DPadDown);
         Step(5, () => Snap("pad_title"));
+        // listy: krzyżak chodzi po wierszach i przewija listę (światy, języki, paczki); ikony PlayStation wg nazwy pada
+        Step(3, () => SetScreen(new WorldSelectScreen()));
+        for (int i = 0; i < 6; i++) Tap(PadButton.DPadDown);
+        Step(5, () => Snap("pad_worlds"));
+        Step(3, () => { Pad.Inject(new PadState(), "PS5 DualSense Wireless Controller"); SetScreen(new LanguageScreen(new TitleScreen())); });
+        for (int i = 0; i < 12; i++) Tap(PadButton.DPadDown);
+        Step(5, () => Snap("pad_languages_ps"));
+        Step(3, () => SetScreen(new ResourcePackScreen(new TitleScreen(), new List<string> { ResourcePacks.BuiltinId })));
+        Tap(PadButton.DPadDown);
+        Step(5, () => Snap("pad_packs_ps"));
+        Step(3, () => { Pad.Inject(new PadState(), "Pad testowy"); SetScreen(new TitleScreen()); });
         Step(5, () => CreateWorld("Pad " + DateTime.Now.ToString("HHmmss"), 12345, 1, false, WorldType.Default, true));
         int t1 = 0;
         WaitUntil(() => _sessionStarted && Renderer.PendingMeshes < 10 || ++t1 > 1500);

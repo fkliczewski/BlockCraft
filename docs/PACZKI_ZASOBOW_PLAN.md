@@ -211,7 +211,8 @@ Stan: zrobione — do odbioru (gałąź `feature/pad`).
   A wpisz, B usuń, X spacja, Y ukryj (Back pokazuje znowu), Start Enter, LT Shift, RT symbole.
 - Mysz albo klawiatura wyłączają tryb pada (wraca kursor systemowy). Pady bez mapowania w GLFW: `gamecontrollerdb.txt` obok gry.
 - Sprawdzenie bez pada: `BlockCraft.exe --showcase --pad-preview` (zrzuty `pad_*.png`), selftest `--selftest --pad-only`.
-- Nie zrobione: ikony PlayStation (zawsze układ Xbox), listy światów/paczek bez przeskoku krzyżakiem (gałką działają).
+- Ikony przycisków: Xbox albo PlayStation (krzyżyk/kółko/kwadrat/trójkąt, L1/R2) wg nazwy pada lub ustawienia „Ikony” w „Kontroler...”.
+- Listy (światy, języki, paczki zasobów): krzyżak chodzi po wierszach i przewija listę; na wybranych paczkach A usuwa, X przesuwa wyżej.
 
 Pierwotny plan:
 

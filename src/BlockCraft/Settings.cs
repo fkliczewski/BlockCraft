@@ -47,6 +47,8 @@ public sealed class Settings
     public bool PadVibration { get; set; } = true;
     /// <summary>Przypisania akcji do przycisków pada różne od domyślnych (np. "Jump": "B").</summary>
     public Dictionary<string, string> PadBindings { get; set; } = new();
+    /// <summary>Ikony przycisków: wg pada (Sony = PlayStation), Xbox albo PlayStation.</summary>
+    public PadIconStyle PadIconStyle { get; set; }
 
     private static string PathFile => System.IO.Path.Combine(WorldStorage.Root, "options.json");
 

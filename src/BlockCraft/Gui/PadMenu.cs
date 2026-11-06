@@ -123,6 +123,9 @@ public sealed class PadMenuController
     {
         var (dx, dy) = Direction(pad, false);
         if (dx == 0 && dy == 0) return;
+        if (dx == 0 && s is IPadLists lists)
+            foreach (var list in lists.PadLists())
+                if (list.Move(_host.CursorX, _host.CursorY, dy) is { } row) { MoveCursor(row.x, row.y); return; }
         if (dx != 0 && dy == 0 && s.WidgetAt(_host.CursorX, _host.CursorY) is Slider slider)
         {
             int dir = dx;
