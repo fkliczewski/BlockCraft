@@ -16,12 +16,37 @@ public sealed class TitleScreen : Screen
     protected override void Init()
     {
         _splash ??= Splashes[new Random().Next(Splashes.Length)];
-        int y = H / 4 + 48;
-        Add(new Button(W / 2 - 100, y, 200, 20, "Tryb jednoosobowy", () => G.SetScreen(new WorldSelectScreen())));
-        Add(new Button(W / 2 - 100, y + 24, 200, 20, "Tryb wieloosobowy", () => G.SetScreen(new Net.MultiplayerScreen(this))));
-        Add(new Button(W / 2 - 100, y + 48, 200, 20, "Twórcy i pomoc", () => G.SetScreen(new HelpScreen(this))));
-        Add(new Button(W / 2 - 100, y + 72 + 12, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
-        Add(new Button(W / 2 + 2, y + 72 + 12, 98, 20, "Wyjdź z gry", () => G.Quit()));
+        if (!_recentChecked)
+        {
+            _recentChecked = true;
+            try { var w = WorldStorage.ListWorlds().FirstOrDefault(); if (w.dir != null) _recent = (w.dir, w.data.Name); }
+            catch (Exception ex) { Log.Error("Ostatni świat: " + ex.Message); }
+        }
+        // jedna główna akcja na górze (ostatni świat), pod nią wybór świata i sieć, rzadkie opcje w małym rzędzie na dole
+        int x = W / 2 - 100, y = H / 4 + 48;
+        if (_recent is { } r)
+        {
+            Add(new Button(x, y, 200, 20, "Graj dalej: " + Fit(r.name, 200 - 16 - G.Sb.Measure("Graj dalej: ")), () => G.LoadWorld(r.dir)));
+            y += 24;
+        }
+        Add(new Button(x, y, 200, 20, _recent == null ? "Zagraj..." : "Światy...", () => G.SetScreen(new WorldSelectScreen())));
+        Add(new Button(x, y + 24, 200, 20, "Gra w sieci...", () => G.SetScreen(new Net.MultiplayerScreen(this))));
+        y += 24 + 24 + 12;
+        Add(new Button(x, y, 64, 20, "Ustawienia", () => G.SetScreen(new OptionsScreen(this))));
+        Add(new Button(x + 68, y, 64, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
+        Add(new Button(x + 136, y, 64, 20, "Wyjdź", () => G.Quit()));
+    }
+
+    /// <summary>Ostatnio grany świat (do „Graj dalej”); sprawdzany raz na otwarcie menu.</summary>
+    private (string dir, string name)? _recent;
+    private bool _recentChecked;
+
+    /// <summary>Tekst skrócony wielokropkiem do szerokości.</summary>
+    private string Fit(string text, int width)
+    {
+        if (G.Sb.Measure(text) <= width) return text;
+        while (text.Length > 1 && G.Sb.Measure(text + "...") > width) text = text[..^1];
+        return text + "...";
     }
     protected override void Escape() { }
     public override void Render(int mx, int my, float pt)
@@ -194,91 +219,211 @@ public sealed class CreateWorldScreen : Screen
     }
 }
 
-public sealed class OptionsScreen : Screen
+/// <summary>Ekran ustawień z kategoriami: kolumna kategorii po lewej, w panelu najwyżej 6 opcji jednej kategorii
+/// w jednej kolumnie i opis opcji pod kursorem. Na padzie kategorie przełączają LB/RB.</summary>
+public abstract class TabbedOptionsScreen : Screen, IPadTabs
 {
-    private readonly Screen _parent;
-    public OptionsScreen(Screen p) { _parent = p; }
-    public override bool PausesGame => true;
-    protected override void Init()
-    {
-        var s = G.Settings;
-        int y = H / 6;
-        Add(new Slider(W / 2 - 155, y, 150, 20, (s.Fov - 30) / 80f, v => "Pole widzenia: " + (Math.Abs(30 + v * 80 - 70) < 0.5f ? "Normalne" : ((int)(30 + v * 80)).ToString()), v => { s.Fov = 30 + v * 80; }));
-        Add(new Button(W / 2 + 5, y, 150, 20, () => "Poziom trudności: " + DiffName(G.CurrentDifficulty), () =>
-        {
-            G.CurrentDifficulty = (G.CurrentDifficulty + 1) % 4; s.Difficulty = G.CurrentDifficulty;
-        }) { Enabled = (G.World == null || !G.World.Hardcore) && G.Client == null }); // gość: trudność ustala host
-        Add(new Button(W / 2 - 155, y + 48, 150, 20, "Ustawienia graficzne...", () => G.SetScreen(new VideoScreen(this))));
-        Add(new Button(W / 2 + 5, y + 48, 150, 20, "Sterowanie...", () => G.SetScreen(new ControlsScreen(this))));
-        Add(new Slider(W / 2 - 155, y + 72, 150, 20, s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v));
-        Add(new Button(W / 2 + 5, y + 72, 150, 20, () => "Licznik FPS: " + (s.ShowFps ? "TAK" : "NIE"), () => s.ShowFps = !s.ShowFps));
-        Add(new Button(W / 2 - 155, y + 24, 150, 20, "Muzyka i dźwięki...", () => G.SetScreen(new BlockCraft.Audio.SoundOptionsScreen(this))));
-        Add(new Button(W / 2 + 5, y + 24, 150, 20, "Paczki zasobów...", () => G.SetScreen(new ResourcePackScreen(this, G.ActivePackIds))));
-        Add(new Button(W / 2 - 155, y + 96, 150, 20, "Język...", () => G.SetScreen(new LanguageScreen(this))));
-        Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
-    }
-    public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };
-    private void Done() { G.Settings.Save(); G.ApplySettings(); G.SetScreen(_parent); }
-    protected override void Escape() => Done();
-    public override void Render(int mx, int my, float pt)
-    {
-        if (G.World == null) DrawDirtBackground(); else DrawDim();
-        G.Sb.TextCentered("Ustawienia", W / 2f, 15, 0xFFFFFFFF);
-        base.Render(mx, my, pt);
-    }
-}
-
-public sealed class VideoScreen : Screen
-{
-    private readonly Screen _parent;
-    public VideoScreen(Screen p) { _parent = p; }
-    protected override void Init()
-    {
-        var s = G.Settings;
-        int y = H / 6; int l = W / 2 - 155, r = W / 2 + 5;
-        Add(new Button(l, y, 150, 20, () => "Grafika: " + (s.FancyGraphics ? "Dokładna" : "Szybka"), () => s.FancyGraphics = !s.FancyGraphics));
-        Add(new Slider(r, y, 150, 20, (s.RenderDistance - 2) / 14f, v => "Zasięg renderowania: " + (int)Math.Round(2 + v * 14) + " chunków", v => s.RenderDistance = (int)Math.Round(2 + v * 14), 14));
-        Add(new Button(l, y + 24, 150, 20, () => "Wygładzone światło: " + (s.SmoothLighting ? "TAK" : "NIE"), () => s.SmoothLighting = !s.SmoothLighting));
-        Add(new Button(r, y + 24, 150, 20, () => "Chmury: " + (s.Clouds ? "TAK" : "NIE"), () => s.Clouds = !s.Clouds));
-        Add(new Button(l, y + 48, 150, 20, () => "Kołysanie widoku: " + (s.ViewBobbing ? "TAK" : "NIE"), () => s.ViewBobbing = !s.ViewBobbing));
-        Add(new Button(r, y + 48, 150, 20, () => "Skala GUI: " + (s.GuiScale == 0 ? "Auto" : s.GuiScale.ToString()), () => { s.GuiScale = (s.GuiScale + 1) % 5; G.ApplySettings(); G.SetScreen(this); }));
-        Add(new Button(l, y + 72, 150, 20, () => "Synchronizacja V: " + (s.VSync ? "TAK" : "NIE"), () => { s.VSync = !s.VSync; G.ApplySettings(); }));
-        Add(new Slider(r, y + 72, 150, 20, (s.MaxFps - 30) / 230f, v => "Maks. FPS: " + (v >= 0.99f ? "Bez limitu" : ((int)(30 + v * 230)).ToString()), v => s.MaxFps = v >= 0.99f ? 1000 : (int)(30 + v * 230)));
-        Add(new Slider(l, y + 96, 150, 20, s.Brightness, v => "Jasność: " + (int)(v * 100) + "%", v => s.Brightness = v));
-        Add(new Slider(r, y + 96, 150, 20, (s.RenderScale - 25) / 75f, v => "Skala renderu 3D: " + (25 + (int)Math.Round(v * 15) * 5) + "%", v => s.RenderScale = 25 + (int)Math.Round(v * 15) * 5, 15));
-        Add(new Button(l, y + 120, 150, 20, "Profil słabego GPU", () => {
-            BlockCraft.Render.GpuProfile.ApplyLaptop(s, BlockCraft.Render.GpuProfile.Kind.Integrated);
-            G.ApplySettings();
-            RequestPackReloadIfLimitChanged(); // limit rozdzielczości z profilu (albo ze slajdera): nowy atlas
-            G.SetScreen(new VideoScreen(_parent));
-        }));
-        Add(new Button(r, y + 120, 150, 20, () => "Dalekie postacie: " + (s.FarEntities ? "TAK" : "NIE"), () => s.FarEntities = !s.FarEntities));
-        _packTexSize ??= s.MaxPackTextureSize;
-        Add(new Button(l, y + 144, 150, 20, () => "Tekstury paczek: do " + s.MaxPackTextureSize + "x",
-            () => s.MaxPackTextureSize = s.MaxPackTextureSize >= 128 ? 16 : Math.Max(16, s.MaxPackTextureSize * 2)));
-        Add(new Button(W / 2 - 100, H / 6 + 168, 200, 20, "Gotowe", Done));
-    }
+    protected readonly Screen Parent;
+    protected int Tab;
+    private readonly string _title;
+    private readonly string[] _tabNames;
     /// <summary>Limit rozdzielczości tekstur paczek przy otwarciu ekranu (zmiana = przeładowanie atlasu).</summary>
     private int? _packTexSize;
-    private void Done()
+
+    private const int RailW = 96, Gap = 8, PanelW = 216, RowH = 24, Rows = 6;
+    private int Left => W / 2 - (RailW + Gap + PanelW) / 2;
+    private int PanelX => Left + RailW + Gap;
+    private int Top => Math.Max(30, (H - 240) / 2 + 30);
+    private int PanelH => Rows * RowH + 4;
+    private int _rowY;
+
+    protected TabbedOptionsScreen(Screen parent, string title, string[] tabNames, int tab)
+    {
+        Parent = parent; _title = title; _tabNames = tabNames; Tab = Math.Clamp(tab, 0, tabNames.Length - 1);
+    }
+    public override bool PausesGame => true;
+
+    protected override void Init()
+    {
+        _packTexSize ??= G.Settings.MaxPackTextureSize;
+        for (int i = 0; i < _tabNames.Length; i++)
+        {
+            int t = i;
+            Add(new TabButton(Left, Top + i * RowH, RailW, 20, _tabNames[i], t == Tab, () => Select(t)));
+        }
+        _rowY = Top + 4;
+        BuildTab(Tab);
+        Add(new Button(W / 2 - 100, H - 28, 200, 20, "Gotowe", Done));
+    }
+
+    protected virtual string Title => _title;
+
+    /// <summary>Opcje wybranej kategorii (przez Row, OptionButton, OptionSlider).</summary>
+    protected abstract void BuildTab(int tab);
+    protected virtual void OnTabSelected(int tab) { }
+
+    protected T Row<T>(T widget, string hint) where T : Widget
+    {
+        widget.X = PanelX + 8; widget.Y = _rowY; widget.W = PanelW - 16; widget.H = 20; widget.Hint = hint;
+        _rowY += RowH;
+        return Add(widget);
+    }
+    protected Button OptionButton(Func<string> text, Action click, string hint) => Row(new Button(0, 0, 0, 0, text, click), hint);
+    protected Slider OptionSlider(float value, Func<float, string> label, Action<float> change, string hint, int steps = 0) =>
+        Row(new Slider(0, 0, 0, 0, value, label, change, steps), hint);
+    protected static string YesNo(bool v) => v ? "TAK" : "NIE";
+
+    private void Select(int t) { Tab = t; OnTabSelected(t); Rebuild(); }
+    protected void Rebuild() { Widgets.Clear(); Init(); }
+
+    public void PadTab(int dir)
+    {
+        G.PlayUiClick();
+        Select((Tab + dir + _tabNames.Length) % _tabNames.Length);
+    }
+
+    /// <summary>Pad: kursor na wybranej kategorii.</summary>
+    public override (int x, int y)? PadStart() => (Left + RailW / 2, Top + Tab * RowH + 10);
+
+    protected void Done()
     {
         G.Settings.Save(); G.ApplySettings();
         RequestPackReloadIfLimitChanged();
-        G.SetScreen(_parent);
+        G.SetScreen(Parent);
     }
+
     /// <summary>Limit rozdzielczości paczek zmieniony od otwarcia ekranu: przeładowanie atlasu przed następną klatką.</summary>
-    private void RequestPackReloadIfLimitChanged()
+    protected void RequestPackReloadIfLimitChanged()
     {
         if (_packTexSize != G.Settings.MaxPackTextureSize) G.RequestPackReload();
         _packTexSize = G.Settings.MaxPackTextureSize;
     }
+
     protected override void Escape() => Done();
+
     public override void Render(int mx, int my, float pt)
     {
         if (G.World == null) DrawDirtBackground(); else DrawDim();
-        G.Sb.TextCentered("Ustawienia graficzne", W / 2f, 15, 0xFFFFFFFF);
+        G.Sb.TextCentered(Title, W / 2f, Top - 18, 0xFFFFFFFF);
+        OptionsPanel.Draw(G, PanelX, Top - 2, PanelW, PanelH);
         base.Render(mx, my, pt);
+        OptionsPanel.Hint(G, WidgetAt(mx, my)?.Hint, W / 2f, Top + PanelH + 4, RailW + Gap + PanelW);
     }
+}
+
+/// <summary>Ustawienia: Gra, Grafika (profil + jasność + własne), Dźwięk, Sterowanie, Paczki i język.</summary>
+public sealed class OptionsScreen : TabbedOptionsScreen
+{
+    public enum Section { Game, Graphics, Sound, Controls, Packs }
+    private static readonly string[] Names = { "Gra", "Grafika", "Dźwięk", "Sterowanie", "Paczki i język" };
+    private static Section _last = Section.Game;
+
+    public OptionsScreen(Screen p, Section? tab = null) : base(p, "Ustawienia", Names, (int)(tab ?? _last)) { }
+    protected override void OnTabSelected(int tab) => _last = (Section)tab;
+
+    protected override void BuildTab(int tab)
+    {
+        var s = G.Settings;
+        switch ((Section)tab)
+        {
+            case Section.Game:
+                OptionButton(() => "Poziom trudności: " + DiffName(G.CurrentDifficulty), () => { G.CurrentDifficulty = (G.CurrentDifficulty + 1) % 4; s.Difficulty = G.CurrentDifficulty; },
+                    "Pokojowy: bez potworów. Trudny: silniejsze potwory, a głód może zabić.").Enabled = (G.World == null || !G.World.Hardcore) && G.Client == null; // gość: trudność ustala host
+                OptionSlider((s.Fov - 30) / 80f, v => "Pole widzenia: " + (Math.Abs(30 + v * 80 - 70) < 0.5f ? "Normalne" : ((int)(30 + v * 80)).ToString()), v => s.Fov = 30 + v * 80,
+                    "Jak szeroko widzisz świat. Normalne to 70 stopni.");
+                OptionButton(() => "Kołysanie widoku: " + YesNo(s.ViewBobbing), () => s.ViewBobbing = !s.ViewBobbing, "Kamera kołysze się przy chodzeniu.");
+                OptionButton(() => "Skala menu: " + (s.GuiScale == 0 ? "Auto" : s.GuiScale.ToString()), () => { s.GuiScale = (s.GuiScale + 1) % 5; G.ApplySettings(); },
+                    "Wielkość menu, napisów i paska przedmiotów.");
+                OptionButton(() => "Licznik FPS: " + YesNo(s.ShowFps), () => s.ShowFps = !s.ShowFps, "Liczba klatek na sekundę w rogu ekranu.");
+                break;
+            case Section.Graphics:
+                Button profile = null;
+                profile = OptionButton(() => "Profil grafiki: " + GraphicsQuality.Name(GraphicsQuality.Match(s)), () =>
+                {
+                    GraphicsQuality.Apply(s, GraphicsQuality.Next(GraphicsQuality.Match(s)));
+                    G.ApplySettings();
+                    profile.Hint = GraphicsQuality.Description(GraphicsQuality.Match(s));
+                }, GraphicsQuality.Description(GraphicsQuality.Match(s)));
+                OptionSlider(s.Brightness, v => "Jasność: " + (v < 0.01f ? "Ciemno" : v > 0.99f ? "Jasno" : "+" + (int)(v * 100) + "%"), v => s.Brightness = v,
+                    "Rozjaśnia ciemne miejsca na ekranie; światło w świecie się nie zmienia.");
+                OptionButton(() => "Własne ustawienia...", () => G.SetScreen(new GraphicsCustomScreen(this)),
+                    "Wszystkie opcje grafiki osobno: jakość świata, efekty i wydajność.");
+                break;
+            case Section.Sound:
+                OptionSlider(Sound.CategoryVolume("master"), v => "Głośność główna: " + Pct(v), v => Sound.SetCategoryVolume("master", v), "Wszystkie dźwięki i muzyka.");
+                OptionSlider(Sound.CategoryVolume("music"), v => "Muzyka: " + Pct(v), v => Sound.SetCategoryVolume("music", v), "Muzyka w tle.");
+                OptionButton(() => "Pozostałe głośności...", () => G.SetScreen(new BlockCraft.Audio.SoundOptionsScreen(this)), "Osobno: pogoda, bloki, stworzenia, gracze i otoczenie.");
+                break;
+            case Section.Controls:
+                OptionSlider(s.Sensitivity, v => "Czułość myszy: " + (int)(v * 200) + "%", v => s.Sensitivity = v, "Jak szybko obraca się kamera przy ruchu myszą.");
+                OptionButton(() => "Odwróć mysz: " + YesNo(s.InvertMouse), () => s.InvertMouse = !s.InvertMouse, "Gdy TAK: ruch myszą w górę patrzy w dół.");
+                OptionButton(() => "Pad...", () => G.SetScreen(new ControllerScreen(this)), "Czułość, martwa strefa, wibracje, ikony i przypisania przycisków pada.");
+                OptionButton(() => "Klawisze...", () => G.SetScreen(new ControlsScreen(this)), "Lista klawiszy klawiatury i myszy.");
+                break;
+            case Section.Packs:
+                OptionButton(() => "Paczki zasobów...", () => G.SetScreen(new ResourcePackScreen(this, G.ActivePackIds)), "Tekstury, dźwięki i modele z paczek Minecrafta 1.8.");
+                OptionButton(() => "Język nazw przedmiotów...", () => G.SetScreen(new LanguageScreen(this)), "Nazwy przedmiotów z plików językowych 1.8; menu zostaje po polsku.");
+                break;
+        }
+    }
+
+    private static string Pct(float v) => v <= 0.001f ? "WYŁ." : (int)Math.Round(v * 100) + "%";
+    public static string DiffName(int d) => d switch { 0 => "Pokojowy", 1 => "Łatwy", 2 => "Normalny", _ => "Trudny" };
+}
+
+/// <summary>Ustawienia → Grafika → „Własne ustawienia...”: wszystkie opcje grafiki osobno (profil zmienia się wtedy na Własna).</summary>
+public sealed class GraphicsCustomScreen : TabbedOptionsScreen
+{
+    private static readonly string[] Names = { "Świat", "Efekty", "Wydajność" };
+    private static int _last;
+
+    public GraphicsCustomScreen(Screen parent, int? tab = null) : base(parent, "Własne ustawienia grafiki", Names, tab ?? _last) { }
+    protected override void OnTabSelected(int tab) => _last = tab;
+
+    protected override void BuildTab(int tab)
+    {
+        var s = G.Settings;
+        switch (tab)
+        {
+            case 0:
+                OptionButton(() => "Jakość: " + (s.FancyGraphics ? "Dokładna" : "Szybka"), () => s.FancyGraphics = !s.FancyGraphics,
+                    "Szybka: liście bez prześwitów i prostsze efekty, więcej klatek.");
+                OptionButton(() => "Wygładzone światło: " + YesNo(s.SmoothLighting), () => s.SmoothLighting = !s.SmoothLighting, "Miękkie cienie w narożnikach bloków.");
+                OptionButton(() => "Chmury: " + YesNo(s.Clouds), () => s.Clouds = !s.Clouds, "Chmury na niebie.");
+                OptionSlider((s.RenderDistance - 2) / 14f, v => "Zasięg widzenia: " + (int)Math.Round(2 + v * 14) + " chunków", v => s.RenderDistance = (int)Math.Round(2 + v * 14),
+                    "Jak daleko widać świat. Mniejszy zasięg to więcej klatek.", 14);
+                OptionButton(() => "Dalekie postacie: " + YesNo(s.FarEntities), () => s.FarEntities = !s.FarEntities, "Zwierzęta i potwory widoczne aż do granicy mgły.");
+                break;
+            case 1:
+                OptionButton(() => "Kolory HDR: " + YesNo(s.Tonemapping), () => { s.Tonemapping = !s.Tonemapping; EffectsChanged(); },
+                    "Jasne niebo i światło bez przepalonych, płaskich plam (tonemapping).");
+                OptionButton(() => "Żywe kolory: " + YesNo(s.VividColors), () => { s.VividColors = !s.VividColors; EffectsChanged(); },
+                    "Mocniejsze kolory, ciepłe światło i lekko przyciemnione rogi ekranu.");
+                OptionButton(() => "Wygładzanie krawędzi: " + YesNo(s.Fxaa), () => { s.Fxaa = !s.Fxaa; EffectsChanged(); }, "Mniej postrzępione krawędzie bloków (FXAA).");
+                OptionButton(() => "Falujące rośliny: " + YesNo(s.WavingPlants), () => { s.WavingPlants = !s.WavingPlants; EffectsChanged(); }, "Liście, trawa i woda poruszają się na wietrze.");
+                break;
+            case 2:
+                if (G.GpuPerformanceAlternative is { } performanceGpu)
+                    OptionButton(() => "GPU: wydajność...", () => G.SetScreen(new GpuChoiceScreen(this, G.GlRenderer, performanceGpu)),
+                        "Przełącz na " + GpuChoiceScreen.Short(performanceGpu.Name) + ": więcej klatek (jeden restart gry).");
+                if (G.GpuPowerSavingAlternative is { } powerSavingGpu)
+                    OptionButton(() => "GPU: oszczędzanie baterii...", () => G.SetScreen(new GpuChoiceScreen(this, G.GlRenderer, powerSavingGpu)),
+                        "Przełącz na " + GpuChoiceScreen.Short(powerSavingGpu.Name) + ": mniejsze zużycie energii (jeden restart gry).");
+                OptionSlider((s.MaxFps - 30) / 230f, v => "Maks. FPS: " + (v >= 0.99f ? "Bez limitu" : ((int)(30 + v * 230)).ToString()), v => s.MaxFps = v >= 0.99f ? 1000 : (int)(30 + v * 230),
+                    "Górny limit klatek na sekundę; niższy oszczędza baterię.");
+                OptionButton(() => "Synchronizacja V: " + YesNo(s.VSync), () => { s.VSync = !s.VSync; G.ApplySettings(); }, "Klatki równo z odświeżaniem monitora, bez rozrywania obrazu.");
+                OptionSlider((s.RenderScale - 25) / 75f, v => "Skala renderu 3D: " + (25 + (int)Math.Round(v * 15) * 5) + "%", v => s.RenderScale = 25 + (int)Math.Round(v * 15) * 5,
+                    "Niższa rozdzielczość samego świata dla słabszych kart; menu zostaje ostre.", 15);
+                OptionButton(() => "Tekstury paczek: do " + s.MaxPackTextureSize + "x", () => s.MaxPackTextureSize = s.MaxPackTextureSize >= 128 ? 16 : Math.Max(16, s.MaxPackTextureSize * 2),
+                    "Największa rozdzielczość tekstur z paczek; większe są zmniejszane.");
+                break;
+        }
+    }
+
+    /// <summary>Efekty widać od razu w tle; preset efektów dopasowany do zmian (albo Własna).</summary>
+    private void EffectsChanged() { G.Settings.GraphicsPreset = GraphicsPresets.Match(G.Settings); G.ApplySettings(); }
+
+    protected override string Title => "Własne ustawienia grafiki (profil: " + GraphicsQuality.Name(GraphicsQuality.Match(G.Settings)) + ")";
 }
 
 public sealed class ControlsScreen : Screen
@@ -320,14 +465,22 @@ public sealed class PauseScreen : Screen
 {
     protected override void Init()
     {
-        int y = H / 4 + 8;
-        Add(new Button(W / 2 - 100, y + 24 - 16, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
-        Add(new Button(W / 2 - 100, y + 72 - 16, 98, 20, "Osiągnięcia", () => G.SetScreen(new AchievementsScreen(this))));
-        Add(new Button(W / 2 + 2, y + 72 - 16, 98, 20, "Statystyki", () => G.SetScreen(new StatsScreen(this))));
-        Add(new Button(W / 2 - 100, y + 96 - 16, 98, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
-        Add(new Button(W / 2 + 2, y + 96 - 16, 98, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
-        if (G.Client == null) Add(new Button(W / 2 - 100, y + 48 - 16, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));
-        Add(new Button(W / 2 - 100, y + 120 - 16, 200, 20, G.Client != null ? "Rozłącz się" : "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
+        // powrót do gry na górze; rzadkie ekrany w małym rzędzie; wyjście oddzielone odstępem, żeby nie trafić w nie przypadkiem
+        int x = W / 2 - 100, y = H / 4 + 16;
+        Add(new Button(x, y, 200, 20, "Wróć do gry", () => G.SetScreen(null)));
+        y += 24;
+        Add(new Button(x, y, 200, 20, "Ustawienia...", () => G.SetScreen(new OptionsScreen(this))));
+        y += 24;
+        if (G.Client == null)
+        {
+            Add(new Button(x, y, 200, 20, () => G.HostLink != null ? "Gra w sieci (otwarta)" : "Otwórz w sieci...", () => G.SetScreen(new Net.NetHostScreen(this))));
+            y += 24;
+        }
+        Add(new Button(x, y, 64, 20, "Osiągnięcia", () => G.SetScreen(new AchievementsScreen(this))));
+        Add(new Button(x + 68, y, 64, 20, "Statystyki", () => G.SetScreen(new StatsScreen(this))));
+        Add(new Button(x + 136, y, 64, 20, "Pomoc", () => G.SetScreen(new HelpScreen(this))));
+        y += 24 + 16;
+        Add(new Button(x, y, 200, 20, G.Client != null ? "Rozłącz się" : "Zapisz i wyjdź do menu", () => G.QuitToTitle()));
     }
     public override void Render(int mx, int my, float pt)
     {

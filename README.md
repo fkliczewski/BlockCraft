@@ -215,6 +215,30 @@ Tekstury zastępcze, modele mobów, font i GUI powstają w kodzie. Wybrane tekst
 
 </details>
 
+<details>
+<summary><b>🎨 Paczki zasobów i język</b></summary>
+
+- Oficjalne paczki zasobów 1.8 (`.zip` albo folder z `pack.mcmeta`): Ustawienia → „Paczki zasobów...”, kolejność, przeładowanie bez restartu
+- Wbudowana pozycja „Minecraft 1.8 (oryginalne)” z pobranego `client.jar`; źródła paczek z folderów i repozytoriów git
+- Tekstury bloków i przedmiotów w HD z animacjami, GUI, czcionka, cząsteczki, niebo, pogoda, kolory biomów, skórki mobów, dźwięki
+- Modele bloków z JSON (`blockstates`, `models/block`) dla bloków pełnych i roślin
+- Język nazw przedmiotów z plików `.lang` 1.8 (Ustawienia → „Język...”); czcionka Unicode 1.8 dla cyrylicy, greki, CJK itd.
+- Wyszukiwanie przedmiotów w trybie kreatywnym (bez polskich znaków, słowa w dowolnej kolejności, po kluczu i zaklęciach)
+- Plan i stan: [docs/PACZKI_ZASOBOW_PLAN.md](docs/PACZKI_ZASOBOW_PLAN.md)
+
+</details>
+
+<details>
+<summary><b>🎮 Pad</b></summary>
+
+- Xbox 360/One, 8BitDo (X-input), PlayStation i inne przez mapowania GLFW/SDL (`gamecontrollerdb.txt` obok gry)
+- Gra: gałki ruch i kamera, spusty atak i użycie, wszystkie akcje z przypisaniami do zmiany
+- Menu i ekwipunek: kursor z gałki, krzyżak przeskakuje po przyciskach, slotach i listach, przeciąganie, szybkie przeniesienie
+- Klawiatura ekranowa z polskimi znakami przy każdym polu tekstowym
+- Podpowiedzi przycisków (ikony Xbox albo PlayStation), wibracje, Ustawienia → Sterowanie → „Kontroler...”
+
+</details>
+
 ---
 
 ## 🎮 Sterowanie
@@ -229,6 +253,10 @@ Tekstury zastępcze, modele mobów, font i GUI powstają w kodzie. Wybrane tekst
 | <kbd>PPM</kbd> | Stawianie / użycie | | <kbd>F3</kbd> | Ekran debug |
 | <kbd>ŚPM</kbd> | Wybierz blok | | <kbd>F5</kbd> | Zmiana kamery |
 | <kbd>1</kbd>-<kbd>9</kbd> / kółko | Slot hotbara | | <kbd>F11</kbd> | Pełny ekran |
+
+**Pad (domyślnie):** lewa gałka ruch, prawa kamera, RT atak, LT użyj, A skok, B skradanie, X wyrzuć, Y ekwipunek,
+LB/RB slot, LS sprint, RS wybierz blok, Start pauza, Back czat, krzyżak w górę perspektywa, w dół komenda.
+W menu: A wybierz, B wstecz, X prawy klik, Y szybkie przeniesienie. Przypisania: Ustawienia → Sterowanie → „Kontroler...”.
 
 ### 💬 Komendy
 
@@ -254,13 +282,15 @@ Blok poleceń (tylko `/give`, edycja w kreatywnym przez operatora) i wagonik z b
 
 ## 🚀 Uruchomienie
 
-**Wymagania:** Windows, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), karta graficzna z OpenGL 3.3.
+**Wymagania:** Windows, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), karta graficzna z OpenGL 3.3.
 
 ```bash
 git clone https://github.com/fkliczewski/BlockCraft.git
 cd BlockCraft/src/BlockCraft
 dotnet run -c Release
 ```
+
+Albo z katalogu głównego: `python run.py` (argumenty dla gry po `--`, np. `python run.py -- --selftest`).
 
 Publikacja do jednego folderu:
 
@@ -273,9 +303,17 @@ dotnet publish src/BlockCraft -c Release -r win-x64 --self-contained -o BlockCra
 | Flaga | Co robi |
 |---|---|
 | *(brak)* | Normalna gra |
-| `--selftest` | Testy logiki w konsoli (`SelfTest.cs`) |
+| `--selftest` | Testy logiki w konsoli (`SelfTest.cs`); zawężone: `--packs-only`, `--pad-only`, `--search-only`, `--cmd-only`, `--audio-only` |
 | `--autotest` | Automatyczny przebieg gry ze zrzutami do weryfikacji wizualnej (`GameAutotest.cs`) |
 | `--showcase` | Nagrywa sceny i zrzuty do tego README (`GameShowcase.cs`) |
+| `--showcase --packs-preview` | Zrzuty porównawcze bez paczki i z paczką zasobów (`GamePacksPreview.cs`) |
+| `--showcase --pad-preview` | Zrzuty obsługi pada z podstawionym stanem pada, bez sprzętu (`GamePadPreview.cs`) |
+| `--showcase --gfx-preview` | Te same ujęcia bez efektów, z każdym efektem osobno oraz w profilu Cacy (`GameGfxPreview.cs`, plan w `docs/GRAFIKA_PLAN.md`) |
+| `--showcase --menus-preview` | Zrzuty menu głównego, kategorii ustawień i menu gry (`GameMenusPreview.cs`) |
+| `--resourcepack NAZWA` | Paczka zasobów na tę sesję (np. `minecraft-1.8`), bez zmiany ustawień |
+| `--pack-source ŚCIEŻKA\|URL` | Dodatkowe źródło paczek na tę sesję (folder albo repozytorium git) |
+| `--language KOD` | Język nazw przedmiotów na tę sesję (np. `en_US`) |
+| `--relay ADRES` | Przekaźnik sieci na tę sesję (np. `gry.fimson.pl`) |
 | `--bench tnt N [--lit] [--slice MS]` | Pomiar TNT bez okna z sumą kontrolną świata (`Bench.cs`, wyniki w `docs/perf/TNT_POMIARY.md`) |
 | `--stress tnt N [--lit]` | Pomiar płynności klatek w oknie przy N TNT, wynik w `blockcraft.log` (linia `STRESS`); zostawia świat "Stress ..." w zapisach |
 | `--stress render [--rd N] [--scale P] [--laptop] [--no-cave]` | Pomiar FPS, czasu CPU i GPU klatki na stałej scenie (wyniki w `docs/perf/RENDER_POMIARY.md`) |
@@ -337,9 +375,9 @@ src/BlockCraft/
 Wszystkie GIF-y i zrzuty to prawdziwe klatki z gry, nagrane automatycznie:
 
 ```bash
-# 1. nagraj sceny (klatki PNG do bin/Release/net8.0/showcase)
+# 1. nagraj sceny (klatki PNG do bin/Release/net10.0/showcase)
 cd src/BlockCraft && dotnet build -c Release
-bin/Release/net8.0/BlockCraft.exe --showcase
+bin/Release/net10.0/BlockCraft.exe --showcase
 
 # 2. złóż GIF-y i zmniejszone zrzuty do docs/media
 cd ../../tools/readme-media && npm install && npm run media
@@ -357,6 +395,9 @@ cd ../../tools/readme-media && npm install && npm run media
 - [x] Redstone
 - [x] 🌐 Multiplayer - host w grze i dołączanie kodem przez Tailcat.Link (`derp.fimson.pl`)
 - [x] 🔊 Dźwięki i muzyka 1.8 (assety Mojang pobierane przy starcie, mikser 3D)
+- [x] 🎨 Paczki zasobów 1.8 (tekstury HD, dźwięki, modele bloków pełnych, język), wyszukiwanie przedmiotów
+- [x] 🎮 Pad i klawiatura ekranowa
+- [ ] Modele z paczek dla schodów, płyt, płotków, drzwi i przedmiotów; wiele języków menu (TODO w planie paczek)
 - [ ] 🧪 Projekt testów xUnit (`BlockCraft.Tests`)
 
 Szczegóły w [CHECKLISTA.md](CHECKLISTA.md).

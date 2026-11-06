@@ -151,6 +151,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
         else if (_showcase && _args.Contains("--pad-preview")) SetupPadPreview();
         else if (_showcase && _args.Contains("--gfx-preview")) SetupGfxPreview();
+        else if (_showcase && _args.Contains("--menus-preview")) SetupMenusPreview();
         else if (_showcase) SetupShowcase();
         else if (_stress) SetupStress();
     }

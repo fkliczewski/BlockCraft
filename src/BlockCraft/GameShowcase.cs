@@ -179,7 +179,7 @@ public sealed partial class Game
         Record("title", 120, 2);
         Step(5, () => SetScreen(new CreateWorldScreen(new TitleScreen())));
         Step(10, () => Snap("screen_create"));
-        Step(5, () => SetScreen(new VideoScreen(new TitleScreen())));
+        Step(5, () => SetScreen(new OptionsScreen(new TitleScreen(), OptionsScreen.Section.Graphics)));
         Step(10, () => Snap("screen_video"));
         Step(5, () => CreateWorld("Showcase " + DateTime.Now.ToString("HHmmss"), 12345, 1, false, WorldType.Default, true));
         int t1 = 0;

@@ -7,6 +7,8 @@ public abstract class Widget
 {
     public int X, Y, W, H;
     public bool Visible = true, Enabled = true;
+    /// <summary>Jedno zdanie opisu pokazywane pod panelem ustawień, gdy kursor (albo pad) jest na widżecie.</summary>
+    public string Hint;
     public bool Hover(int mx, int my) => Visible && mx >= X && my >= Y && mx < X + W && my < Y + H;
     public abstract void Draw(Game g, int mx, int my);
     public virtual bool MouseDown(Game g, int mx, int my, int btn) => false;
@@ -48,6 +50,65 @@ public sealed class Button : Widget
         g.PlayUiClick();
         OnClick?.Invoke();
         return true;
+    }
+}
+
+/// <summary>Kategoria w kolumnie po lewej (ustawienia): wybrana ma żółty napis i pasek łączący ją z panelem.</summary>
+public sealed class TabButton : Widget
+{
+    public readonly string Text;
+    public readonly bool Selected;
+    private readonly Action _click;
+    public TabButton(int x, int y, int w, int h, string text, bool selected, Action click) { X = x; Y = y; W = w; H = h; Text = text; Selected = selected; _click = click; }
+
+    public override void Draw(Game g, int mx, int my)
+    {
+        bool hover = Hover(mx, my);
+        Button.DrawButton(g, X, Y, W, H, hover && !Selected ? 2 : 1);
+        if (Selected)
+        {
+            g.Sb.Fill(X + 2, Y + 2, 2, H - 4, 0xFF55FFFF);
+            g.Sb.Fill(X + W, Y + 2, 8, H - 4, OptionsPanel.Background); // łącznik z panelem opcji
+        }
+        uint col = Selected ? 0xFF55FFFF : hover ? 0xFFA0FFFF : 0xFFE0E0E0;
+        g.Sb.TextCentered(Text, X + W / 2f + (Selected ? 1 : 0), Y + (H - 8) / 2f, col);
+    }
+
+    public override bool MouseDown(Game g, int mx, int my, int btn)
+    {
+        if (btn != 0 || !Hover(mx, my) || Selected) return false;
+        g.PlayUiClick();
+        _click();
+        return true;
+    }
+}
+
+/// <summary>Wspólny wygląd panelu ustawień: tło, ramka i opis opcji pod kursorem (zawijany do szerokości).</summary>
+public static class OptionsPanel
+{
+    public const uint Background = 0xB0000000, Border = 0xFF5A5A5A, HintColor = 0xFFB8B8B8;
+
+    public static void Draw(Game g, int x, int y, int w, int h)
+    {
+        g.Sb.Fill(x, y, w, h, Background);
+        g.Sb.Rect(x, y, w, h, Border);
+    }
+
+    /// <summary>Opis wycentrowany pod panelem, najwyżej dwa wiersze.</summary>
+    public static void Hint(Game g, string text, float cx, int y, int width)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var sb = g.Sb;
+        var lines = new List<string>();
+        string line = "";
+        foreach (var word in text.Split(' '))
+        {
+            string next = line.Length == 0 ? word : line + " " + word;
+            if (sb.Measure(next) > width && line.Length > 0) { lines.Add(line); line = word; }
+            else line = next;
+        }
+        if (line.Length > 0) lines.Add(line);
+        for (int i = 0; i < Math.Min(2, lines.Count); i++) sb.TextCentered(lines[i], cx, y + i * 10, HintColor);
     }
 }
 
