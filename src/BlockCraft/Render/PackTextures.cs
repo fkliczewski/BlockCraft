@@ -44,32 +44,70 @@ public static partial class TextureGen
 
     /// <summary>Nakłada tekstury z paczek (pierwsza ma pierwszeństwo). Null albo pusta lista = same tekstury gry.
     /// Zwraca indeksy warstw, których piksele się zmieniły.</summary>
-    public static List<int> ApplyPacks(IReadOnlyList<Func<string, byte[]>> packs)
+    public static List<int> ApplyPacks(IReadOnlyList<Func<string, byte[]>> packs) => ApplyPacks(packs, null);
+
+    /// <summary>Jak wyżej; extraPaths: tekstury z paczek (np. "blocks/grass_side_overlay"), których używają modele bloków
+    /// z paczek, a gra nie ma ich w atlasie — dostają osobne warstwy „pack:ścieżka” (do następnego nakładania).</summary>
+    public static List<int> ApplyPacks(IReadOnlyList<Func<string, byte[]>> packs, IEnumerable<string> extraPaths,
+        IReadOnlyList<Func<string, byte[]>> modelPacks = null)
     {
         if (packs is { Count: 0 }) packs = null;
         Ensure();
         lock (Lock)
         {
             _generated ??= _tex.Select(p => (uint[])p.Clone()).ToArray();
-            var ctx = new PackSource(packs);
+            ResetModelTextureLayers(packs != null ? extraPaths : null);
+            var sources = new PackTextureSources(packs, modelPacks);
             var changed = new List<int>();
             PackAnimations.Clear(); PackOverridden.Clear();
             foreach (var (name, i) in _index)
             {
                 uint[] px = null; PackAnim anim = null;
                 if (packs != null)
-                    try { px = ResolvePackTexture(name, ctx, out anim); }
+                    try { px = sources.Resolve(name, out anim); }
                     catch (Exception ex) { Log.Error("Paczka zasobów: tekstura " + name + ": " + ex.Message); }
                 if (px != null) { PackOverridden.Add(name); if (anim != null) PackAnimations[name] = anim; }
-                var target = px ?? _generated[i];
+                var target = px ?? (i < _generated.Length ? _generated[i] : _generated[0]); // brak pliku: tekstura „missing”
                 if (!_tex[i].AsSpan().SequenceEqual(target)) changed.Add(i);
                 _tex[i] = target;
             }
             if (PackOverridden.Count > 0) Log.Info($"Paczki zasobów: {PackOverridden.Count} tekstur z paczek, {PackAnimations.Count} animacji");
-            BuildAtlas(packs, ctx.MaxNative);
+            BuildAtlas(packs, sources.MaxNative, modelPacks);
             return changed;
         }
     }
+
+    private static void ResetModelTextureLayers(IEnumerable<string> extraPaths)
+    {
+        // warstwy z poprzedniego nakładania („pack:...”) usuwamy, potem dokładamy potrzebne teraz
+        if (_tex.Count > _generated.Length)
+        {
+            _tex.RemoveRange(_generated.Length, _tex.Count - _generated.Length);
+            foreach (var k in _index.Where(kv => kv.Value >= _generated.Length).Select(kv => kv.Key).ToList()) _index.Remove(k);
+        }
+        if (extraPaths != null)
+            foreach (var path in extraPaths.Distinct().OrderBy(p => p, StringComparer.Ordinal))
+                if (LayerForPackPath(path) < 0) { _index[PackLayerPrefix + path] = _tex.Count; _tex.Add(_tex[0]); }
+    }
+
+    private sealed class PackTextureSources
+    {
+        private readonly PackSource _regular;
+        private readonly PackSource _models;
+
+        public PackTextureSources(IReadOnlyList<Func<string, byte[]>> packs,
+            IReadOnlyList<Func<string, byte[]>> modelPacks, int size = 16)
+        {
+            _regular = new PackSource(packs, size);
+            _models = new PackSource(modelPacks ?? packs, size);
+        }
+
+        public int MaxNative => Math.Max(_regular.MaxNative, _models.MaxNative);
+
+        public uint[] Resolve(string name, out PackAnim animation) =>
+            ResolvePackTexture(name, name.StartsWith(PackLayerPrefix) ? _models : _regular, out animation);
+    }
+
 
     // ================= atlas HD =================
 
@@ -83,7 +121,8 @@ public static partial class TextureGen
     public static readonly Dictionary<string, PackAnim> AtlasAnimations = new();
 
     /// <summary>Drugi przebieg nakładania w rozdzielczości paczek HD (gdy większa niż 16).</summary>
-    private static void BuildAtlas(IReadOnlyList<Func<string, byte[]>> packs, int maxNative)
+    private static void BuildAtlas(IReadOnlyList<Func<string, byte[]>> packs, int maxNative,
+        IReadOnlyList<Func<string, byte[]>> modelPacks)
     {
         _atlasHd.Clear(); AtlasAnimations.Clear();
         int cap = 16;
@@ -97,11 +136,11 @@ public static partial class TextureGen
             foreach (var (k, v) in PackAnimations) AtlasAnimations[k] = v;
             return;
         }
-        var hd = new PackSource(packs, size);
+        var sources = new PackTextureSources(packs, modelPacks, size);
         foreach (var name in PackOverridden)
         {
             uint[] px = null; PackAnim anim = null;
-            try { px = ResolvePackTexture(name, hd, out anim); }
+            try { px = sources.Resolve(name, out anim); }
             catch (Exception ex) { Log.Error("Paczka zasobów: tekstura HD " + name + ": " + ex.Message); }
             if (px == null || px.Length != size * size) continue;
             _atlasHd[_index[name]] = px;
@@ -134,9 +173,39 @@ public static partial class TextureGen
         return d;
     }
 
+    /// <summary>Prefiks warstw z teksturami dokładanymi dla modeli z paczek.</summary>
+    public const string PackLayerPrefix = "pack:";
+    private static Dictionary<string, string> _nameByPath;
+
+    /// <summary>Warstwa atlasu dla ścieżki tekstury 1.8 ("blocks/stone"): tekstura gry przypisana 1:1 albo warstwa „pack:”;
+    /// -1 = brak. Tekstury składane przez grę (np. bok trawy z nakładką) nie są przypisane — model dostaje oryginalny plik.</summary>
+    public static int LayerForPackPath(string path)
+    {
+        Ensure();
+        lock (Lock)
+        {
+            if (_nameByPath == null)
+            {
+                var d = new Dictionary<string, string>(StringComparer.Ordinal);
+                var rules = PackRules;
+                foreach (var name in _index.Keys.Where(n => !n.StartsWith(PackLayerPrefix)))
+                {
+                    if (rules.Custom.ContainsKey(name) || rules.Transform.ContainsKey(name) || rules.Skip.Contains(name)) continue;
+                    if (rules.Alias.TryGetValue(name, out var alias)) d.TryAdd(alias, name);
+                    else if (name.StartsWith("item_")) d.TryAdd("items/" + name[5..], name);
+                    else d.TryAdd("blocks/" + name, name);
+                }
+                _nameByPath = d;
+            }
+            if (_nameByPath.TryGetValue(path, out var n) && _index.TryGetValue(n, out int layer)) return layer;
+            return _index.TryGetValue(PackLayerPrefix + path, out int pl) ? pl : -1;
+        }
+    }
+
     private static uint[] ResolvePackTexture(string name, PackSource src, out PackAnim anim)
     {
         anim = null;
+        if (name.StartsWith(PackLayerPrefix)) return Pick(src.Img(name[PackLayerPrefix.Length..]), out anim);
         var rules = PackRules;
         if (rules.Transform.TryGetValue(name, out var tr)) return Transformed(src.Img(tr.File), src, tr.Frame, out anim);
         if (rules.Custom.TryGetValue(name, out var fn)) return fn(src);

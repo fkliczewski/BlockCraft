@@ -1,4 +1,4 @@
-using BlockCraft.Core;
+﻿using BlockCraft.Core;
 using BlockCraft.Gui;
 using BlockCraft.Render;
 using BlockCraft.World;
@@ -62,7 +62,8 @@ public sealed partial class Game
     /// <summary>Co klatkę: zmiana w obserwowanym folderze albo pobrane repo -> przeładowanie aktywnych paczek.</summary>
     private void CheckSourceChanges()
     {
-        if (_reloadDownloadedLanguages || (!_clientLanguagesReady && ClientAssets.Done))
+        bool clientAssetsFinished = !_clientLanguagesReady && ClientAssets.Done;
+        if (_reloadDownloadedLanguages || clientAssetsFinished)
         {
             _reloadDownloadedLanguages = false;
             _clientLanguagesReady = ClientAssets.Done;
@@ -70,6 +71,7 @@ public sealed partial class Game
             Lang.Load(ActiveLanguage, ResourcePacks.Readers);
             ResourcePacks.CloseAll();
         }
+        if (clientAssetsFinished && ActivePackIds.Count > 0) _reloadPacks = true;
         if (ContentSources.ConsumeChange() && ActivePackIds.Count > 0) _reloadPacks = true;
     }
 
@@ -84,6 +86,29 @@ public sealed partial class Game
 
     /// <summary>Po zmianie ustawień wpływających na tekstury (np. limit rozdzielczości paczek): przeładowanie przed następną klatką.</summary>
     public void RequestPackReload() => _reloadPacks = true;
+
+    /// <summary>Modele bloków z paczek (zbierają potrzebne tekstury), potem atlas z tymi teksturami i przypisanie warstw.</summary>
+    private static List<int> ApplyPackTexturesAndModels()
+    {
+        var sources = ResourcePacks.Active.Select(p => new PackModels.Source(p.Read, p.Builtin)).ToList();
+        // jak paczka domyślna w MC: modele 1.8 z client.jar zawsze pod spodem (rodzice typu block/cube_all)
+        string jar = Path.Combine(ClientAssets.Root, "client.jar");
+        ResourcePack vanilla = null;
+        if (sources.Count > 0 && !ResourcePacks.Active.Any(p => p.Builtin) && File.Exists(jar))
+        {
+            vanilla = new ResourcePack(ResourcePacks.BuiltinId, jar, true);
+            sources.Add(new PackModels.Source(vanilla.Read, true));
+        }
+        try
+        {
+            var models = PackModels.Load(sources);
+            var modelReaders = sources.Select(source => source.Read).ToList();
+            var changed = TextureGen.ApplyPacks(ResourcePacks.Readers, models.TexturePaths, modelReaders);
+            PackModels.Activate(models, path => Math.Max(0, TextureGen.LayerForPackPath(path)));
+            return changed;
+        }
+        finally { vanilla?.Dispose(); }
+    }
 
     /// <summary>Paczki do użycia: z parametru uruchomienia albo z ustawień.</summary>
     public List<string> ActivePackIds => _packOverride ?? Settings.ResourcePacks ?? new();
@@ -101,7 +126,7 @@ public sealed partial class Game
     {
         ResourcePacks.SetActive(ActivePackIds);
         TextureGen.MaxAtlasSize = Settings.MaxPackTextureSize;
-        TextureGen.ApplyPacks(ResourcePacks.Readers);
+        ApplyPackTexturesAndModels();
         if (ResourcePacks.Active.Count > 0) SkinGen.Rebuild(ResourcePacks.ReadImage);
         Lang.Load(ActiveLanguage, ResourcePacks.Readers);
         Sb.ReloadFont();
@@ -114,7 +139,9 @@ public sealed partial class Game
         var sw = System.Diagnostics.Stopwatch.StartNew();
         ResourcePacks.SetActive(ActivePackIds);
         TextureGen.MaxAtlasSize = Settings.MaxPackTextureSize;
-        var changed = TextureGen.ApplyPacks(ResourcePacks.Readers);
+        bool hadModels = PackModels.Any;
+        var changed = ApplyPackTexturesAndModels();
+        if (hadModels || PackModels.Any) MarkAllDirty(); // geometria bloków z modeli paczek
         Renderer.ReloadTextures();
         Func<string, RawImage> packImages = ResourcePacks.Active.Count > 0 ? ResourcePacks.ReadImage : null;
         SkinGen.Rebuild(packImages);

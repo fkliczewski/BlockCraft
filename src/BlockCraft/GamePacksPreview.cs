@@ -58,6 +58,19 @@ public sealed partial class Game
             Step(20, () => Snap("blocks_" + tag));
             Step(5, () => { Player.Pitch = Player.PrevPitch = 20; Player.Yaw = Player.PrevYaw = 0; });
             Step(20, () => Snap("blocks_low_" + tag));
+            // zbliżenie: kamień, bruk, mniszek, ziemia (modele z paczek)
+            Step(5, () =>
+            {
+                int zz = bz - 6;
+                for (int dx = -4; dx <= 4; dx++) for (int dz = -2; dz <= 3; dz++) for (int dy = 0; dy < 4; dy++) World.SetBlock(bx + dx, by + dy, zz + dz, B.Air);
+                World.SetBlock(bx - 3, by, zz + 2, B.Stone); World.SetBlock(bx - 1, by, zz + 2, B.Cobblestone);
+                World.SetBlock(bx + 1, by, zz + 2, B.Dandelion); World.SetBlock(bx + 3, by, zz + 2, B.Dirt);
+                _holdY = by + 1.2; Player.SetPositionAndPrev(bx + 0.5, by + 1.2, zz - 1.5);
+                Player.Yaw = Player.PrevYaw = 0; Player.Pitch = Player.PrevPitch = 25;
+            });
+            WaitForMeshes(120);
+            Step(15, () => Snap("models_" + tag));
+            Step(5, () => { _holdY = by + 9; Player.SetPositionAndPrev(bx + 0.5, by + 9, bz + 0.5); Player.Pitch = Player.PrevPitch = 50; });
             Step(5, () => { Player.Pitch = Player.PrevPitch = 50; HideGui = false; Cmds.Execute(Player, "/gamemode creative"); });
             foreach (int tab in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 10, 11 })
             {

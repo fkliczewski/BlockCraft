@@ -120,14 +120,14 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in float aLayer; layout(location=3) in vec2 aFS;
 layout(location=4) in vec2 aLight; layout(location=5) in vec4 aTint;
 uniform mat4 uViewProj; uniform vec3 uOffset;
-out vec3 vUV; out vec2 vLight; out float vShade; out vec4 vTint; out float vMask; out float vDist;
+out vec3 vUV; out vec2 vLight; out float vShade; out vec4 vTint; out float vMask; out float vOpaque; out float vDist;
 void main(){ vec3 p = aPos + uOffset; gl_Position = uViewProj*vec4(p,1.0);
- vUV = vec3((aUV - 32768.0) / 4096.0, aLayer); vLight = aLight*15.0; vShade = aFS.y/255.0; vTint = aTint; vMask = mod(aFS.x, 2.0); vDist = length(p.xz); }";
+ vUV = vec3((aUV - 32768.0) / 4096.0, aLayer); vLight = aLight*15.0; vShade = aFS.y/255.0; vTint = aTint; vMask = mod(aFS.x, 2.0); vOpaque = mod(floor(aFS.x / 2.0), 2.0); vDist = length(p.xz); }";
     private static readonly string ChunkFrag = @"#version 330 core
-in vec3 vUV; in vec2 vLight; in float vShade; in vec4 vTint; in float vMask; in float vDist;
+in vec3 vUV; in vec2 vLight; in float vShade; in vec4 vTint; in float vMask; in float vOpaque; in float vDist;
 uniform sampler2DArray uTex; uniform float uAlphaCut; uniform vec3 uFogColor; uniform float uFogStart; uniform float uFogEnd; uniform float uFogDensity; uniform int uFogMode;
 out vec4 o;" + EntityRenderer.LightmapGlsl + @"
-void main(){ vec4 t = texture(uTex, vUV); if (t.a < uAlphaCut) discard;
+void main(){ vec4 t = texture(uTex, vUV); if (vOpaque > 0.5) t.a = 1.0; if (t.a < uAlphaCut) discard;
  vec3 tint = vTint.rgb; if (vMask > 0.5) tint = t.a < 0.99 ? vTint.rgb : vec3(1.0);
  vec3 c = t.rgb * tint * vShade * lightmap(vLight.x, vLight.y);
  float fog = uFogMode==1 ? 1.0-exp(-uFogDensity*vDist) : clamp((vDist-uFogStart)/(uFogEnd-uFogStart),0.0,1.0);
