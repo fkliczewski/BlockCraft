@@ -122,7 +122,22 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 - Bez zmian: teksty menu i komunikaty gry (są po polsku w kodzie), mikstury bez efektu (niezręczna, gęsta) — nazwa gry,
   znaki spoza czcionki gry (np. ç, ə) jako „?” do czasu stron Unicode czcionki.
 
-## Etap 6 — Modele bloków z JSON  *(największy, opcjonalny)*
+## Etap 6 — Modele bloków z JSON  *(zrobiony dla bloków pełnych i roślin — do odbioru)*
+
+Zrobione (`Render/PackModels.cs`, `Render/ChunkMesherPack.cs`): blockstates (warianty "normal" i właściwości, obroty x/y,
+losowanie wagowe stałe dla pozycji), modele z `parent` (modele 1.8 z client.jar zawsze pod spodem jak paczka domyślna),
+zmienne tekstur, elementy z obrotem (22.5/45°, rescale), ściany z uv, rotation, cullface, tintindex, shade; nowe tekstury
+używane przez modele dostają warstwy atlasu (`pack:ścieżka`, też HD). Światło i AO jak dla sześcianów, ściany wewnątrz
+bloku pełnego biorą światło od sąsiada. Model z paczki działa tylko, gdy któryś plik łańcucha jest z paczki innej niż
+wbudowana „Minecraft 1.8 (oryginalne)” (sama 1.8 nie zmienia geometrii gry).
+Obsługiwane bloki: pełne (RenderType.Cube) i rośliny krzyżyk, w tym warianty z meta: kamienie, ziemia, piasek, piaskowce,
+cegły kamienne, pryzmaryn, kwarc (z osią), wełna/szkło/glina w kolorach, kwiaty, trawa/paproć, kłody i snopek (oś),
+piec/dynia/dozownik/podajnik/tłok (kierunek), sadzonki (etap), gąbka, trawa i grzybnia pod śniegiem.
+Nie zrobione: bloki o złożonej geometrii gry (schody, płyty, płotki, drzwi, szyny, redstone, ciecze, uprawy, pochodnie),
+`uvlock`, modele przedmiotów (`models/item`) i ikony bloków w ekwipunku (dalej z geometrii gry).
+Uwaga (jak w MC): blok dalej jest „pełny”, więc model mniejszy niż sześcian może odsłaniać dziury w sąsiednich ścianach.
+
+Pierwotny plan:
 
 - `blockstates/*.json` + `models/block/*.json`: elementy, obroty, UV, `cull`, `tintindex`.
 - Mesher korzysta z modelu z paczki, gdy go podano; w przeciwnym razie z obecnego kodu.
@@ -139,8 +154,8 @@ withera (animowane/osobne tekstury), skórki graczy z sieci (osobny temat).
 | 3 | zrobiony |
 | 4 | zrobiony |
 | 5 | zrobiony |
-| 2 | zrobiony — do odbioru |
-| 6 | do zrobienia |
+| 2 | zrobiony |
+| 6 | zrobiony (bloki pełne i rośliny) — do odbioru |
 
 ### Etap 1 — co jest i jak sprawdzić
 
