@@ -81,7 +81,7 @@ Gra dalej ma atlas 16x16 w pamięci (ikony 3D, kolizje kształtów); na GPU idzi
 
 - `gui/widgets.png`, `gui/icons.png`, okna kontenerów (`gui/container/*.png`), `gui/options_background.png`,
   logo `gui/title/minecraft.png`.
-- Czcionka `font/ascii.png` (szerokości znaków jak w MC), polskie znaki z `font/unicode_page_*`.
+- Czcionka `font/ascii.png` (szerokości znaków jak w MC), znaki spoza niej z `font/unicode_page_*`.
 - `particle/particles.png`, `environment/` (słońce, księżyc, chmury), `misc/` (winieta, nakładki).
 - `colormap/grass.png`, `colormap/foliage.png` — kolory trawy i liści zależne od biomu.
 
@@ -92,7 +92,11 @@ i wybuch z `entity/explosion.png`, słońce, fazy księżyca, chmury, deszcz i �
 i liści z `colormap/` (przebudowa chunków po zmianie).
 Świadomie bez zmian: logo (gra nazywa się BlockCraft, `gui/title/minecraft.png` ma napis Minecraft), zakładki i tło trybu
 kreatywnego, okna statywu, stołu do zaklęć, kowadła, latarni, konia, wieśniaka, lejka i dozownika (własne układy — do zrobienia
-przy okazji), strony Unicode czcionki (`font/glyph_*.png`).
+przy okazji).
+**Czcionka Unicode — zrobiona (gałąź `feature/czcionka-unicode`):** znaki spoza czcionki gry (cyrylica, greka, akcenty, hebrajski,
+hindi, CJK...) ze stron `font/unicode_page_XX.png` i szerokości z `font/glyph_sizes.bin` jak `FontRenderer` 1.8 — z paczki,
+a bez niej z `client.jar` (`Render/UnicodeFont.cs`, strony wczytywane przy pierwszym znaku). Selftest w `--packs-only`,
+zrzut `languages_unicode.png` z `--showcase --pad-preview`. Bez `client.jar` i paczki: jak dotąd „?”.
 
 ## Etap 4 — Encje
 
@@ -227,3 +231,14 @@ Pierwotny plan:
 - Ekran ustawień „Kontroler...”: przypisania przycisków, czułość, wibracje (jeśli dostępne), podgląd stanu pada.
 - Podpowiedzi przycisków na ekranie (ikony A/B/X/Y) zamiast klawiszy, gdy ostatnio używano pada.
 - Wiele padów w sieci lokalnej nie jest w planie (jeden gracz na instancję gry).
+
+## TODO (do zrobienia później)
+
+1. **Modele bloków z paczek dla brył spoza sześcianu**: schody, płyty, płotki, ściany, drzwi, furtki, szyby, tory itd.
+   (stany z blockstates: facing/half/shape/connections), `uvlock`, modele przedmiotów (`models/item`, wygląd w ręce i w GUI).
+2. **Wyszukiwarka w ekwipunku przetrwania**: pole szukania w ekwipunku i skrzyniach, podświetlanie pasujących przedmiotów.
+3. **Duża skrzynia w świecie**: podwójny model 1.8 (`entity/chest/normal_double.png`) zamiast dwóch pojedynczych skrzyń.
+4. **Mody innego rodzaju** (poza paczkami zasobów) — do opisania.
+5. **Wiele języków gry (menu i komunikaty)**: wszystkie teksty interfejsu w plikach językowych (np. `lang/pl_PL.lang`, `en_US`),
+   wybór języka w „Język...” razem z nazwami przedmiotów, klucze zamiast tekstów w kodzie, polski jako domyślny i zapasowy,
+   tłumaczenia z paczek zasobów; selftest, że każdy klucz ma tekst w języku domyślnym.

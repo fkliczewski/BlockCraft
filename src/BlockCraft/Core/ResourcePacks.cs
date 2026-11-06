@@ -295,6 +295,13 @@ public static class ResourcePacks
         return null;
     }
 
+    /// <summary>Jak Read, ale archiwa są zamykane po odczycie (pliki czytane w trakcie gry, np. strony czcionki).</summary>
+    public static byte[] ReadAndClose(string rel)
+    {
+        foreach (var p in _active) { var b = p.ReadAndClose(rel); if (b != null) return b; }
+        return null;
+    }
+
     /// <summary>Odczyt z każdej aktywnej paczki osobno, w kolejności pierwszeństwa.</summary>
     public static IReadOnlyList<Func<string, byte[]>> Readers => _active.Select(p => (Func<string, byte[]>)p.Read).ToList();
 

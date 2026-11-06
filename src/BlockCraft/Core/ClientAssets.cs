@@ -65,19 +65,31 @@ public static class ClientAssets
     public static uint[] TryReadTexture(string path, out int width, out int height)
     {
         width = height = 0;
+        var data = TryReadFile("assets/minecraft/textures/" + path);
+        if (data == null) return null;
+        try
+        {
+            var img = StbImageSharp.ImageResult.FromMemory(data, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+            width = img.Width; height = img.Height;
+            var px = new uint[width * height];
+            Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
+            return px;
+        }
+        catch (Exception ex) { Log.Error("ClientAssets: " + path + ": " + ex.Message); return null; }
+    }
+
+    /// <summary>Synchronicznie czyta plik z pobranego client.jar (np. "assets/minecraft/font/glyph_sizes.bin"); null = brak.</summary>
+    public static byte[] TryReadFile(string path)
+    {
         try
         {
             string jar = Path.Combine(Root, "client.jar");
             if (!File.Exists(jar)) return null;
             using var zip = ZipFile.OpenRead(jar);
-            var entry = zip.GetEntry("assets/minecraft/textures/" + path);
+            var entry = zip.GetEntry(path);
             if (entry == null) return null;
-            using var input = entry.Open(); using var bytes = new MemoryStream(); input.CopyTo(bytes); bytes.Position = 0;
-            var img = StbImageSharp.ImageResult.FromStream(bytes, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
-            width = img.Width; height = img.Height;
-            var px = new uint[width * height];
-            Buffer.BlockCopy(img.Data, 0, px, 0, Math.Min(img.Data.Length, px.Length * 4));
-            return px;
+            using var input = entry.Open(); using var bytes = new MemoryStream(); input.CopyTo(bytes);
+            return bytes.ToArray();
         }
         catch (Exception ex) { Log.Error("ClientAssets: " + path + ": " + ex.Message); return null; }
     }

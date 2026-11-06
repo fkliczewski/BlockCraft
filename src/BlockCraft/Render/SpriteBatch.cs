@@ -51,8 +51,13 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
         Flush();
         FontTex?.Dispose();
         _glyphs.Clear();
+        _unicode.Reset();
         BuildFont();
     }
+
+    /// <summary>Znaki spoza czcionki gry: czcionka Unicode 1.8 (paczki, potem client.jar), tworzona przy pierwszym takim znaku.</summary>
+    private readonly UnicodeFontProvider _unicode = UnicodeFontProvider.FromPacksAndClientJar();
+    private UnicodeFont Unicode => _unicode.Font;
 
     /// <summary>Atlas czcionki: znaki ASCII z font/ascii.png paczki (siatka 16x16, szerokość jak w FontRenderer 1.8),
     /// pozostałe (polskie litery) z czcionki gry, powiększone do rozdzielczości paczki.</summary>
@@ -214,7 +219,9 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
         }
         return (int)(Math.Max(max, w) * scale);
     }
-    private int CharW(char c) => _glyphs.TryGetValue(c, out var g) ? (c == ' ' ? 3 : g.w) : (_glyphs.TryGetValue(char.ToLowerInvariant(c), out var g2) ? g2.w : 5);
+    private int CharW(char c) => _glyphs.TryGetValue(c, out var g) ? (c == ' ' ? 3 : g.w)
+        : Unicode.TryGet(c, out var ug) ? ug.Advance - 1
+        : _glyphs.TryGetValue(char.ToLowerInvariant(c), out var g2) ? g2.w : _glyphs['?'].w;
 
     public void Text(string s, float x, float y, uint color = 0xFFFFFFFF, bool shadow = true, float scale = 1)
     {
@@ -245,7 +252,16 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
                 continue;
             }
             if (c == '\n') { cx = x; y += 10 * scale; continue; }
+            if (!_glyphs.ContainsKey(c) && Unicode.TryGet(c, out var ug))
+            {
+                // znak z czcionki Unicode: osobna tekstura strony, 8 px wysokości jak w FontRenderer.renderUnicodeChar
+                SetTex(ug.Tex.Handle, false);
+                Quad(cx, y, ug.Width * scale, 8 * scale, ug.U0, ug.V0, ug.U1, ug.V1, col, col, 0);
+                cx += ug.Advance * scale;
+                continue;
+            }
             if (!_glyphs.TryGetValue(c, out var g) && !_glyphs.TryGetValue(char.ToLowerInvariant(c), out g)) { g = _glyphs['?']; }
+            SetTex(FontTex.Handle, false); // powrót po znaku Unicode; bez zmiany tekstury nie przerywa partii
             if (c != ' ')
                 Quad(cx, y - FontData.Top * scale, FontData.CellW * scale, FontData.CellH * scale,
                     g.x / tw, g.y / th, (g.x + FontData.CellW * _fontPixelScale) / tw, (g.y + FontData.CellH * _fontPixelScale) / th, col, col, 0);
@@ -284,5 +300,5 @@ void main(){ vec4 t = uMode==1 ? texture(uArr, vec3(vUV, vLayer)) : texture(uTex
     }
     public void End3D() { Flush(); GL.DepthMask(true); }
 
-    public void Dispose() { _mesh.Dispose(); _shader.Dispose(); White.Dispose(); FontTex.Dispose(); }
+    public void Dispose() { _mesh.Dispose(); _shader.Dispose(); White.Dispose(); FontTex.Dispose(); _unicode.Dispose(); }
 }

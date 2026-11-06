@@ -41,6 +41,8 @@ public sealed partial class Game
         Step(3, () => { Pad.Inject(new PadState(), "PS5 DualSense Wireless Controller"); SetScreen(new LanguageScreen(new TitleScreen())); });
         for (int i = 0; i < 12; i++) Tap(PadButton.DPadDown);
         Step(5, () => Snap("pad_languages_ps"));
+        Step(3, () => _screen?.Scroll(0, 0, -1000)); // koniec listy: cyrylica, greka, chiński z czcionki Unicode
+        Step(5, () => Snap("languages_unicode"));
         Step(3, () => SetScreen(new ResourcePackScreen(new TitleScreen(), new List<string> { ResourcePacks.BuiltinId })));
         Tap(PadButton.DPadDown);
         Step(5, () => Snap("pad_packs_ps"));
