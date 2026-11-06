@@ -52,6 +52,7 @@ public static partial class ItemRegistry
         Simple(I.Lead,"lead","Smycz",5);
         var egg = Simple(I.SpawnEgg,"spawn_egg","Jajko przyzywające",3);
         egg.Variants = SpawnEggs.All.Select(e => e.Id).ToArray();
+        egg.TranslatedNameFn = LangKeys.SpawnEggName;
         egg.NameFn = s => "Jajko: " + (SpawnEggs.Find(s.Damage)?.Name ?? "?");
         egg.ColorFn = s => 0xFF000000 | (SpawnEggs.Find(s.Damage)?.Base ?? 0xFFFFFF);
         egg.OverlayFn = s => (TextureGen.Layer("item_spawn_egg_spots"), 0xFF000000 | (SpawnEggs.Find(s.Damage)?.Spots ?? 0));

@@ -85,6 +85,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         _showcase = args.Contains("--showcase");
         _stress = !_autotest && !_showcase && args.Contains("--stress");
         Settings = Settings.Load();
+        ParsePackArgs(args);
         // przekaźnik sieci: z ustawień, --relay nadpisuje na czas uruchomienia (autotesty przez gry.fimson.pl)
         int relay = Array.IndexOf(args, "--relay");
         Relay = new Net.RelaySetting(Settings, relay >= 0 && relay + 1 < args.Length ? args[relay + 1] : null);
@@ -110,9 +111,15 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         SharedQuadIndices.Init();
         ItemRegistry.Init(); Recipes.Init(); Entities.Registries.Init();
         Sb = new SpriteBatch();
-        Gui = new GuiTextures();
+        LoadResourcePacksAtStart();
+        Gui = new GuiTextures(ResourcePacks.ReadImage);
+        Biome.LoadColorMaps(ResourcePacks.ReadImage);
         Renderer = new WorldRenderer();
+        if (ResourcePacks.Active.Count > 0) Renderer.Entities.ReloadSkins(ResourcePacks.ReadImage);
         Icons = new IconAtlas(Renderer.Entities, Renderer.Terrain);
+        ResourcePacks.CloseAll();
+        // języki z pobranych zasobów 1.8 są dostępne dopiero po ich wczytaniu
+        Audio.AssetStore.Finished += () => _reloadDownloadedLanguages = true;
         Sound.Init(Settings);
         Renderer.SoundHook = (n, x, y, z, v, p) =>
         {
@@ -130,8 +137,10 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         StartMenuWorld();
         SetScreen(new TitleScreen());
         _lastTime = _clock.Elapsed.TotalSeconds;
+        SyncSourcesInBackground();
         if (ArgsNetAutotest) SetupNetAutotest();
         else if (_autotest) SetupAutotest();
+        else if (_showcase && _args.Contains("--packs-preview")) SetupPacksPreview();
         else if (_showcase) SetupShowcase();
         else if (_stress) SetupStress();
     }
@@ -146,6 +155,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         int rdOld = Renderer.RenderDistance;
         Renderer.RenderDistance = Settings.RenderDistance;
         Renderer.CloudsEnabled = Settings.Clouds;
+        Renderer.FarEntities = Settings.FarEntities;
         Renderer.Gamma = Settings.Brightness;
         if (World?.ChunkManager != null) World.ChunkManager.Radius = Settings.RenderDistance;
         // trudność świata zmienia tylko przycisk w opcjach (CurrentDifficulty) i /difficulty, nie każde zastosowanie ustawień
@@ -499,7 +509,7 @@ public sealed partial class Game : GameWindow, IPlayerHandler
                 if (Client != null) { Client.Out.Begin(Net.C2S.OpenInventory); Client.Out.End(); }
                 else p.AwardAchievement("openInventory");
                 if (p.Creative) SetScreen(new CreativeScreen(p)); else SetScreen(new ContainerScreen(p, p.InventoryContainer));
-                break;
+                _ignoreNextChar = !ctrl && !e.Alt; break; // znak „e” z tego wciśnięcia nie ma trafić do pola wyszukiwania
             case Keys.T: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("")); break; // Ctrl/Alt+T nie daje znaku
             case Keys.Slash: _ignoreNextChar = !ctrl && !e.Alt; SetScreen(new ChatScreen("/")); break;
             case Keys.F1: HideGui = !HideGui; break;
@@ -572,6 +582,8 @@ public sealed partial class Game : GameWindow, IPlayerHandler
         }
 
         MouseLook();
+        CheckSourceChanges();
+        if (_reloadPacks) { _reloadPacks = false; try { ReloadResourcePacksNow(); } catch (Exception ex) { Log.Error("Paczki zasobów: " + ex); } }
         bool gpuQ = _stressMeasure;
         if (gpuQ) StressGpuBegin();
         try { RenderFrame(pt); } catch (Exception ex) { Log.Error("Render: " + ex); }

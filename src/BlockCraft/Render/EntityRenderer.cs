@@ -360,6 +360,8 @@ void main(){ vec4 t = texture(uTex, vUV); if(t.a < 0.1) discard; t *= vCol;
 
     // ---- wyciągnięty sprite (przedmioty 3D jak w MC) ----
     private readonly Dictionary<int, List<(int x, int y, int dir)>> _edges = new();
+    /// <summary>Po zmianie tekstur (paczki zasobów): krawędzie wyciąganych przedmiotów liczone od nowa.</summary>
+    public void ClearTextureCaches() => _edges.Clear();
     private List<(int x, int y, int dir)> Edges(int layer)
     {
         if (_edges.TryGetValue(layer, out var l)) return l;

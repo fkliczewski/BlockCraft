@@ -1,5 +1,6 @@
 using BlockCraft.Entities;
 using BlockCraft.Items;
+using BlockCraft.Render;
 using BlockCraft.World;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
@@ -71,37 +72,67 @@ public class ContainerScreen : Screen
     public override bool PausesGame => false;
     protected override void Init() { Left = (W - C.Width) / 2; Top = (H - C.Height) / 2; }
 
+    /// <summary>Tło okna z paczki zasobów i jego układ (null = rysowane przez grę).</summary>
+    protected (PackContainerLayout layout, Texture2D bg) PackBackground()
+    {
+        var layout = PackContainerLayout.For(C);
+        var bg = layout == null ? null : G.Gui.Container(layout.Texture);
+        return bg == null ? (null, null) : (layout, bg);
+    }
+
     protected virtual void DrawBackground(int mx, int my)
     {
+        var (layout, bg) = PackBackground();
+        if (bg != null) { layout.DrawFrame(G.Sb, bg, C, Left, Top); layout.DrawProgress(G.Sb, bg, C, Left, Top); }
+        else DrawGeneratedFrame();
+        if (C is PlayerContainer) DrawPlayerInventoryDetails(bg);
+        else if (C is WorkbenchContainer) DrawWorkbenchDetails(bg);
+        else if (C is FurnaceContainer fc) DrawFurnaceDetails(bg, fc.Furnace);
+        else if (C is ChestContainer cc) G.Sb.Text(cc.Title, Left + 8, Top + 6, 0xFF404040, false);
+        if (C is not PlayerContainer) DrawInventoryLabel(PackContainerLayout.For(C));
+    }
+
+    protected void DrawGeneratedFrame()
+    {
         GuiDraw.Panel(G, Left, Top, C.Width, C.Height);
-        foreach (var s in C.Slots) GuiDraw.Slot(G, Left + s.X - 1, Top + s.Y - 1, s.IsOutput && C is not FurnaceContainer ? 18 : 18);
+        foreach (var s in C.Slots) GuiDraw.Slot(G, Left + s.X - 1, Top + s.Y - 1, 18);
+    }
+
+    private void DrawPlayerInventoryDetails(Texture2D bg)
+    {
         var sb = G.Sb;
-        if (C is PlayerContainer)
+        if (bg == null)
         {
             sb.Fill(Left + 26, Top + 8, 52, 70, 0xFF000000);
-            sb.Text("Wytwarzanie", Left + 86, Top + 6, 0xFF404040, false);
             DrawArrow(Left + 133, Top + 28, 1f);
-            for (int a = 0; a < 4; a++) if (C.Slots[5 + a].Stack == null) DrawArmorGhost(Left + 8, Top + 8 + a * 18, a);
-            G.DrawPlayerPreview(Left + 51, Top + 75, 30, Left + 51 - G.MouseGuiX, Top + 25 - G.MouseGuiY);
         }
-        else if (C is WorkbenchContainer)
-        {
-            sb.Text("Wytwarzanie", Left + 28, Top + 6, 0xFF404040, false);
-            DrawArrow(Left + 90, Top + 35, 1f);
-            GuiDraw.Slot(G, Left + 119, Top + 30, 26);
-        }
-        else if (C is FurnaceContainer fc)
-        {
-            sb.TextCentered("Piec", Left + C.Width / 2f, Top + 6, 0xFF404040, false);
-            var f = fc.Furnace;
-            float burn = f.CurrentItemBurnTime > 0 ? (float)f.BurnTime / f.CurrentItemBurnTime : 0;
-            DrawFlame(Left + 57, Top + 37, f.BurnTime > 0 ? burn : 0);
-            DrawArrow(Left + 79, Top + 34, f.CookTime / (float)FurnaceTileEntity.CookTotal, true);
-            GuiDraw.Slot(G, Left + 111, Top + 30, 26);
-        }
-        else if (C is ChestContainer cc) sb.Text(cc.Title, Left + 8, Top + 6, 0xFF404040, false);
-        if (C is not ChestContainer && C is not PlayerContainer) sb.Text("Ekwipunek", Left + 8, Top + C.Height - 96 + 2, 0xFF404040, false);
-        else if (C is ChestContainer) sb.Text("Ekwipunek", Left + 8, Top + 72, 0xFF404040, false);
+        sb.Text("Wytwarzanie", Left + 86, Top + 6, 0xFF404040, false);
+        for (int a = 0; a < 4; a++) if (C.Slots[5 + a].Stack == null) DrawArmorGhost(Left + 8, Top + 8 + a * 18, a);
+        G.DrawPlayerPreview(Left + 51, Top + 75, 30, Left + 51 - G.MouseGuiX, Top + 25 - G.MouseGuiY);
+    }
+
+    private void DrawWorkbenchDetails(Texture2D bg)
+    {
+        G.Sb.Text("Wytwarzanie", Left + 28, Top + 6, 0xFF404040, false);
+        if (bg != null) return;
+        DrawArrow(Left + 90, Top + 35, 1f);
+        GuiDraw.Slot(G, Left + 119, Top + 30, 26);
+    }
+
+    private void DrawFurnaceDetails(Texture2D bg, FurnaceTileEntity f)
+    {
+        G.Sb.TextCentered("Piec", Left + C.Width / 2f, Top + 6, 0xFF404040, false);
+        if (bg != null) return;
+        DrawFlame(Left + 57, Top + 37, f.BurnFraction);
+        DrawArrow(Left + 79, Top + 34, f.CookFraction, true);
+        GuiDraw.Slot(G, Left + 111, Top + 30, 26);
+    }
+
+    /// <summary>Napis "Ekwipunek" w miejscu wskazanym przez układ okna (null = jak w oknie gry).</summary>
+    protected void DrawInventoryLabel(PackContainerLayout layout)
+    {
+        int y = layout?.InventoryLabelY(C) ?? PackContainerLayout.DefaultInventoryLabelY(C);
+        G.Sb.Text("Ekwipunek", Left + 8, Top + y, 0xFF404040, false);
     }
 
     private void DrawArmorGhost(int x, int y, int slot)
@@ -235,9 +266,12 @@ public class ContainerScreen : Screen
     {
         if (C is FurnaceContainer fc && P.World.GetTileEntity(fc.Furnace.X, fc.Furnace.Y, fc.Furnace.Z) != fc.Furnace) G.SetScreen(null);
         if (C is WorkbenchContainer wb && P.World.GetBlock(wb.Bx, wb.By, wb.Bz) != B.CraftingTable) G.SetScreen(null);
-        if (C is ChestContainer ch && ch.Chest is TileEntity te && P.World.GetTileEntity(te.X, te.Y, te.Z) != te) G.SetScreen(null);
+        if (C is ChestContainer ch && !ChestStillThere(ch.Chest)) G.SetScreen(null);
         if (C is RsContainer rc && !rc.StillValid(P)) G.SetScreen(null);
     }
+
+    private bool ChestStillThere(IInventory chest) =>
+        chest.Parts.All(part => part is not TileEntity te || P.World.GetTileEntity(te.X, te.Y, te.Z) == te);
 
     public override void OnClose() { P.CloseContainer(); }
 }
@@ -261,22 +295,36 @@ public sealed class CreativeScreen : Screen
     public CreativeScreen(Player p, int tab = -1) { _p = p; _inv = (PlayerContainer)p.InventoryContainer; if (tab >= 0) _tab = Math.Clamp(tab, 0, TabNames.Length - 1); }
     public override bool PausesGame => false;
 
+    /// <summary>Zakładka wyszukiwania (indeks w TabNames).</summary>
+    private const int SearchTab = 8;
+    /// <summary>Ostatnie zapytanie: zostaje po zamknięciu ekwipunku, jak w 1.8.</summary>
+    private static string _query = "";
+
     protected override void Init()
     {
         _left = (W - PW) / 2; _top = (H - PH) / 2;
-        _search = Add(new TextField(_left + 82, _top + 6, 89, 10) { Visible = _tab == 8, Focused = _tab == 8, MaxLength = 30 });
+        _search = Add(new TextField(_left + 82, _top + 6, 89, 10) { Visible = _tab == SearchTab, Focused = _tab == SearchTab, MaxLength = 30, Text = _query });
         Refresh();
     }
 
     private void Refresh()
     {
-        if (_tab == 8)
+        if (_tab == SearchTab)
         {
-            string q = _search?.Text.ToLowerInvariant() ?? "";
-            _items = ItemRegistry.CreativeItems(-1).Where(s => s.Name.ToLowerInvariant().Contains(q) || (s.Item?.Key ?? "").Contains(q)).ToList();
+            _query = _search?.Text ?? "";
+            _items = ItemSearch.Filter(ItemRegistry.CreativeItems(-1), _query);
         }
         else if (_tab != 9) _items = ItemRegistry.CreativeItems(_tab);
         _scroll = 0;
+    }
+
+    /// <summary>Przejście do wyszukiwania z wpisanym tekstem (pisanie w innej zakładce, T, kliknięcie w zakładkę).</summary>
+    private void OpenSearch(string text)
+    {
+        _tab = SearchTab;
+        _search.Visible = _search.Focused = true;
+        if (text != null) _search.Text = text;
+        Refresh();
     }
 
     private int Rows => (_items.Count + 8) / 9;
@@ -298,6 +346,7 @@ public sealed class CreativeScreen : Screen
         GuiDraw.Panel(G, _left, _top, PW, PH);
         DrawTab(_tab, true);
         sb.Text(TabNames[_tab], _left + 8, _top + 6, 0xFF404040, false);
+        if (_tab == SearchTab && _items.Count == 0) sb.TextCentered("Brak wyników", _left + 89, _top + 56, 0xFF404040, false);
         ItemStack hoverStack = null;
         if (_tab != 9)
         {
@@ -350,6 +399,8 @@ public sealed class CreativeScreen : Screen
             if (mx >= x - 1 && my >= y - 1 && mx < x + 17 && my < y + 17) { sb.Fill(x, y, 16, 16, 0x80FFFFFF); hoverStack = st; }
         }
         base.Render(mx, my, pt);
+        // podpowiedź w pustym polu wyszukiwania (rysowana na polu)
+        if (_tab == SearchTab && _search.Text.Length == 0) sb.Text("§8np. zelazny kilof", _search.X + 4, _search.Y + 1, 0xFFFFFFFF, false);
         for (int t = 0; t < TabNames.Length; t++)
         {
             var (tx, ty) = TabPos(t);
@@ -379,8 +430,15 @@ public sealed class CreativeScreen : Screen
         for (int t = 0; t < TabNames.Length; t++)
         {
             var (tx, ty) = TabPos(t);
-            if (mx >= tx && my >= ty && mx < tx + 28 && my < ty + 32) { _tab = t; G.PlayUiClick(); _search.Visible = t == 8; _search.Focused = t == 8; Refresh(); return; }
+            if (mx >= tx && my >= ty && mx < tx + 28 && my < ty + 32)
+            {
+                G.PlayUiClick();
+                if (t == SearchTab) { OpenSearch(null); return; }
+                _tab = t; _search.Visible = _search.Focused = false; Refresh(); return;
+            }
         }
+        // prawy przycisk na polu wyszukiwania czyści je (jak w 1.8)
+        if (btn == 1 && _tab == SearchTab && _search.Hover(mx, my)) { OpenSearch(""); return; }
         base.MouseDown(mx, my, btn);
         bool shift = G.IsShiftDown;
         // hotbar
@@ -440,8 +498,10 @@ public sealed class CreativeScreen : Screen
     }
     public override void KeyDown(Keys k, bool ctrl, bool shift)
     {
-        if (_search.Focused && _tab == 8)
+        if (_tab == SearchTab)
         {
+            // w zakładce Szukaj pole zawsze przyjmuje klawisze (nawet po kliknięciu w siatkę): Backspace działa, a „e” się wpisuje
+            _search.Focused = true;
             if (k == Keys.Escape) { G.SetScreen(null); return; }
             if (_search.Key(G, k, ctrl, shift)) Refresh();
             return;
@@ -450,7 +510,15 @@ public sealed class CreativeScreen : Screen
     }
     public override void CharTyped(char c)
     {
-        if (_tab != 8) { if (c == 't' || c == 'T') { } return; }
+        if (_tab != SearchTab)
+        {
+            // T otwiera puste wyszukiwanie (jak klawisz czatu w 1.8); inne litery i cyfry od razu szukają.
+            // E zamyka ekwipunek (KeyDown), więc go tu nie łapiemy.
+            if (c is 't' or 'T') OpenSearch("");
+            else if (char.IsLetterOrDigit(c) && c is not ('e' or 'E')) OpenSearch(c.ToString());
+            return;
+        }
+        _search.Focused = true; // po kliknięciu w siatkę dalsze pisanie wraca do pola (klawisze i tak trafiają do pola — KeyDown)
         if (_search.Char(G, c)) Refresh();
     }
     public override void OnClose()

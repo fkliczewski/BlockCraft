@@ -14,12 +14,13 @@ public static partial class TextureGen
 
     public static IReadOnlyList<uint[]> Textures { get { Ensure(); return _tex; } }
     public static int Count { get { Ensure(); return _tex.Count; } }
-    public static bool Has(string name) { Ensure(); return _index.ContainsKey(name); }
+    public static bool Has(string name) { Ensure(); lock (Lock) return _index.ContainsKey(name); }
 
     public static int Layer(string name)
     {
         Ensure();
-        if (_index.TryGetValue(name, out int i)) return i;
+        lock (Lock)
+            if (_index.TryGetValue(name, out int i)) return i;
         lock (Missing) if (Missing.Add(name)) Log.Error("Brak tekstury: " + name);
         return 0;
     }

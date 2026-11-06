@@ -49,9 +49,11 @@ public sealed class Shader : IDisposable
 public sealed class Texture2D : IDisposable
 {
     public readonly int Handle, Width, Height;
+    /// <summary>Rozmiar w jednostkach GUI (DrawPx): tekstury HD z paczek mają więcej pikseli niż oryginał 1.8.</summary>
+    public int LogicalWidth, LogicalHeight;
     public Texture2D(int w, int h, uint[] pixels, bool linear = false)
     {
-        Width = w; Height = h;
+        Width = w; Height = h; LogicalWidth = w; LogicalHeight = h;
         Handle = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, Handle);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba8, w, h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
@@ -74,12 +76,15 @@ public sealed class TextureArray : IDisposable
 {
     public readonly int Handle, Size, Layers;
     private readonly bool _mips;
+    /// <summary>Liczba poziomów mipmap razem z pełnym rozmiarem.</summary>
+    private readonly int _levels;
     public TextureArray(int size, IReadOnlyList<uint[]> layers, bool mipmaps, int levels = 4)
     {
         Size = size; Layers = layers.Count; _mips = mipmaps;
         Handle = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2DArray, Handle);
         int lv = mipmaps ? levels + 1 : 1;
+        _levels = lv;
         GL.TexStorage3D(TextureTarget3d.Texture2DArray, lv, SizedInternalFormat.Rgba8, size, size, Math.Max(1, layers.Count));
         for (int i = 0; i < layers.Count; i++)
             GL.TexSubImage3D(TextureTarget.Texture2DArray, 0, 0, 0, i, size, size, 1, PixelFormat.Rgba, PixelType.UnsignedByte, layers[i]);
@@ -138,7 +143,7 @@ public sealed class TextureArray : IDisposable
         if (_mips)
         {
             var cur = px; int s = Size;
-            for (int l = 1; s > 1 && l <= 4; l++)
+            for (int l = 1; s > 1 && l < _levels; l++)
             {
                 var next = Downsample(cur, s); s /= 2;
                 GL.TexSubImage3D(TextureTarget.Texture2DArray, l, 0, 0, layer, s, s, 1, PixelFormat.Rgba, PixelType.UnsignedByte, next);

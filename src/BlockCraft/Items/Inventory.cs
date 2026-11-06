@@ -190,8 +190,19 @@ public abstract class Container
     public int GridW, GridH;
     public int Width = 176, Height = 166;
     public string Title = "";
+    /// <summary>Okno z paczki zasobów (gui/container/NAZWA.png bez rozszerzenia); null = tło rysowane przez grę.</summary>
+    public virtual string PackWindow => null;
     protected PlayerInventory PInv;
     public int FirstPlayerSlot; // pierwszy slot ekwipunku gracza (27 głównych + 9 hotbar)
+
+    /// <summary>Okno skrzyni jak generic_54 z 1.8: rzędy po 9 slotów (3 albo 6) i pod nimi ekwipunek gracza.</summary>
+    protected void AddChestLayout(PlayerInventory inv, IInventory chest)
+    {
+        int rows = chest.Size / 9, shift = (rows - 3) * 18;
+        Height = 114 + rows * 18;
+        for (int r = 0; r < rows; r++) for (int c = 0; c < 9; c++) Slots.Add(new Slot(chest, r * 9 + c, 8 + c * 18, 18 + r * 18));
+        AddPlayerSlots(inv, 85 + shift, 143 + shift);
+    }
 
     protected void AddPlayerSlots(PlayerInventory inv, int y0, int hotbarY)
     {
@@ -499,6 +510,7 @@ public abstract class Container
 
 public sealed class PlayerContainer : Container
 {
+    public override string PackWindow => "inventory";
     public PlayerContainer(PlayerInventory inv)
     {
         Title = "Wytwarzanie";
@@ -523,6 +535,7 @@ public sealed class PlayerContainer : Container
 
 public sealed class WorkbenchContainer : Container
 {
+    public override string PackWindow => "crafting_table";
     public readonly int Bx, By, Bz;
     public WorkbenchContainer(PlayerInventory inv, int x, int y, int z)
     {
@@ -537,9 +550,11 @@ public sealed class WorkbenchContainer : Container
     protected override bool TransferFromPlayer(ItemStack s) => false;
 }
 
-public sealed class FurnaceContainer : Container
+public sealed class FurnaceContainer : Container, IFurnaceProgressSource
 {
+    public override string PackWindow => "furnace";
     public readonly FurnaceTileEntity Furnace;
+    public IFurnaceProgress Progress => Furnace;
     public FurnaceContainer(PlayerInventory inv, FurnaceTileEntity f)
     {
         Furnace = f; Title = "Piec";
@@ -558,13 +573,12 @@ public sealed class FurnaceContainer : Container
 
 public sealed class ChestContainer : Container
 {
+    public override string PackWindow => "generic_54";
     public readonly IInventory Chest;
     public ChestContainer(PlayerInventory inv, IInventory chest, string title)
     {
         Chest = chest; Title = title;
-        Height = 114 + 3 * 18;
-        for (int r = 0; r < 3; r++) for (int c = 0; c < 9; c++) Slots.Add(new Slot(chest, r * 9 + c, 8 + c * 18, 18 + r * 18));
-        AddPlayerSlots(inv, 85, 143);
+        AddChestLayout(inv, chest);
     }
-    protected override bool TransferFromPlayer(ItemStack s) => MergeStack(s, 0, 27, false);
+    protected override bool TransferFromPlayer(ItemStack s) => MergeStack(s, 0, Chest.Size, false);
 }

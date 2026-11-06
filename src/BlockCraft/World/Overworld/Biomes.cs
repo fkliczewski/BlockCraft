@@ -196,12 +196,44 @@ public static class Biome
         return (uint)((Ch(16) << 16) | (Ch(8) << 8) | Ch(0));
     }
 
+    /// <summary>Mapy kolorów 256x256 z paczki zasobów (colormap/grass.png, colormap/foliage.png); null = tabela gry.</summary>
+    public static uint[] GrassMap, FoliageMap;
+
+    /// <summary>Wczytuje mapy kolorów czytnikiem obrazów paczek (ścieżka względem textures/, null = brak).
+    /// Zwraca true, gdy któraś mapa się zmieniła (siatki chunków do przebudowy).</summary>
+    public static bool LoadColorMaps(Func<string, RawImage> readImage)
+    {
+        uint[] grass = GrassMap, foliage = FoliageMap;
+        GrassMap = ColorMap(readImage, "colormap/grass.png");
+        FoliageMap = ColorMap(readImage, "colormap/foliage.png");
+        return !SameMap(grass, GrassMap) || !SameMap(foliage, FoliageMap);
+    }
+
+    private static uint[] ColorMap(Func<string, RawImage> readImage, string path) =>
+        readImage(path)?.RequireSize(m => m.W >= 2 && m.H >= 2, "co najmniej 2x2")?.Resize(256, 256).Px;
+
+    private static bool SameMap(uint[] a, uint[] b) => a == null ? b == null : b != null && a.AsSpan().SequenceEqual(b);
+
+    /// <summary>ColorizerGrass/ColorizerFoliage: punkt mapy wg temperatury i wilgotności biomu, wynik 0xRRGGBB.</summary>
+    private static uint FromMap(uint[] map, BiomeDef d)
+    {
+        double t = Math.Clamp(d.Temp, 0, 1), r = Math.Clamp(d.Rain, 0, 1) * t;
+        int x = (int)((1 - t) * 255), y = (int)((1 - r) * 255);
+        uint p = map[(y << 8) | x];
+        return ((p & 0xFF) << 16) | (p & 0xFF00) | ((p >> 16) & 0xFF);
+    }
+
     /// <summary>Kolor trawy (ColorizerGrass): tabela dla biomów z wiki MC 1.8, reszta z interpolacji mapy kolorów.</summary>
     public static uint GrassColor(int b)
     {
         var d = Get(b);
         if (d.Kind == BiomeKind.Swamp) return 0x6A7039;
         if (d.Kind == BiomeKind.Mesa) return 0x90814D;
+        if (GrassMap != null)
+        {
+            uint m = FromMap(GrassMap, d);
+            return (d.Base >= 0 ? d.Base : d.Id) == RoofedForest ? (((m & 0xFEFEFE) + 0x28340A) >> 1) : m;
+        }
         uint c = Tri(d.Temp, d.Rain, 0x80B497, 0xBFB755, 0x47CD33);
         int baseId = d.Base >= 0 ? d.Base : d.Id;
         c = baseId switch
@@ -228,6 +260,7 @@ public static class Biome
         var d = Get(b);
         if (d.Kind == BiomeKind.Swamp) return 0x6A7039;
         if (d.Kind == BiomeKind.Mesa) return 0x9E814D;
+        if (FoliageMap != null) return FromMap(FoliageMap, d);
         int baseId = d.Base >= 0 ? d.Base : d.Id;
         return baseId switch
         {

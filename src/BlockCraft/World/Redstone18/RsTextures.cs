@@ -28,6 +28,8 @@ namespace BlockCraft.Render
             var tc = (uint[])Get16("chest_front").Clone();
             for (int y = 2; y < 9; y++) for (int x = 6; x < 10; x++) if (x == 6 || x == 9 || y == 2 || y == 8) tc[y * 16 + x] = Hex(0xA01818);
             Add("trapped_chest_front", tc);
+            Add("trapped_chest_side", (uint[])Get16("chest_side").Clone());
+            Add("trapped_chest_top", (uint[])Get16("chest_top").Clone());
 
             var p = New();
             var up = Get16("door_iron_upper"); var lo = Get16("door_iron_lower");

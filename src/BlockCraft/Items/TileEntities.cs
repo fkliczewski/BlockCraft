@@ -8,15 +8,35 @@ public interface IInventory
     ItemStack Get(int i);
     void Set(int i, ItemStack s);
     void Changed();
+    /// <summary>Ekwipunki, z których się składa (np. obie połowy dużej skrzyni); zwykły ekwipunek to on sam.</summary>
+    IEnumerable<IInventory> Parts => new[] { this };
 }
 
-public sealed class FurnaceTileEntity : TileEntity, IInventory
+/// <summary>Stan pieca widoczny w oknie: paliwo i przepalanie.</summary>
+public interface IFurnaceProgress
+{
+    bool IsBurning { get; }
+    float BurnFraction { get; }
+    float CookFraction { get; }
+}
+
+/// <summary>Kontener, którego okno pokazuje postęp pieca.</summary>
+public interface IFurnaceProgressSource
+{
+    IFurnaceProgress Progress { get; }
+}
+
+public sealed class FurnaceTileEntity : TileEntity, IInventory, IFurnaceProgress
 {
     public static bool Swapping;
     public readonly ItemStack[] Slots = new ItemStack[3];
     public int BurnTime, CurrentItemBurnTime, CookTime;
     public float StoredXp;
     public const int CookTotal = 200;
+    /// <summary>Pozostała część paliwa (0..1), 0 = piec nie pali się.</summary>
+    public float BurnFraction => BurnTime > 0 && CurrentItemBurnTime > 0 ? (float)BurnTime / CurrentItemBurnTime : 0;
+    /// <summary>Postęp przepalania bieżącego przedmiotu (0..1).</summary>
+    public float CookFraction => CookTime / (float)CookTotal;
     public override int TypeId => 1;
     public int Size => 3;
     public ItemStack Get(int i) => Slots[i];
@@ -105,4 +125,16 @@ public sealed class ChestTileEntity : TileEntity, IInventory
 
     public override void Save(BinaryWriter bw) { foreach (var s in Slots) bw.WriteStack(s); }
     public override void Load(BinaryReader br) { for (int i = 0; i < 27; i++) Slots[i] = br.ReadStack(); }
+}
+
+/// <summary>Duża skrzynia: dwie sąsiednie skrzynie widziane jako jeden ekwipunek (jak InventoryLargeChest w 1.8).</summary>
+public sealed class LargeChestInventory : IInventory
+{
+    public readonly IInventory First, Second;
+    public LargeChestInventory(IInventory first, IInventory second) { First = first; Second = second; }
+    public int Size => First.Size + Second.Size;
+    public ItemStack Get(int i) => i < First.Size ? First.Get(i) : Second.Get(i - First.Size);
+    public void Set(int i, ItemStack s) { if (i < First.Size) First.Set(i, s); else Second.Set(i - First.Size, s); }
+    public void Changed() { First.Changed(); Second.Changed(); }
+    public IEnumerable<IInventory> Parts => First.Parts.Concat(Second.Parts);
 }

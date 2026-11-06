@@ -291,6 +291,7 @@ namespace BlockCraft.Items
             var banner = Simple(I.Banner, "banner", "Sztandar", World.Blocks.TabDecoration, 16);
             banner.Variants = Enumerable.Range(0, 16).Select(i => 15 - i).ToArray();
             banner.NameFn = World.Banners.Name;
+            banner.TranslatedNameFn = stack => LangKeys.VariantName(stack, World.Banners.BaseOf(stack));
             banner.ColorFn = s => 0xFF000000 | Swap(World.Banners.LayerRgb(World.Banners.BaseOf(s)));
             banner.UseOnBlock = (p, s, x, y, z, face, hx, hy, hz) => World.Banners.Place(p, s, x, y, z, face);
         }

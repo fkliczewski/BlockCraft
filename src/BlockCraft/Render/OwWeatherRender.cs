@@ -15,17 +15,52 @@ public sealed partial class WorldRenderer
     public bool WeatherNativeTextures => _weatherNative;
     public int WeatherTextureSize => _weatherTextures?.Size ?? 0;
 
+    private static readonly string[] WeatherKinds = { "rain", "snow" };
+    /// <summary>environment/rain.png i snow.png z aktywnych paczek, każdy osobno (null = obraz domyślny).</summary>
+    private readonly ImageResult[] _packWeather = new ImageResult[WeatherKinds.Length];
+
+    /// <summary>Po zmianie paczek zasobów: niebo, chmury i pogoda.</summary>
+    public void ReloadPackAssets()
+    {
+        BuildCelestialTextures();
+        BuildClouds();
+        _weatherTextures?.Dispose(); _weatherTextures = null; _weatherNative = _weatherNativeFailed = false;
+        for (int i = 0; i < WeatherKinds.Length; i++) _packWeather[i] = PackWeatherImage(WeatherKinds[i]);
+    }
+
+    private static ImageResult PackWeatherImage(string kind) =>
+        ResourcePacks.ReadImage("environment/" + kind + ".png")
+            ?.RequireSize(i => i.W <= MaxWeatherSize && i.H <= MaxWeatherSize, $"najwyżej {MaxWeatherSize}x{MaxWeatherSize}") is { } img
+            ? ToImageResult(img.W, img.H, img.Px) : null;
+
+    private const int MaxWeatherSize = 512;
+
+    private static ImageResult ToImageResult(int w, int h, uint[] px)
+    {
+        var data = new byte[px.Length * 4];
+        System.Buffer.BlockCopy(px, 0, data, 0, data.Length);
+        return new ImageResult { Width = w, Height = h, Data = data, Comp = ColorComponents.RedGreenBlueAlpha, SourceComp = ColorComponents.RedGreenBlueAlpha };
+    }
+
+    /// <summary>Obraz opadu: z paczki, z oryginalnych zasobów 1.8 albo wygenerowany przez grę.</summary>
+    private ImageResult WeatherImage(int i)
+    {
+        if (_packWeather[i] != null) return _packWeather[i];
+        if (ClientAssets.Ready)
+        {
+            using var stream = File.OpenRead(ClientAssets.WeatherPath(WeatherKinds[i]));
+            return ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+        }
+        return ToImageResult(16, 16, TextureGen.Get("weather_" + WeatherKinds[i]));
+    }
+
     private void EnsureWeatherTextures()
     {
-        if (ClientAssets.Ready && !_weatherNative && !_weatherNativeFailed)
+        if ((_packWeather.Any(i => i != null) || ClientAssets.Ready) && !_weatherNative && !_weatherNativeFailed)
         {
             try
             {
-                var images = new[] { "rain", "snow" }.Select(n =>
-                {
-                    using var stream = File.OpenRead(ClientAssets.WeatherPath(n));
-                    return ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
-                }).ToArray();
+                var images = Enumerable.Range(0, WeatherKinds.Length).Select(WeatherImage).ToArray();
                 int size = images.Max(i => Math.Max(i.Width, i.Height));
                 if (size > 512 || images.Any(i => i.Width < 1 || i.Height < 1)) throw new IOException("nieprawidłowy rozmiar tekstury pogody");
                 var pixels = images.Select(i =>

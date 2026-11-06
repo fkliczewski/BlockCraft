@@ -161,6 +161,7 @@ public sealed partial class ChunkMesher
                     if (id == 0) continue;
                     var b = Block.ById[id];
                     int meta = _meta[i];
+                    if (b.Render is RenderType.Cube or RenderType.Cross && PackModel(b, x, y, z, meta)) continue;
                     switch (b.Render)
                     {
                         case RenderType.Cube: Cube(b, x, y, z, meta); break;
@@ -245,42 +246,16 @@ public sealed partial class ChunkMesher
 
     private void Face(VertexBuffer buf, int x, int y, int z, int f, int tex, int flags, uint tint, bool emissive)
     {
-        int nx = x + Dir.X[f], ny = y + Dir.Y[f], nz = z + Dir.Z[f];
         var fv = FaceVerts[f]; var uv = FaceUV[f];
         float shade = FaceShade[f];
         for (int k = 0; k < 4; k++)
         {
             int vx = fv[k * 3], vy = fv[k * 3 + 1], vz = fv[k * 3 + 2];
-            if (SmoothLighting)
-            {
-                // dwie osie styczne do ściany
-                int ax, ay, az, bx, by, bz;
-                if (f <= 1) { ax = vx == 0 ? -1 : 1; ay = 0; az = 0; bx = 0; by = 0; bz = vz == 0 ? -1 : 1; }
-                else if (f <= 3) { ax = vx == 0 ? -1 : 1; ay = 0; az = 0; bx = 0; by = vy == 0 ? -1 : 1; bz = 0; }
-                else { ax = 0; ay = vy == 0 ? -1 : 1; az = 0; bx = 0; by = 0; bz = vz == 0 ? -1 : 1; }
-                int c0 = Idx(nx, ny, nz);
-                int c1 = Idx(nx + ax, ny + ay, nz + az);
-                int c2 = Idx(nx + bx, ny + by, nz + bz);
-                int c3 = Idx(nx + ax + bx, ny + ay + by, nz + az + bz);
-                bool o1 = _opaque[_id[c1]], o2 = _opaque[_id[c2]], o3 = _opaque[_id[c3]] || (o1 && o2);
-                float sky = _sky[c0], blk = _blk[c0]; int n = 1;
-                if (!o1) { sky += _sky[c1]; blk += _blk[c1]; n++; }
-                if (!o2) { sky += _sky[c2]; blk += _blk[c2]; n++; }
-                if (!o3) { sky += _sky[c3]; blk += _blk[c3]; n++; }
-                _vs[k] = sky / n; _vb[k] = blk / n;
-                float ao = (1f + (o1 ? 0.2f : 1f) + (o2 ? 0.2f : 1f) + (o3 ? 0.2f : 1f)) / 4f;
-                _vl[k] = ao;
-            }
-            else
-            {
-                int c0 = Idx(nx, ny, nz);
-                _vs[k] = _sky[c0]; _vb[k] = _blk[c0]; _vl[k] = 1f;
-            }
+            SampleFaceVertexLight(x, y, z, f, vx, vy, vz, k, true);
             if (emissive) _vb[k] = 15;
         }
         // przekątna zależna od AO
-        bool flip = _vl[0] + _vl[2] < _vl[1] + _vl[3];
-        int s = flip ? 1 : 0;
+        int s = FaceVertexStart();
         for (int j = 0; j < 4; j++)
         {
             int k = (j + s) & 3;
@@ -295,16 +270,22 @@ public sealed partial class ChunkMesher
         uint tint = TintFor(b, x, y, z, meta);
         int i = Idx(x, y, z);
         float sky = _sky[i], blk = _blk[i];
+        var (ox, oz) = CrossOffset(b, x, z);
+        float a0 = 0.5f - 0.45f, a1 = 0.5f + 0.45f;
+        float h1 = 1f;
+        Quad2(Solid, x + a0 + ox, y, z + a0 + oz, x + a1 + ox, y + h1, z + a1 + oz, tex, tint, sky, blk, 1f);
+        Quad2(Solid, x + a0 + ox, y, z + a1 + oz, x + a1 + ox, y + h1, z + a0 + oz, tex, tint, sky, blk, 1f);
+    }
+
+    private (float x, float z) CrossOffset(Block b, int x, int z)
+    {
         float ox = 0, oz = 0;
         if (b.Id == B.TallGrass || b.Id == B.Dandelion || b.Id == B.Poppy)
         {
             uint h = MathUtil.HashU(x + _ox, 0, z + _oz);
             ox = ((h & 15) / 15f - 0.5f) * 0.5f; oz = (((h >> 8) & 15) / 15f - 0.5f) * 0.5f;
         }
-        float a0 = 0.5f - 0.45f, a1 = 0.5f + 0.45f;
-        float h1 = 1f;
-        Quad2(Solid, x + a0 + ox, y, z + a0 + oz, x + a1 + ox, y + h1, z + a1 + oz, tex, tint, sky, blk, 1f);
-        Quad2(Solid, x + a0 + ox, y, z + a1 + oz, x + a1 + ox, y + h1, z + a0 + oz, tex, tint, sky, blk, 1f);
+        return (ox, oz);
     }
 
     /// <summary>Pionowy czworokąt dwustronny z (x0,y0,z0) do (x1,y1,z1).</summary>

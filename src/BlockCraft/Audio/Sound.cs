@@ -33,17 +33,19 @@ public static class Sound
         _vols = settings?.SoundVolumes != null ? new Dictionary<string, float>(settings.SoundVolumes) : new();
         Mix.CategoryVolume = CategoryVolume;
         _started = Mix.Start();
-        AssetStore.Finished = ReloadBank;
+        ReloadBank();
         AssetStore.StartAsync();
         Music.Init();
     }
 
     public static void Shutdown() { _started = false; Mix.Stop(); }
 
-    static void ReloadBank()
+    /// <summary>Wczytuje sounds.json od nowa (po pobraniu zasobów 1.8 i po zmianie paczek zasobów).</summary>
+    public static void ReloadBank()
     {
-        var b = SoundBank.Load();
+        var b = SoundBank.Load(ResourcePacks.SoundReaders, ResourcePacks.SoundDomains, ResourcePacks.SoundFileLookups);
         lock (BankLock) _bank = b;
+        Mix.Clear();
         Log.Info("Sound: bank przeładowany, zdarzeń " + b.Events.Count);
     }
 
@@ -100,7 +102,8 @@ public static class Sound
         {
             v.Category = def.Category;
             var e = bank.Pick(def);
-            if (e != null) { entryVol = e.Volume; entryPitch = e.Pitch; stream = e.Stream || forceStream; name = e.Name; }
+            if (e == null) return null;
+            entryVol = e.Volume; entryPitch = e.Pitch; stream = e.Stream || forceStream; name = e.Name;
         }
         else if (bank.HasAssets) return null; // nieznane zdarzenie przy załadowanych assetach: cisza
         v.Volume = Math.Clamp(vol * entryVol, 0f, 1f);

@@ -60,6 +60,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     private readonly Mesh _skyQuad, _sunMesh, _starMesh, _lineMesh;
     private Mesh _cloudMesh;
     private Texture2D _sunTex, _moonTex;
+    private bool _moonPhases;
     public readonly List<Particle> Particles = new();
     public Action<string, double, double, double, float, float> SoundHook;
     /// <summary>Modele bloków z tile entity rysowane co klatkę (np. tabliczki w 16 obrotach), w przebiegu encji.</summary>
@@ -67,13 +68,15 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
     public int RenderedSections, TotalSections;
     public int RenderDistance = 8;
     public bool CloudsEnabled = true;
+    /// <summary>Encje rysowane do końca mgły, więc łagodnie się z niej wyłaniają.</summary>
+    public bool FarEntities = true;
     public float Gamma = 0.5f;
     private int _waterLayer, _lavaLayer;
 
     public WorldRenderer()
     {
         ItemRegistry.Init();
-        Terrain = new TextureArray(16, TextureGen.Textures, true, 4);
+        Terrain = NewTerrainArray();
         Entities = new EntityRenderer { TerrainTex = Terrain };
         _waterLayer = TextureGen.Layer("water_still"); _lavaLayer = TextureGen.Layer("lava_still");
         _chunk = new Shader(ChunkVert, ChunkFrag, "chunk");
@@ -91,8 +94,7 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
         _lineMesh = new Mesh(12, () => { GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 12, 0); }, false);
         _tnt = new TntInstancer(Entities);
         BuildStars();
-        BuildCelestialTextures();
-        BuildClouds();
+        ReloadPackAssets();
         int n = Math.Clamp(Environment.ProcessorCount / 2, 1, 3);
         _workers = new Thread[n];
         for (int i = 0; i < n; i++) { _workers[i] = new Thread(WorkerLoop) { IsBackground = true, Name = "Mesher" + i, Priority = ThreadPriority.BelowNormal }; _workers[i].Start(); }
@@ -118,14 +120,14 @@ public sealed partial class WorldRenderer : IWorldListener, IDisposable
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in float aLayer; layout(location=3) in vec2 aFS;
 layout(location=4) in vec2 aLight; layout(location=5) in vec4 aTint;
 uniform mat4 uViewProj; uniform vec3 uOffset;
-out vec3 vUV; out vec2 vLight; out float vShade; out vec4 vTint; out float vMask; out float vDist;
+out vec3 vUV; out vec2 vLight; out float vShade; out vec4 vTint; out float vMask; out float vOpaque; out float vDist;
 void main(){ vec3 p = aPos + uOffset; gl_Position = uViewProj*vec4(p,1.0);
- vUV = vec3((aUV - 32768.0) / 4096.0, aLayer); vLight = aLight*15.0; vShade = aFS.y/255.0; vTint = aTint; vMask = mod(aFS.x, 2.0); vDist = length(p.xz); }";
+ vUV = vec3((aUV - 32768.0) / 4096.0, aLayer); vLight = aLight*15.0; vShade = aFS.y/255.0; vTint = aTint; vMask = mod(aFS.x, 2.0); vOpaque = mod(floor(aFS.x / 2.0), 2.0); vDist = length(p.xz); }";
     private static readonly string ChunkFrag = @"#version 330 core
-in vec3 vUV; in vec2 vLight; in float vShade; in vec4 vTint; in float vMask; in float vDist;
+in vec3 vUV; in vec2 vLight; in float vShade; in vec4 vTint; in float vMask; in float vOpaque; in float vDist;
 uniform sampler2DArray uTex; uniform float uAlphaCut; uniform vec3 uFogColor; uniform float uFogStart; uniform float uFogEnd; uniform float uFogDensity; uniform int uFogMode;
 out vec4 o;" + EntityRenderer.LightmapGlsl + @"
-void main(){ vec4 t = texture(uTex, vUV); if (t.a < uAlphaCut) discard;
+void main(){ vec4 t = texture(uTex, vUV); if (vOpaque > 0.5) t.a = 1.0; if (t.a < uAlphaCut) discard;
  vec3 tint = vTint.rgb; if (vMask > 0.5) tint = t.a < 0.99 ? vTint.rgb : vec3(1.0);
  vec3 c = t.rgb * tint * vShade * lightmap(vLight.x, vLight.y);
  float fog = uFogMode==1 ? 1.0-exp(-uFogDensity*vDist) : clamp((vDist-uFogStart)/(uFogEnd-uFogStart),0.0,1.0);
@@ -188,6 +190,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
     private void BuildCelestialTextures()
     {
+        _sunTex?.Dispose(); _moonTex?.Dispose();
+        var packSun = ResourcePacks.ReadImage("environment/sun.png");
+        var packMoon = ResourcePacks.ReadImage("environment/moon_phases.png")?.RequireSize(i => i.W == i.H * 2, "szerokość = 2 x wysokość (4x2 fazy)");
         var sun = new uint[32 * 32];
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
             {
@@ -199,7 +204,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 else if (d < 26) c = TextureGen.Rgba(200, 160, 60, 90);
                 sun[y * 32 + x] = c;
             }
-        _sunTex = new Texture2D(32, 32, sun);
+        _sunTex = packSun != null ? new Texture2D(packSun.W, packSun.H, packSun.Px) : new Texture2D(32, 32, sun);
         var moon = new uint[32 * 32]; var r = new Rng(3);
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
             {
@@ -211,15 +216,21 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                     moon[y * 32 + x] = TextureGen.Rgba(g, g, g + 10);
                 }
             }
-        _moonTex = new Texture2D(32, 32, moon);
-        _sunSh = new Shader(SunVert, SunFrag, "sun");
+        // moon_phases.png z 1.8: 4x2 fazy księżyca
+        _moonPhases = packMoon != null;
+        _moonTex = _moonPhases ? new Texture2D(packMoon.W, packMoon.H, packMoon.Px) : new Texture2D(32, 32, moon);
+        _sunSh ??= new Shader(SunVert, SunFrag, "sun");
     }
 
     private const float CloudY = 108.33f;
-    private const int CloudCells = 128, CloudCell = 12;
+    private const int CloudCell = 12;
+    /// <summary>Rozmiar wzoru chmur w komórkach (128 wygenerowany, 256 z environment/clouds.png).</summary>
+    private int CloudCells = 128;
     private void BuildClouds()
     {
         // wzór chmur 128x128 komórek, kafelkowalny
+        _cloudMesh?.Dispose(); _cloudMesh = null;
+        CloudCells = 128;
         var r = new Rng(1234);
         var grid = new bool[CloudCells * CloudCells];
         var n1 = new float[CloudCells * CloudCells];
@@ -238,6 +249,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
                 }
         }
         for (int i = 0; i < grid.Length; i++) grid[i] = n1[i] + r.NextFloat() * 0.08f > 0.6f;
+        // environment/clouds.png z paczki: piksel nieprzezroczysty = komórka chmury (jak RenderGlobal 1.8)
+        if (ResourcePacks.ReadImage("environment/clouds.png")?.RequireSize(i => i.W == i.H && i.W is >= 16 and <= 512, "kwadrat od 16 do 512 pikseli") is { } ci)
+        {
+            CloudCells = ci.W;
+            grid = new bool[CloudCells * CloudCells];
+            for (int i = 0; i < grid.Length; i++) grid[i] = ci.Px[i] >> 24 >= 128;
+        }
         bool G(int x, int y) => grid[((y % CloudCells + CloudCells) % CloudCells) * CloudCells + ((x % CloudCells + CloudCells) % CloudCells)];
         var v = new List<float>();
         void Q(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float s) { foreach (var p in new[] { a, b, c, d }) { v.Add(p.X); v.Add(p.Y); v.Add(p.Z); v.Add(s); } }
@@ -721,7 +739,9 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             _sunSh.Use();
             var skyVp = view.ClearTranslation() * proj;
             DrawCelestial(_sunTex, sunDir * 100, 30, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
-            DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
+            int phase = w.MoonPhase;
+            if (_moonPhases) DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)), phase % 4 / 4f, phase / 4 / 2f, (phase % 4 + 1) / 4f, (phase / 4 + 1) / 2f);
+            else DrawCelestial(_moonTex, -sunDir * 100, 20, skyVp, new Vector4(1, 1, 1, 1 - w.RainAt(pt)));
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             }
         }
@@ -764,7 +784,7 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
             if (e == viewer && !thirdPerson) continue;
             if (e is Player pp && pp.Spectator) continue;
             double eds = e.DistanceSq(cam.X, cam.Y, cam.Z);
-            if (eds > maxD * maxD || !InRenderRange(e, eds, rangeWeight)) continue;
+            if (!(FarEntities ? InsideFog(e, cam) : eds <= maxD * maxD && InRenderRange(e, eds, rangeWeight))) continue;
             var bb = e.BoundingBox.Grow(0.5);
             if (!InFrustum(new Vector3((float)(bb.MinX - cam.X), (float)(bb.MinY - cam.Y), (float)(bb.MinZ - cam.Z)), new Vector3((float)(bb.MaxX - cam.X), (float)(bb.MaxY - cam.Y), (float)(bb.MaxZ - cam.Z)))) continue;
             if (e is TntEntity tnt && _tnt != null)
@@ -894,6 +914,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         return distSq < d * d;
     }
 
+    /// <summary>Tryb „Dalekie postacie”: encja rysowana, dopóki leży przed granicą mgły liczonej poziomo, jak w shaderze encji.</summary>
+    private bool InsideFog(Entity e, Vector3d cam)
+    {
+        double dx = e.X - cam.X, dz = e.Z - cam.Z;
+        return dx * dx + dz * dz < (double)FogEnd * FogEnd;
+    }
+
     private static Vector3 cam_(Vector3d c) => new((float)c.X, (float)c.Y, (float)c.Z);
     private void _camRightUp(Matrix4 view)
     {
@@ -915,13 +942,13 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
         b.Quad(new(x1, y1, z1), new(x1, y0, z1), new(x1, y0, z0), new(x1, y1, z0), 0, 0, 1, 1, 1);
     }
 
-    private void DrawCelestial(Texture2D tex, Vector3 c, float size, Matrix4 vp, Vector4 col)
+    private void DrawCelestial(Texture2D tex, Vector3 c, float size, Matrix4 vp, Vector4 col, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1)
     {
         var n = Vector3.Normalize(c);
         var t1 = Vector3.Normalize(Vector3.Cross(n, Vector3.UnitZ)); var t2 = Vector3.Cross(n, t1);
         t1 *= size / 2; t2 *= size / 2;
         var pts = new[] { c - t1 - t2, c - t1 + t2, c + t1 + t2, c + t1 - t2 };
-        float[] uv = { 0, 0, 0, 1, 1, 1, 1, 0 };
+        float[] uv = { u0, v0, u0, v1, u1, v1, u1, v0 };
         var v = new float[20];
         for (int i = 0; i < 4; i++) { v[i * 5] = pts[i].X; v[i * 5 + 1] = pts[i].Y; v[i * 5 + 2] = pts[i].Z; v[i * 5 + 3] = uv[i * 2]; v[i * 5 + 4] = uv[i * 2 + 1]; }
         _sunMesh.Upload(v, 20);
@@ -958,12 +985,38 @@ in vec2 vUV; uniform sampler2D uTex; uniform vec4 uColor; out vec4 o; void main(
 
     // ================= animowane tekstury =================
     private int _animTick;
+    /// <summary>Animacje z paczek zasobów: warstwa atlasu i ostatnio wgrana klatka.</summary>
+    private readonly Dictionary<string, (int layer, int frame)> _packAnim = new();
     public void TickAnimations()
     {
         _animTick++;
+        foreach (var (name, anim) in TextureGen.AtlasAnimations)
+        {
+            int frame = anim.FrameAt(_animTick);
+            if (!_packAnim.TryGetValue(name, out var st)) st = (TextureGen.Layer(name), -1);
+            if (st.frame != frame) { Terrain.UpdateLayer(st.layer, anim.Frames[frame]); _packAnim[name] = (st.layer, frame); }
+        }
         if (_animTick % 2 != 0) return;
-        if (TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, wf[(_animTick / 2) % wf.Count]);
-        if (_animTick % 4 == 0 && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, lf[(_animTick / 4) % lf.Count]);
+        if (!TextureGen.PackOverridden.Contains("water_still") && TextureGen.Animations.TryGetValue("water_still", out var wf)) Terrain.UpdateLayer(_waterLayer, TextureGen.ToAtlas(wf[(_animTick / 2) % wf.Count]));
+        if (_animTick % 4 == 0 && !TextureGen.PackOverridden.Contains("lava_still") && TextureGen.Animations.TryGetValue("lava_still", out var lf)) Terrain.UpdateLayer(_lavaLayer, TextureGen.ToAtlas(lf[(_animTick / 4) % lf.Count]));
+    }
+
+    /// <summary>Atlas terenu w rozmiarze TextureGen.AtlasSize; mipmapy aż do 1x1 (16: 4 poziomy jak dotąd).</summary>
+    private static TextureArray NewTerrainArray()
+    {
+        int size = TextureGen.AtlasSize;
+        return new TextureArray(size, TextureGen.AtlasLayers(), true, (int)Math.Log2(size));
+    }
+
+    /// <summary>Po zmianie paczek zasobów: atlas terenu od nowa (rozmiar mógł się zmienić przy paczce HD).</summary>
+    public void ReloadTextures()
+    {
+        var old = Terrain;
+        Terrain = NewTerrainArray();
+        Entities.TerrainTex = Terrain;
+        old.Dispose();
+        _packAnim.Clear();
+        Entities.ClearTextureCaches();
     }
 
     // ================= cząsteczki =================

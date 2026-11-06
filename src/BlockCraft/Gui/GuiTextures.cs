@@ -15,15 +15,51 @@ public sealed class GuiTextures : IDisposable
 
     private static uint C(uint hex, int a = 255) => TextureGen.Hex(hex, a);
 
-    public GuiTextures()
+    private readonly Func<string, RawImage> _readImage;
+
+    /// <param name="readImage">Obraz z paczek zasobów (ścieżka względem textures/), null = brak.</param>
+    public GuiTextures(Func<string, RawImage> readImage)
     {
-        Widgets = new Texture2D(256, 256, MakeWidgets());
-        Icons = new Texture2D(256, 256, MakeIcons());
+        _readImage = readImage;
+        // obszary jak w gui/widgets.png i gui/icons.png z 1.8; poza nimi zostają nasze dodatki (np. zakładki kreatywne)
+        Widgets = Compose(MakeWidgets(), "gui/widgets.png", new[] { (0, 0, 182, 22), (0, 22, 24, 24), (0, 46, 200, 60) });
+        Icons = Compose(MakeIcons(), "gui/icons.png", new[] { (0, 0, 256, 80) });
         Logo = MakeLogo();
-        var d = TextureGen.Get("dirt");
-        var dirt = new uint[256];
-        for (int i = 0; i < 256; i++) dirt[i] = d[i];
-        Dirt = new Texture2D(16, 16, dirt);
+        // wszystkie okna od razu, póki archiwa paczek są otwarte (zamyka je CloseAll po przeładowaniu)
+        foreach (var texture in PackContainerLayout.ByTexture.Keys) Container(texture);
+        var bg = _readImage("gui/options_background.png");
+        if (bg != null) Dirt = new Texture2D(bg.W, bg.H, bg.Px) { LogicalWidth = 16, LogicalHeight = 16 };
+        else
+        {
+            var d = TextureGen.Get("dirt");
+            var dirt = new uint[256];
+            for (int i = 0; i < 256; i++) dirt[i] = d[i];
+            Dirt = new Texture2D(16, 16, dirt);
+        }
+    }
+
+    /// <summary>Tekstura 256x256 wygenerowana w grze z wklejonymi obszarami z paczki (paczka HD: całość w jej rozdzielczości).</summary>
+    private Texture2D Compose(uint[] generated, string packPath, (int x, int y, int w, int h)[] regions)
+    {
+        var img = _readImage(packPath)?.RequireSize(IsSquareGui, SquareGuiSize);
+        if (img == null) return new Texture2D(256, 256, generated);
+        int k = img.W / 256;
+        var dst = new RawImage { W = 256, H = 256, Px = generated }.Upscale(k);
+        foreach (var (x, y, w, h) in regions) dst.Paste(img, x * k, y * k, w * k, h * k);
+        return new Texture2D(dst.W, dst.H, dst.Px) { LogicalWidth = 256, LogicalHeight = 256 };
+    }
+
+    private const string SquareGuiSize = "kwadrat 256x256 albo jego wielokrotność";
+    private static bool IsSquareGui(RawImage i) => i.W == i.H && i.W >= 256 && i.W % 256 == 0;
+
+    private readonly Dictionary<string, Texture2D> _containers = new();
+    /// <summary>Tło okna z paczki (gui/container/NAZWA.png, współrzędne jak w 1.8, 256x256) albo null = rysowane przez grę.</summary>
+    public Texture2D Container(string name)
+    {
+        if (_containers.TryGetValue(name, out var t)) return t;
+        var img = _readImage("gui/container/" + name + ".png")?.RequireSize(IsSquareGui, SquareGuiSize);
+        if (img != null) t = new Texture2D(img.W, img.H, img.Px) { LogicalWidth = 256, LogicalHeight = 256 };
+        return _containers[name] = t;
     }
 
     private static void Fill(uint[] p, int x, int y, int w, int h, uint c) { for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) if (x + i < 256 && y + j < 256) p[(y + j) * 256 + x + i] = c; }
@@ -240,5 +276,9 @@ public sealed class GuiTextures : IDisposable
         return new Texture2D(w, h, outP);
     }
 
-    public void Dispose() { Widgets.Dispose(); Icons.Dispose(); Logo.Dispose(); Dirt.Dispose(); }
+    public void Dispose()
+    {
+        Widgets.Dispose(); Icons.Dispose(); Logo.Dispose(); Dirt.Dispose();
+        foreach (var t in _containers.Values) t?.Dispose();
+    }
 }

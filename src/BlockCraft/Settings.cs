@@ -14,6 +14,8 @@ public sealed class Settings
     public bool SmoothLighting { get; set; } = true;
     public bool FancyGraphics { get; set; } = true;
     public bool Clouds { get; set; } = true;
+    /// <summary>Encje widoczne aż do granicy mgły (wyłaniają się z niej) zamiast znikać wg rozmiaru jak w MC.</summary>
+    public bool FarEntities { get; set; } = true;
     public bool ViewBobbing { get; set; } = true;
     public float Brightness { get; set; } = 0.5f;
     public bool VSync { get; set; } = true;
@@ -27,6 +29,14 @@ public sealed class Settings
     public string GpuProfileFor { get; set; } = "";
     /// <summary>Głośności kategorii dźwięku (master, music, record, weather, block, hostile, neutral, player, ambient), 0..1.</summary>
     public Dictionary<string, float> SoundVolumes { get; set; } = new();
+    /// <summary>Aktywne paczki zasobów (nazwy w resourcepacks/), pierwsza ma pierwszeństwo.</summary>
+    public List<string> ResourcePacks { get; set; } = new();
+    /// <summary>Dodatkowe źródła paczek: foldery i repozytoria git (URL, opcjonalnie "#gałąź").</summary>
+    public List<string> PackSources { get; set; } = new();
+    /// <summary>Język nazw przedmiotów z plików .lang MC 1.8 (np. "en_US"); pusty = polskie nazwy gry.</summary>
+    public string Language { get; set; } = "";
+    /// <summary>Największa rozdzielczość tekstur bloków z paczek (16, 32, 64, 128); większe paczki są zmniejszane.</summary>
+    public int MaxPackTextureSize { get; set; } = 64;
     /// <summary>Własny przekaźnik sieci (np. gry.fimson.pl); puste = publiczne przekaźniki Tailscale.</summary>
     public string Relay { get; set; } = "";
 
